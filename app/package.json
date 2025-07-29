@@ -1,0 +1,23 @@
+{
+  "name": "app",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "catalog:app"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitejs/plugin-vue": "catalog:app",
+    "@vue/tsconfig": "catalog:app",
+    "unplugin-auto-import": "catalog:app",
+    "unplugin-vue-router": "catalog:app",
+    "vite": "catalog:app",
+    "vue-tsc": "catalog:app"
+  }
+}
