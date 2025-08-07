@@ -1,21 +1,40 @@
 <script setup lang="ts">
-import { sum } from '@clippa/utils'
+import { Director, Theater, Video } from 'open-clippa'
 
-const a = ref(0)
-const b = ref(0)
-const count = ref(0)
+const theater = new Theater('wrapper')
 
-function clickHandle() {
-  a.value++
-  b.value++
+const director = new Director({ theater })
 
-  count.value = sum(a.value, b.value)
+function fileSelected([file]: FileList) {
+  const video = new Video({ src: file, start: 0, duration: 5000 })
+  theater.hire(video)
+
+  video.load().then(() => {
+    director.action()
+  })
 }
 </script>
 
 <template>
-  <HelloWorld />
-  <button @click="clickHandle()">
-    {{ count }}
-  </button>
+  <yy-config-provider theme="dark">
+    <div h-screen flex items-center justify-center>
+      <div text-center>
+        <p text-blue text-4xl mb-5>
+          Open Clippa
+        </p>
+
+        <yy-upload mb-5 @change="fileSelected">
+          <yy-button>上传文件</yy-button>
+        </yy-upload>
+
+        <div id="wrapper" />
+      </div>
+    </div>
+  </yy-config-provider>
 </template>
+
+<style>
+  html {
+  color-scheme: dark;
+}
+</style>

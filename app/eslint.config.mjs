@@ -2,13 +2,9 @@ import antfu from '@antfu/eslint-config'
 
 export default antfu({
   formatters: true,
+  vue: true,
   rules: {
     'no-new': 'off',
   },
-  type: 'lib',
-  pnpm: true,
-}, {
-  rules: {
-    'ts/consistent-type-definitions': 'off',
-  },
+  type: 'app',
 })

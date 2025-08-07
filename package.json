@@ -13,6 +13,10 @@
     "prepare": "husky",
     "commitlint": "commitlint --edit"
   },
+  "dependencies": {
+    "open-clippa": "workspace:^",
+    "pixi.js": "catalog:"
+  },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:",
     "@commitlint/cli": "catalog:",

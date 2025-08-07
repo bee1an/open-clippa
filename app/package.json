@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "catalog:app"
+    "unocss": "catalog:app",
+    "vue": "catalog:app",
+    "yy-craft": "catalog:app"
   },
   "devDependencies": {
     "@types/node": "catalog:",

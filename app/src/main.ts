@@ -1,5 +1,8 @@
 import { createApp } from 'vue'
+import yyCraft from 'yy-craft'
 import App from './App.vue'
-import './style.css'
+import 'virtual:uno.css'
 
-createApp(App).mount('#app')
+createApp(App).use(
+  yyCraft,
+).mount('#app')
