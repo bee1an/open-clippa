@@ -1,9 +1,10 @@
+import type { RolldownOptions } from 'rolldown'
 import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig } from 'rolldown'
 import { packages } from './internal/common'
 
-const option: any[] = []
+const option: RolldownOptions[] = []
 
 const commonConfig = {}
 
