@@ -17,10 +17,6 @@ director.on('durationChange', (d) => {
 function fileSelected([file]: FileList) {
   const video = new Video({ src: file, start: 0, duration: 5000 })
   theater.hire(video)
-
-  video.load().then(() => {
-    director.action()
-  })
 }
 </script>
 
@@ -32,11 +28,19 @@ function fileSelected([file]: FileList) {
           Open Clippa
         </p>
 
-        <yy-upload mb-2 @change="fileSelected">
-          <yy-button>上传文件</yy-button>
-        </yy-upload>
+        <div mb-2 flex="~" justify-center gap-2>
+          <yy-upload @change="fileSelected">
+            <yy-button>上传文件</yy-button>
+          </yy-upload>
+          <yy-button @click="() => director.action()">
+            开始
+          </yy-button>
+          <yy-button @click="() => director.stop()">
+            暂停
+          </yy-button>
+        </div>
 
-        <p mb-2 text-left>
+        <p mb-2 text-center>
           {{ currentTime }} / {{ duration }}
         </p>
 
