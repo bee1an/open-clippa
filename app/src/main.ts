@@ -5,4 +5,8 @@ import 'virtual:uno.css'
 
 createApp(App).use(
   yyCraft,
-).mount('#app')
+).use({
+  install(_) {
+    // console.log('123', _._context.components)
+  },
+}).mount('#app')

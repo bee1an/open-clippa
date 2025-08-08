@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Director, Theater, Video } from 'open-clippa'
 
-const theater = new Theater('wrapper')
+const theater = new Theater({ siteId: 'wrapper', width: 600, height: 400 })
 
 const director = new Director({ theater })
 
@@ -18,11 +18,16 @@ function fileSelected([file]: FileList) {
   const video = new Video({ src: file, start: 0, duration: 5000 })
   theater.hire(video)
 }
+
+const sliderValue = ref(0)
+watch(currentTime, () => {
+  sliderValue.value = currentTime.value / duration.value
+})
 </script>
 
 <template>
   <yy-config-provider theme="dark">
-    <div h-screen flex items-center justify-center>
+    <div h-screen flex="~ col" items-center justify-center>
       <div text-center>
         <p text-blue text-4xl mb-5>
           Open Clippa
@@ -39,13 +44,14 @@ function fileSelected([file]: FileList) {
             暂停
           </yy-button>
         </div>
-
-        <p mb-2 text-center>
-          {{ currentTime }} / {{ duration }}
-        </p>
-
-        <div id="wrapper" />
       </div>
+      <div id="wrapper" mb-5 />
+      <div w-130 mb-2>
+        <yy-slider v-model="sliderValue" :max="1" />
+      </div>
+      <p>
+        {{ currentTime }} / {{ duration }}
+      </p>
     </div>
   </yy-config-provider>
 </template>

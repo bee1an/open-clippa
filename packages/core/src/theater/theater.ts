@@ -1,19 +1,9 @@
 import type { Performer } from '@clippa/performer'
 import type { MaybeArray } from 'type-aide'
+import type { TheaterEvents } from './events'
+import type { TheaterOption } from './option'
 import { EventBus } from '@clippa/utils'
 import { Application } from 'pixi.js'
-
-export type TheaterEvents = {
-  /**
-   * 雇佣
-   */
-  hire: [Performer]
-
-  /**
-   * 延迟添加
-   */
-  delayedAdd: [Performer]
-}
 
 export class Theater extends EventBus<TheaterEvents> {
   private _app!: Application
@@ -26,16 +16,18 @@ export class Theater extends EventBus<TheaterEvents> {
     return this._performers
   }
 
-  constructor(siteId: string) {
+  constructor(option: TheaterOption) {
     super()
-    this._initial(siteId)
+    this._initial(option)
   }
 
-  private async _initial(siteId: string): Promise<Application> {
+  private async _initial(option: TheaterOption): Promise<Application> {
+    const { siteId } = option
+
     const app = new Application()
     this._app = app
 
-    await app.init()
+    await app.init(option)
 
     const theaterWrapper = document.getElementById(siteId)
 
