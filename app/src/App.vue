@@ -5,6 +5,15 @@ const theater = new Theater('wrapper')
 
 const director = new Director({ theater })
 
+const currentTime = ref(0)
+director.on('updateCurrentTime', (t) => {
+  currentTime.value = t
+})
+const duration = ref(0)
+director.on('durationChange', (d) => {
+  duration.value = d
+})
+
 function fileSelected([file]: FileList) {
   const video = new Video({ src: file, start: 0, duration: 5000 })
   theater.hire(video)
@@ -23,9 +32,13 @@ function fileSelected([file]: FileList) {
           Open Clippa
         </p>
 
-        <yy-upload mb-5 @change="fileSelected">
+        <yy-upload mb-2 @change="fileSelected">
           <yy-button>上传文件</yy-button>
         </yy-upload>
+
+        <p mb-2 text-left>
+          {{ currentTime }} / {{ duration }}
+        </p>
 
         <div id="wrapper" />
       </div>

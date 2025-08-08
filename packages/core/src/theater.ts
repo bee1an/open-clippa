@@ -1,5 +1,5 @@
 import type { Performer } from '@clippa/performer'
-import { EventBus } from '@clippa/utils/src/eventBus'
+import { EventBus } from '@clippa/utils'
 import { Application } from 'pixi.js'
 
 export type TheaterEvents = {
@@ -51,7 +51,7 @@ export class Theater extends EventBus<TheaterEvents> {
     preformers: Performer[],
   ): void {
     preformers.forEach(async (p) => {
-      this._app.stage.addChild(p.sprite!) // TODO
+      this._app.stage.addChild(p.sprite!)
     })
   }
 }

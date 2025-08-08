@@ -23,6 +23,8 @@ export class Video implements Performer {
     this.start = start
     this.duration = duration
     this.src = transformSrc(src)
+
+    this.load()
   }
 
   private _loader?: Promise<void>
