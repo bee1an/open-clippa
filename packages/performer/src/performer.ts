@@ -4,6 +4,12 @@ export interface Performer {
   start: number
   duration: number
   sprite?: Sprite
+
+  play: () => void
+
+  pause: () => void
+
+  load: () => Promise<void>
 }
 
 export interface PerformerOption {

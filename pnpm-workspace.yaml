@@ -16,6 +16,7 @@ catalog:
   pixi.js: ^8.12.0
   rolldown: 1.0.0-beta.29
   tsx: ^4.20.3
+  type-aide: ^0.0.2
   typescript: ^5.8.3
   unplugin-vue-components: ^29.0.0
   vitest: ^3.2.4

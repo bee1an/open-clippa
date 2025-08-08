@@ -30,6 +30,7 @@
     "lint-staged": "catalog:",
     "rolldown": "catalog:",
     "tsx": "catalog:",
+    "type-aide": "catalog:",
     "typescript": "catalog:",
     "unplugin-vue-components": "catalog:",
     "vitest": "catalog:",

@@ -1,3 +1,4 @@
+import type { Performer } from '@clippa/performer'
 import type { Theater } from '../theater'
 import type { DirectorEvents } from './events'
 import type { DirectorOption } from './options'
@@ -58,18 +59,34 @@ export class Director extends EventBus<DirectorEvents> {
   guidance(theater: Theater): void {
     this.theater = theater
 
+    const tryAdd = (p: Performer): any => this.checkPerformerInShowTime(p) && this.theater.add(p)
+
     this.theater.on('hire', (performer) => {
       if (performer.start + performer.duration > this.duration) {
         this.duration = performer.start + performer.duration
       }
+
+      tryAdd(performer)
     })
+
+    this.theater.on('delayedAdd', tryAdd)
+  }
+
+  /**
+   * 检查表演者是否在当前时间段
+   */
+  checkPerformerInShowTime(performer: Performer): boolean {
+    return this.currentTime >= performer.start && this.currentTime < performer.start + performer.duration
   }
 
   private _requestAnimationFrameId?: number
   /** 循环函数 */
   private _start(): void {
-    const preformers = this.theater.filterPerformerByTime(this.currentTime)
-    this.theater.performance(preformers)
+    const { added, removed } = this.updatePerformers()
+
+    added.forEach(p => p.play())
+    removed.forEach(p => p.pause())
+
     const time = Date.now()
 
     this._requestAnimationFrameId = requestAnimationFrame(() => {
@@ -102,5 +119,25 @@ export class Director extends EventBus<DirectorEvents> {
    */
   stop(): void {
     typeof this._requestAnimationFrameId === 'number' && cancelAnimationFrame(this._requestAnimationFrameId)
+
+    const preformers = this.theater.filterPerformerByTime(this.currentTime)
+
+    preformers.forEach((p) => {
+      p.pause()
+    })
+  }
+
+  /**
+   * 根据当前时间更新表演者
+   */
+  updatePerformers(): { added: Performer[], removed: Performer[] } {
+    const added: Performer[] = []
+    const removed: Performer[] = []
+
+    this.theater.performers.forEach((p) => {
+      this.checkPerformerInShowTime(p) ? added.push(p) : removed.push(p)
+    })
+
+    return { added, removed }
   }
 }
