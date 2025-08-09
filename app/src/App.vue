@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Director, Theater, Video } from 'open-clippa'
+import { Director, Stage, Theater, Video } from 'open-clippa'
 
-const theater = new Theater({ siteId: 'wrapper', width: 600, height: 400 })
+const theater = new Theater()
 
-const director = new Director({ theater })
+const stage = new Stage({ id: 'wrapper', width: 600, height: 400 })
+
+const director = new Director({ theater, stage })
 
 const currentTime = ref(0)
 director.on('updateCurrentTime', (t) => {

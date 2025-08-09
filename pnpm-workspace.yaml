@@ -32,4 +32,4 @@ catalogs:
     vite: ^7.0.4
     vue: ^3.5.18
     vue-tsc: ^3.0.5
-    yy-craft: ^1.1.0
+    yy-craft: ^1.1.1

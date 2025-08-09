@@ -1,4 +1,5 @@
 import type { Performer } from '@clippa/performer'
+import type { Stage } from '../stage'
 import type { Theater } from '../theater'
 import type { DirectorEvents } from './events'
 import type { DirectorOption } from './option'
@@ -9,6 +10,16 @@ export class Director extends EventBus<DirectorEvents> {
    * 剧场
    */
   theater!: Theater
+
+  /**
+   * 舞台
+   */
+  stage!: Stage
+
+  /**
+   * 是否播放中
+   */
+  private _playing: boolean = false
 
   /**
    * 当前播放时间
@@ -48,28 +59,35 @@ export class Director extends EventBus<DirectorEvents> {
 
   constructor(option: DirectorOption) {
     super()
-    option.theater && this.guidance(option.theater)
+    this.guidance(option.stage)
+    this.manage(option.theater)
   }
 
   /**
    * 给当前导演对象绑定剧场对象
-   *
-   * 自动监听剧场对象的 hire 事件
    */
-  guidance(theater: Theater): void {
+  manage(theater: Theater): void {
     this.theater = theater
-
-    const tryAdd = (p: Performer): any => this.checkPerformerInShowTime(p) && this.theater.add(p)
 
     this.theater.on('hire', (performer) => {
       if (performer.start + performer.duration > this.duration) {
         this.duration = performer.start + performer.duration
       }
 
-      tryAdd(performer)
+      this.checkPerformerInShowTime(performer) && this.stage.add(performer)
     })
+  }
 
-    this.theater.on('delayedAdd', tryAdd)
+  /**
+   * 给导演对象绑定舞台对象
+   */
+  guidance(stage: Stage): void {
+    this.stage = stage
+
+    this.stage.on(
+      'delayedAdd',
+      (p: Performer): any => this.checkPerformerInShowTime(p) && this.stage.add(p),
+    )
   }
 
   /**
@@ -84,8 +102,14 @@ export class Director extends EventBus<DirectorEvents> {
   private _start(): void {
     const { added, removed } = this.updatePerformers()
 
-    added.forEach(p => p.play())
-    removed.forEach(p => p.pause())
+    added.forEach((p) => {
+      this.stage.add(p)
+      p.play()
+    })
+    removed.forEach((p) => {
+      this.stage.remove(p)
+      p.pause()
+    })
 
     const time = Date.now()
 
@@ -111,6 +135,9 @@ export class Director extends EventBus<DirectorEvents> {
    * 会在剧场对象中过滤出当前时间段的表演者
    */
   action(): void {
+    if (this._playing)
+      return
+    this._playing = true
     this._start()
   }
 
@@ -118,11 +145,14 @@ export class Director extends EventBus<DirectorEvents> {
    * 停止
    */
   stop(): void {
-    typeof this._requestAnimationFrameId === 'number' && cancelAnimationFrame(this._requestAnimationFrameId)
+    if (!this._playing)
+      return
+    this._playing = false
 
-    const preformers = this.theater.filterPerformerByTime(this.currentTime)
+    typeof this._requestAnimationFrameId === 'number'
+    && cancelAnimationFrame(this._requestAnimationFrameId)
 
-    preformers.forEach((p) => {
+    this.stage.performers.forEach((p) => {
       p.pause()
     })
   }

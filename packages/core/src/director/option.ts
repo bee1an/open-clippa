@@ -1,5 +1,8 @@
+import type { Stage } from '../stage'
 import type { Theater } from '../theater'
 
 export interface DirectorOption {
-  theater?: Theater
+  theater: Theater
+
+  stage: Stage
 }
