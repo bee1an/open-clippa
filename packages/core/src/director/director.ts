@@ -3,6 +3,7 @@ import type { Stage } from '../stage'
 import type { Theater } from '../theater'
 import type { DirectorEvents } from './events'
 import type { DirectorOption } from './option'
+import { ShowState } from '@clippa/performer'
 import { EventBus } from '@clippa/utils'
 
 export class Director extends EventBus<DirectorEvents> {
@@ -100,16 +101,10 @@ export class Director extends EventBus<DirectorEvents> {
   private _requestAnimationFrameId?: number
   /** 循环函数 */
   private _start(): void {
-    const { added, removed } = this.updatePerformers()
-
-    added.forEach((p) => {
-      this.stage.add(p)
-      p.play()
-    })
-    removed.forEach((p) => {
-      this.stage.remove(p)
-      p.pause()
-    })
+    this.updatePerformers({ in: (p) => {
+      const pCurrentTime = this.currentTime - p.start
+      p.playState === 'paused' ? p.play(pCurrentTime) : p.update(pCurrentTime)
+    } })
 
     const time = Date.now()
 
@@ -141,10 +136,7 @@ export class Director extends EventBus<DirectorEvents> {
     this._start()
   }
 
-  /**
-   * 停止
-   */
-  stop(): void {
+  private _stop(cb?: (p: Performer) => void): void {
     if (!this._playing)
       return
     this._playing = false
@@ -153,21 +145,57 @@ export class Director extends EventBus<DirectorEvents> {
     && cancelAnimationFrame(this._requestAnimationFrameId)
 
     this.stage.performers.forEach((p) => {
-      p.pause()
+      p.pause(this.currentTime - p.start)
+      cb?.(p)
+    })
+  }
+
+  /**
+   * 停止
+   */
+  stop(): void {
+    this._stop()
+  }
+
+  /**
+   * 寻帧
+   */
+  seek(time: number): void {
+    const removeHelper = (p: Performer): void => {
+      this.stage.remove(p)
+      p.showState = ShowState.UNPLAYED
+    }
+
+    this._stop(removeHelper)
+
+    // 暂停时切帧
+    this.stage.performers.forEach(removeHelper)
+
+    this.currentTime = time
+
+    this.updatePerformers({
+      in: p => p.seek(this.currentTime - p.start),
     })
   }
 
   /**
    * 根据当前时间更新表演者
    */
-  updatePerformers(): { added: Performer[], removed: Performer[] } {
-    const added: Performer[] = []
-    const removed: Performer[] = []
-
+  updatePerformers(cb?: {
+    in?: (p: Performer) => void
+    out?: (p: Performer) => void
+  }): void {
     this.theater.performers.forEach((p) => {
-      this.checkPerformerInShowTime(p) ? added.push(p) : removed.push(p)
+      if (this.checkPerformerInShowTime(p)) {
+        p.showState !== 'playing' && this.stage.add(p)
+        cb?.in?.(p)
+      }
+      else {
+        // 暂停属于移除出舞台的默认行为
+        p.showState === 'playing' && this.stage.remove(p)
+        p.pause(this.currentTime - p.start)
+        cb?.out?.(p)
+      }
     })
-
-    return { added, removed }
   }
 }

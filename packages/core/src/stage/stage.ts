@@ -57,7 +57,6 @@ export class Stage extends EventBus<StageEvents> {
       if (p.sprite) {
         this._app.stage.addChild(p.sprite)
       }
-
       else {
         this.addNotReady(p)
       }

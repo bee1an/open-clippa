@@ -21,10 +21,20 @@ function fileSelected([file]: FileList) {
   theater.hire(video)
 }
 
+const video = new Video({ src: 'https://pixijs.com/assets/video.mp4', start: 0, duration: 5000 })
+theater.hire(video)
+
+const video1 = new Video({ src: '/bunny.mp4', start: 4000, duration: 9000, width: 300, height: 200, x: 100, y: 100 })
+theater.hire(video1)
+
 const sliderValue = ref(0)
 watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
+
+function seekBySlider(value: number) {
+  director.seek(value * duration.value)
+}
 </script>
 
 <template>
@@ -49,7 +59,7 @@ watch(currentTime, () => {
       </div>
       <div id="wrapper" mb-5 />
       <div w-130 mb-2>
-        <yy-slider v-model="sliderValue" :max="1" />
+        <yy-slider v-model="sliderValue" :max="1" @change="seekBySlider" />
       </div>
       <p>
         {{ currentTime }} / {{ duration }}

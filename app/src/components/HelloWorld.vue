@@ -1,9 +1,7 @@
-<script setup lang="ts">
-import { HelloWorld } from '@clippa/core'
-
-const helloWorld = ref(new HelloWorld('333'))
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <div>{{ helloWorld.msg }}</div>
+  <div />
 </template>
+
+<style scoped></style>

@@ -1,0 +1,11 @@
+[build]
+publish = "app/dist"
+command = "pnpm run build:app"
+
+[build.environment]
+NODE_VERSION = "23"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
