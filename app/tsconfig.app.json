@@ -7,6 +7,7 @@
       "@clippa/*": ["../packages/*"]
     },
 
+    "types": ["unplugin-vue-router/client"],
     /* Linting */
     "strict": true,
     "noFallthroughCasesInSwitch": true,

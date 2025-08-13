@@ -1,8 +1,8 @@
 import type { Texture, TextureSource, VideoResource } from 'pixi.js'
-import type { Performer, PerformerOption } from './performer'
+import type { Performer, PerformerOption } from '../performer'
 import { transformSrc } from '@clippa/utils'
 import { Assets, Sprite, VideoSource } from 'pixi.js'
-import { PlayState, ShowState } from './performer'
+import { PlayState, ShowState } from '../performer'
 
 VideoSource.defaultOptions.autoPlay = false
 
