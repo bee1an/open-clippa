@@ -47,11 +47,11 @@ export class Stage extends EventBus<StageEvents> {
    * 如果表演者没有准备好会在表演者加载完成后再尝试添加
    */
   add(
-    preformers: MaybeArray<Performer>,
+    performers: MaybeArray<Performer>,
   ): void {
-    preformers = Array.isArray(preformers) ? preformers : [preformers]
+    performers = Array.isArray(performers) ? performers : [performers]
 
-    preformers.forEach(async (p) => {
+    performers.forEach(async (p) => {
       this._performers.add(p)
 
       if (p.sprite) {
@@ -67,11 +67,11 @@ export class Stage extends EventBus<StageEvents> {
    * 将表演者从舞台移除
    */
   remove(
-    preformers: MaybeArray<Performer>,
+    performers: MaybeArray<Performer>,
   ): void {
-    preformers = Array.isArray(preformers) ? preformers : [preformers]
+    performers = Array.isArray(performers) ? performers : [performers]
 
-    preformers.forEach((p) => {
+    performers.forEach((p) => {
       this._performers.delete(p)
 
       if (p.sprite)

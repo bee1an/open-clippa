@@ -1,5 +1,5 @@
 {
-  "name": "@clippa/core",
+  "name": "@clippa/libretto",
   "version": "0.0.0",
   "packageManager": "pnpm@10.11.0",
   "license": "MIT"

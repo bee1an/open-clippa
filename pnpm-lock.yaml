@@ -186,7 +186,9 @@ importers:
         specifier: catalog:app
         version: 3.0.5(typescript@5.8.3)
 
-  packages/core: {}
+  packages/canvas: {}
+
+  packages/libretto: {}
 
   packages/open-clippa: {}
 
