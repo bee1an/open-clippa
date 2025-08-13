@@ -3,7 +3,11 @@ import { Container, Graphics, Text } from 'pixi.js'
 
 export const RULER_HEIGHT = 28
 
-export const DOT_RADIUS = 2
+export const DOT_RADIUS = 1.5
+
+export const DOT_NUM = 3
+
+export const TICK_FONT_SIZE = 10
 
 export interface RulerOption {
   width: number
@@ -24,23 +28,46 @@ export class Ruler {
     this.duration = Math.max(option.duration, 2500)
     this.width = option.width
     const container = new Container()
+    container.cursor = 'pointer'
+    container.eventMode = 'static'
 
     this.container = container
 
-    this._drawBg()
+    this.render()
+  }
 
-    this.buildTime()
+  /**
+   * Updates the width of the ruler and re-renders the component.
+   *
+   * @param width - The new width to set for the ruler.
+   */
+  updateWidth(width: number): void {
+    this.width = width
+    this.render()
+  }
+
+  /**
+   * Renders the ruler component.
+   *
+   * This method removes all the children of the container and then re-renders the
+   * background and tick elements.
+   */
+  render(): void {
+    this.container.removeChildren()
+    this._drawBg()
+    this._drawTick()
   }
 
   private _drawBg(): void {
     if (this._bg) {
       this._bg.width = this.width
+      this.container.addChild(this._bg)
       return
     }
 
     this._bg = new Graphics()
     this._bg.rect(0, 0, this.width, RULER_HEIGHT)
-    this._bg.fill('#ff000022')
+    this._bg.fill('transparent')
     this.container.addChild(this._bg)
   }
 
@@ -53,10 +80,10 @@ export class Ruler {
     this.container.addChild(graphics)
   }
 
-  private _drawTime(x: number): Text {
+  private _drawTextTime(x: number): Text {
     const text = new Text({
       style: {
-        fontSize: 12,
+        fontSize: TICK_FONT_SIZE,
         fill: '#9595ac',
       },
       x,
@@ -70,10 +97,7 @@ export class Ruler {
     return text
   }
 
-  private _timeTexts: Text[] = []
-
   private _minTickSpacingPx = 120
-
   private get _tickGap(): number {
     if (this.duration < 9000) {
       return Math.max(this.width / (Math.floor((this.duration) / 1000)) * this.scale, this._minTickSpacingPx)
@@ -82,21 +106,33 @@ export class Ruler {
     return Math.max(this.width / 9 * this.scale, this._minTickSpacingPx)
   }
 
-  buildTime(): void {
-    let i = 0
-    let x = 0
+  private _timeTexts: Text[] = []
+  private _drawTick(): void {
+    this._timeTexts.length = 0
 
     const gap = this._tickGap
+    let x = 0
+    let i = 0
 
+    const dotGap = gap / (DOT_NUM + 1)
     for (; i < (this.width / gap) - 1; i++) {
+      Array.from({ length: DOT_NUM }, (_, index): void => {
+        this._drawDot(x + dotGap * (index + 1))
+        return void 0
+      })
+
       x += gap
-      const timeText = this._drawTime(x)
-      this._drawDot(x)
+      const timeText = this._drawTextTime(x)
       this._timeTexts.push(timeText)
     }
 
-    for (let index = 0; index < i; index++) {
-      this._timeTexts[index].text = ms2TimeStr(this._timeTexts[index].x / this.width * this.duration)
-    }
+    Array.from({ length: DOT_NUM }, (_, index): void => {
+      this._drawDot(x + dotGap * (index + 1))
+      return void 0
+    })
+
+    this._timeTexts.forEach((text) => {
+      text.text = ms2TimeStr(text.x / this.width * this.duration)
+    })
   }
 }

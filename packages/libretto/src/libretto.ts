@@ -31,6 +31,7 @@ export class Libretto {
     // https://github.com/pixijs/pixijs/issues/11427
     new ResizeObserver(() => {
       app.resize()
+      this.ruler?.updateWidth(app.screen.width)
     }).observe(wrapper)
 
     wrapper.appendChild(app.canvas)
