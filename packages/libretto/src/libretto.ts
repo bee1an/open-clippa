@@ -1,4 +1,5 @@
 import { Application } from 'pixi.js'
+import { Cursor } from './cursor'
 import { Ruler } from './ruler'
 
 export interface LibrettoOption {
@@ -8,6 +9,7 @@ export interface LibrettoOption {
 export class Libretto {
   app?: Application
   ruler?: Ruler
+  cursor?: Cursor
 
   constructor(private _option: LibrettoOption) {}
 
@@ -30,17 +32,25 @@ export class Libretto {
 
     // https://github.com/pixijs/pixijs/issues/11427
     new ResizeObserver(() => {
-      app.resize()
+      app.queueResize()
       this.ruler?.updateWidth(app.screen.width)
+      this.cursor?.updateHeight(app.screen.height)
     }).observe(wrapper)
 
     wrapper.appendChild(app.canvas)
 
     this._createRuler()
+
+    this._createCursor()
   }
 
   private _createRuler(): void {
     this.ruler = new Ruler({ width: this.app!.screen.width, duration: 3000 * 60 })
     this.app!.stage.addChild(this.ruler.container)
+  }
+
+  private _createCursor(): void {
+    this.cursor = new Cursor({ height: this.app!.screen.height, duration: 3000 * 60 })
+    this.app!.stage.addChild(this.cursor.container)
   }
 }
