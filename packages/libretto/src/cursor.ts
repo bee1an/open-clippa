@@ -3,14 +3,22 @@ import { Container, Graphics } from 'pixi.js'
 export interface CursorOption {
   duration: number
   height: number
+  width: number
+  screenWidth: number
 }
 
 export class Cursor {
   container: Container
+  currentTime: number = 0
   duration: number
+
+  width: number
+  screenWidth: number
 
   constructor(option: CursorOption) {
     this.duration = option.duration
+    this.width = option.width
+    this.screenWidth = option.screenWidth
 
     this.container = new Container()
     this.container.cursor = 'pointer'
@@ -57,12 +65,18 @@ export class Cursor {
     const move = (e: PointerEvent): void => {
       const dx = e.x - x!
 
-      const targetX = this.container.x + dx
-      if (targetX >= 0) {
-        // 坐边界判断
-        this.container.x += dx
-        x = e.x
+      x = e.x
+
+      this.container.x += dx
+
+      // 左边界判断
+      if (this.container.x < 0) {
+        this.container.x = 0
       }
+
+      // TODO: 右边界判断
+
+      this.currentTime = (this.container.x / this.container.width) * this.duration
     }
 
     const up = (): void => {
@@ -77,7 +91,21 @@ export class Cursor {
     })
   }
 
+  updateWidth(width: number): void {
+    this.width = width
+  }
+
+  updateScreenWidth(width: number): void {
+    this.screenWidth = width
+  }
+
   updateHeight(height: number): void {
     this._drawBody(height)
+  }
+
+  seek(time: number): void {
+    this.currentTime = time
+
+    this.container.x = ((this.currentTime / this.duration) * this.width) - 10
   }
 }
