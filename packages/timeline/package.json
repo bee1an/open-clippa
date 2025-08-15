@@ -1,5 +1,5 @@
 {
-  "name": "@clippa/libretto",
+  "name": "@clippa/timeline",
   "version": "0.0.0",
   "packageManager": "pnpm@10.11.0",
   "license": "MIT"

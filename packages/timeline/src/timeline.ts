@@ -1,19 +1,21 @@
-import { Application, Graphics } from 'pixi.js'
+import { Application } from 'pixi.js'
 import { Cursor } from './cursor'
-import { Ruler } from './ruler'
+import { Rail, RAIL_HEIGHT } from './rail'
+import { Ruler, RULER_HEIGHT } from './ruler'
 import { ScrollBox } from './scrollBox'
 
-export interface LibrettoOption {
+export interface TimelineOption {
   id: string
 }
 
-export class Libretto {
+export class Timeline {
   app?: Application
   ruler?: Ruler
   cursor?: Cursor
   scroller: ScrollBox = new ScrollBox({ viewportWidth: 0, viewportHeight: 0 })
+  rails: Rail[] = []
 
-  constructor(private _option: LibrettoOption) {}
+  constructor(private _option: TimelineOption) {}
 
   async initial(): Promise<void> {
     const { id } = this._option
@@ -52,17 +54,10 @@ export class Libretto {
     wrapper.appendChild(app.canvas)
 
     this._createRuler()
+
+    this._crateRails()
+
     this._createCursor()
-
-    this.mock()
-  }
-
-  mock(): void {
-    const graphics = new Graphics()
-    graphics.roundRect(5, 50, 1000, 40, 10)
-    graphics.fill('#ffffffaa')
-
-    this.scroller.container.addChild(graphics)
   }
 
   private _createRuler(): void {
@@ -86,5 +81,16 @@ export class Libretto {
       duration: 1000 * 60,
     })
     this.scroller.container.addChild(this.cursor.container)
+  }
+
+  private _crateRails(): void {
+    let y = RULER_HEIGHT
+    for (let index = 0; index < 5; index++) {
+      const rail = new Rail({ width: Math.max(this.app!.stage.width, this.app!.screen.width), y })
+
+      this.rails.push(rail)
+      this.scroller.container.addChild(rail.container)
+      y += RAIL_HEIGHT
+    }
   }
 }

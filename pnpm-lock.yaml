@@ -194,11 +194,11 @@ importers:
 
   packages/canvas: {}
 
-  packages/libretto: {}
-
   packages/open-clippa: {}
 
   packages/performer: {}
+
+  packages/timeline: {}
 
   packages/utils: {}
 

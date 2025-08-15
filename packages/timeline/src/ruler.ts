@@ -91,7 +91,7 @@ export class Ruler extends EventBus<RulerEvents> {
 
     this._bg = new Graphics()
     this._bg.rect(0, 0, this.width, RULER_HEIGHT)
-    this._bg.fill('transparent')
+    this._bg.fill('#525258ff')
     this.container.addChild(this._bg)
   }
 

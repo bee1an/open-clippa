@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Libretto } from 'open-clippa'
+import { Timeline } from 'open-clippa'
 
-const libretto = new Libretto({ id: 'libretto' })
+const libretto = new Timeline({ id: 'libretto' })
 
 onMounted(() => {
   libretto.initial()

@@ -64,8 +64,6 @@ function seekBySlider(value: number) {
       <p>
         {{ currentTime }} / {{ duration }}
       </p>
-
-      <div id="libretto" />
     </div>
   </yy-config-provider>
 </template>

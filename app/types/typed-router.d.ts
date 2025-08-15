@@ -19,7 +19,7 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/canvas': RouteRecordInfo<'/canvas', '/canvas', Record<never, never>, Record<never, never>>,
-    '/libretto': RouteRecordInfo<'/libretto', '/libretto', Record<never, never>, Record<never, never>>,
+    '/timeline': RouteRecordInfo<'/timeline', '/timeline', Record<never, never>, Record<never, never>>,
   }
 
   /**
@@ -37,8 +37,8 @@ declare module 'vue-router/auto-routes' {
       routes: '/canvas'
       views: never
     }
-    'src/pages/libretto.vue': {
-      routes: '/libretto'
+    'src/pages/timeline.vue': {
+      routes: '/timeline'
       views: never
     }
   }
