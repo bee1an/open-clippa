@@ -85,7 +85,7 @@ export class Timeline {
 
   private _crateRails(): void {
     let y = RULER_HEIGHT
-    for (let index = 0; index < 5; index++) {
+    for (let index = 0; index < 4; index++) {
       const rail = new Rail({ width: Math.max(this.app!.stage.width, this.app!.screen.width), y })
 
       this.rails.push(rail)
