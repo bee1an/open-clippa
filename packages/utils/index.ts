@@ -1,3 +1,4 @@
+export * from './src/array'
 export * from './src/drag'
 export * from './src/eventBus'
 export * from './src/time'

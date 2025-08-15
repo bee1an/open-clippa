@@ -1,21 +1,52 @@
-import { drag } from '@clippa/utils'
-import { Container, Graphics } from 'pixi.js'
+import { drag, EventBus } from '@clippa/utils'
+import { Container, Graphics, Text } from 'pixi.js'
 
 export const TRAIN_HEIGHT = 36
 
 export const RESIZE_TRIGGER_WIDTH = 16
 
-export class Train {
-  container: Container = new Container()
+export interface TrainOption {
+  x: number
+  width: number
+}
 
-  width: number = 100
+export type TrainEvents = {
+  /**
+   * 移动前
+   *
+   * 这里使用对象的形式是为了让触发事件的时候可以修改这个参数
+   */
+  beforeMove: [{ nextX: number }]
 
-  constructor() {
+  /**
+   * 拖转结束
+   */
+  moveDown: []
+}
+
+export type TrainState = 'normal' | 'static' | 'translucent'
+
+let i = 0
+export class Train extends EventBus<TrainEvents> {
+  container: Container
+
+  width: number
+
+  x: number = Math.random() * 300
+
+  state: TrainState = 'normal'
+
+  constructor(option: TrainOption) {
+    i++
+    super()
+    this.x = option.x
+    this.width = option.width
+
+    this.container = new Container({ x: this.x, y: 2 })
+
     this._drawResizer()
 
     this._drawSlot()
-    this.container.y = 2
-    this.container.x = Math.random() * 300
   }
 
   private _drawResizerHelper(...rest: [x: number, y: number, w: number, h: number]): Graphics {
@@ -46,18 +77,35 @@ export class Train {
 
     this._slot = new Graphics()
     this._slot.rect(RESIZE_TRIGGER_WIDTH / 2, 0, this.width - RESIZE_TRIGGER_WIDTH, TRAIN_HEIGHT)
-    this._slot.fill('#c98c8cff')
+    this._slot.fill('#c98c8caa')
     this._slot.eventMode = 'static'
     this._slot.cursor = 'move'
 
+    const text = new Text({
+      text: i,
+      x: 20,
+      style: { fontSize: 14 },
+    })
+
     this.container.addChild(this._slot)
+    this.container.addChild(text)
     this._bindDrag(this._slot)
   }
 
   private _bindDrag(traget: Graphics): void {
     drag(traget, {
       move: (_, { dx }) => {
-        this.container.x += dx
+        const site = { nextX: this.x + dx }
+        this.emit('beforeMove', site)
+
+        if (this.state !== 'static') {
+          this.container.x = site.nextX
+        }
+
+        this.x = site.nextX
+      },
+      up: () => {
+        this.emit('moveDown')
       },
     })
   }
@@ -82,5 +130,23 @@ export class Train {
         traget.x += dx
       },
     })
+  }
+
+  updateX(x: number): void {
+    this.x = this.container.x = x
+  }
+
+  /**
+   * 修改状态
+   */
+  updateState(state: TrainState): void {
+    this.state = state
+
+    if (state === 'translucent') {
+      this.container.alpha = 0.5
+      return
+    }
+
+    this.container.alpha = 1
   }
 }
