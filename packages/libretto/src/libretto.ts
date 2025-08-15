@@ -1,6 +1,7 @@
-import { Application, Container, Graphics } from 'pixi.js'
+import { Application, Graphics } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Ruler } from './ruler'
+import { ScrollBox } from './scrollBox'
 
 export interface LibrettoOption {
   id: string
@@ -10,7 +11,7 @@ export class Libretto {
   app?: Application
   ruler?: Ruler
   cursor?: Cursor
-  scroller = new Container()
+  scroller: ScrollBox = new ScrollBox({ viewportWidth: 0, viewportHeight: 0 })
 
   constructor(private _option: LibrettoOption) {}
 
@@ -19,8 +20,6 @@ export class Libretto {
 
     const app = new Application()
     this.app = app
-
-    app.stage.addChild(this.scroller)
 
     const wrapper = document.getElementById(id)
 
@@ -31,17 +30,23 @@ export class Libretto {
     await app.init({
       resizeTo: wrapper,
       backgroundColor: '#393941',
+      height: 200,
     })
+
+    app.stage.addChild(this.scroller.wrapper)
 
     // https://github.com/pixijs/pixijs/issues/11427
     new ResizeObserver(() => {
-      app.queueResize()
+      app.resize()
+
       this.ruler?.updateWidth(app.stage.width)
       this.ruler?.updateScreenWidth(app.screen.width)
 
       this.cursor?.updateWidth(app.stage.width)
       this.cursor?.updateScreenWidth(app.screen.width)
       this.cursor?.updateHeight(app.screen.height)
+
+      this.scroller.updateViewportSize(app.screen.width, app.screen.height)
     }).observe(wrapper)
 
     wrapper.appendChild(app.canvas)
@@ -57,7 +62,7 @@ export class Libretto {
     graphics.roundRect(5, 50, 1000, 40, 10)
     graphics.fill('#ffffffaa')
 
-    this.scroller.addChild(graphics)
+    this.scroller.container.addChild(graphics)
   }
 
   private _createRuler(): void {
@@ -66,7 +71,7 @@ export class Libretto {
       screenWidth: this.app!.screen.width,
       duration: 1000 * 60,
     })
-    this.scroller.addChild(this.ruler.container)
+    this.scroller.container.addChild(this.ruler.container)
 
     this.ruler.on('seek', (seekTime: number) => {
       this.cursor?.seek(seekTime)
@@ -80,6 +85,6 @@ export class Libretto {
       height: this.app!.screen.height,
       duration: 1000 * 60,
     })
-    this.app!.stage.addChild(this.cursor.container)
+    this.scroller.container.addChild(this.cursor.container)
   }
 }
