@@ -1,8 +1,9 @@
-import { Application } from 'pixi.js'
+import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Rail, RAIL_HEIGHT } from './rail'
 import { Ruler, RULER_HEIGHT } from './ruler'
 import { ScrollBox } from './scrollBox'
+import { State } from './state'
 
 export interface TimelineOption {
   id: string
@@ -12,8 +13,10 @@ export class Timeline {
   app?: Application
   ruler?: Ruler
   cursor?: Cursor
+  railContainer: Container = new Container({ y: RULER_HEIGHT })
   scroller: ScrollBox = new ScrollBox({ viewportWidth: 0, viewportHeight: 0 })
   rails: Rail[] = []
+  state: State = State.getInstance()
 
   constructor(private _option: TimelineOption) {}
 
@@ -84,13 +87,26 @@ export class Timeline {
   }
 
   private _crateRails(): void {
-    let y = RULER_HEIGHT
-    for (let index = 0; index < 1; index++) {
-      const rail = new Rail({ width: Math.max(this.app!.stage.width, this.app!.screen.width), y })
+    let y = 0
+    for (let index = 0; index < 2; index++) {
+      const rail = new Rail(
+        {
+          width: Math.max(this.app!.stage.width, this.app!.screen.width),
+          y,
+          trainsOption: [
+            { x: 100, width: 100 },
+            { x: 300, width: 150 },
+            { x: 500, width: 120 },
+          ],
+        },
+      )
 
       this.rails.push(rail)
-      this.scroller.container.addChild(rail.container)
-      y += RAIL_HEIGHT
+
+      this.railContainer.addChild(rail.container)
+      y += RAIL_HEIGHT + 4
     }
+
+    this.scroller.container.addChild(this.railContainer)
   }
 }

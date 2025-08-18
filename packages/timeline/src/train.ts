@@ -1,5 +1,6 @@
 import { drag, EventBus } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
+import { State } from './state'
 
 export const TRAIN_HEIGHT = 36
 
@@ -12,16 +13,21 @@ export interface TrainOption {
 
 export type TrainEvents = {
   /**
-   * 移动前
+   * 拖拽开始
+   */
+  moveStart: []
+
+  /**
+   * 每一次移动前
    *
    * 这里使用对象的形式是为了让触发事件的时候可以修改这个参数
    */
-  beforeMove: [{ nextX: number }]
+  beforeMove: [{ nextX: number }, target: Train]
 
   /**
-   * 拖转结束
+   * 拖拽结束
    */
-  moveDown: []
+  moveEnd: [target: Train]
 }
 
 export type TrainState = 'normal' | 'static' | 'translucent'
@@ -34,7 +40,9 @@ export class Train extends EventBus<TrainEvents> {
 
   x: number = Math.random() * 300
 
-  state: TrainState = 'normal'
+  status: TrainState = 'normal'
+
+  state: State = State.getInstance()
 
   constructor(option: TrainOption) {
     i++
@@ -94,18 +102,25 @@ export class Train extends EventBus<TrainEvents> {
 
   private _bindDrag(traget: Graphics): void {
     drag(traget, {
+      down: () => {
+        this.state.setTrainDragging(true)
+        this.state.setDraggingTrain(this)
+        this.emit('moveStart')
+      },
       move: (_, { dx }) => {
         const site = { nextX: this.x + dx }
-        this.emit('beforeMove', site)
+        this.emit('beforeMove', site, this)
 
-        if (this.state !== 'static') {
+        if (this.status !== 'static') {
           this.container.x = site.nextX
         }
 
         this.x = site.nextX
       },
       up: () => {
-        this.emit('moveDown')
+        this.state.setTrainDragging(false)
+        this.state.setDraggingTrain(null)
+        this.emit('moveEnd', this)
       },
     })
   }
@@ -140,7 +155,7 @@ export class Train extends EventBus<TrainEvents> {
    * 修改状态
    */
   updateState(state: TrainState): void {
-    this.state = state
+    this.status = state
 
     if (state === 'translucent') {
       this.container.alpha = 0.5
@@ -148,5 +163,15 @@ export class Train extends EventBus<TrainEvents> {
     }
 
     this.container.alpha = 1
+  }
+
+  /**
+   * Returns a JSON object representing the train.
+   */
+  toJson(): TrainOption {
+    return {
+      x: this.x,
+      width: this.width,
+    }
   }
 }
