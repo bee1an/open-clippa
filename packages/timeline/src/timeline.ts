@@ -88,7 +88,7 @@ export class Timeline {
 
   private _crateRails(): void {
     let y = 0
-    for (let index = 0; index < 2; index++) {
+    for (let index = 0; index < 3; index++) {
       const rail = new Rail(
         {
           width: Math.max(this.app!.stage.width, this.app!.screen.width),
@@ -101,12 +101,41 @@ export class Timeline {
         },
       )
 
+      // 如果有train离开, 则将这个train设置为游离状态
+      rail.on('trainLeave', (train) => {
+        train.updatePos(undefined, rail.y + train.y)
+        train.updateState('free')
+
+        this.railContainer.addChild(train.container)
+      })
+
       this.rails.push(rail)
 
       this.railContainer.addChild(rail.container)
-      y += RAIL_HEIGHT + 4
+      y += RAIL_HEIGHT + 10
     }
 
     this.scroller.container.addChild(this.railContainer)
+
+    this.railContainer.eventMode = 'static'
+
+    this.railContainer.on('pointermove', (e) => {
+      if (!this.state.trainDragging)
+        return
+
+      const { x, y } = e.getLocalPosition(this.railContainer)
+
+      const rail = this.rails.find((rail) => {
+        const bounds = rail.container.getLocalBounds()
+        bounds.y = rail.y
+
+        return rail.container.getLocalBounds().containsPoint(x, y)
+      })
+
+      if (rail && !rail.trains.includes(this.state.atDragTrain!)) {
+        rail.addDraggingTrain()
+        this.state.atDragTrain!.updatePos(undefined, 2) // TODO
+      }
+    })
   }
 }

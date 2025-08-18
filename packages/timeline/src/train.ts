@@ -22,7 +22,7 @@ export type TrainEvents = {
    *
    * 这里使用对象的形式是为了让触发事件的时候可以修改这个参数
    */
-  beforeMove: [{ nextX: number }, target: Train]
+  beforeMove: [{ xValue: number }, target: Train]
 
   /**
    * 拖拽结束
@@ -30,7 +30,7 @@ export type TrainEvents = {
   moveEnd: [target: Train]
 }
 
-export type TrainState = 'normal' | 'static' | 'translucent'
+export type TrainState = 'normal' | 'static' | 'translucent' | 'free'
 
 let i = 0
 export class Train extends EventBus<TrainEvents> {
@@ -39,6 +39,8 @@ export class Train extends EventBus<TrainEvents> {
   width: number
 
   x: number = Math.random() * 300
+
+  y: number = 2
 
   status: TrainState = 'normal'
 
@@ -50,7 +52,7 @@ export class Train extends EventBus<TrainEvents> {
     this.x = option.x
     this.width = option.width
 
-    this.container = new Container({ x: this.x, y: 2 })
+    this.container = new Container({ x: this.x, y: this.y })
 
     this._drawResizer()
 
@@ -89,15 +91,15 @@ export class Train extends EventBus<TrainEvents> {
     this._slot.eventMode = 'static'
     this._slot.cursor = 'move'
 
+    this.container.addChild(this._slot)
+    this._bindDrag(this._slot)
+
     const text = new Text({
       text: i,
       x: 20,
       style: { fontSize: 14 },
     })
-
-    this.container.addChild(this._slot)
     this.container.addChild(text)
-    this._bindDrag(this._slot)
   }
 
   private _bindDrag(traget: Graphics): void {
@@ -107,15 +109,23 @@ export class Train extends EventBus<TrainEvents> {
         this.state.setDraggingTrain(this)
         this.emit('moveStart')
       },
-      move: (_, { dx }) => {
-        const site = { nextX: this.x + dx }
+      move: (_, { dx, dy }) => {
+        const site = { xValue: this.x + dx, yValue: this.y + dy }
         this.emit('beforeMove', site, this)
 
         if (this.status !== 'static') {
-          this.container.x = site.nextX
+          this.container.x = site.xValue
         }
 
-        this.x = site.nextX
+        if (this.status === 'free') {
+          this.container.y = site.yValue
+        }
+        else {
+          this.container.y = 2
+        }
+
+        this.x = site.xValue
+        this.y = site.yValue
       },
       up: () => {
         this.state.setTrainDragging(false)
@@ -147,8 +157,14 @@ export class Train extends EventBus<TrainEvents> {
     })
   }
 
-  updateX(x: number): void {
-    this.x = this.container.x = x
+  updatePos(x?: number, y?: number): void {
+    if (x) {
+      this.x = this.container.x = x
+    }
+
+    if (y) {
+      this.y = this.container.y = y
+    }
   }
 
   /**

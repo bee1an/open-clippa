@@ -1,3 +1,4 @@
+import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import { EventBus, isIntersection } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
@@ -14,11 +15,12 @@ export interface RailOption {
   trainsOption: TrainOption[]
 }
 
-// eslint-disable-next-line ts/no-empty-object-type
-export type RailEvents = {}
+export type RailEvents = {
+  trainLeave: [Train, FederatedPointerEvent]
+}
 
 export class Rail extends EventBus<RailEvents> {
-  container: Container = new Container()
+  container: Container
   width: number
   y: number
   /**
@@ -33,7 +35,7 @@ export class Rail extends EventBus<RailEvents> {
     this.width = option.width
     this.y = option.y
 
-    this.container.y = this.y
+    this.container = new Container({ y: this.y })
 
     this._drawBody()
 
@@ -54,12 +56,12 @@ export class Rail extends EventBus<RailEvents> {
     return train
   }
 
-  private _trainBeforeMoveHandle = (event: { nextX: number }, train: Train): void => {
+  private _trainBeforeMoveHandle = (event: { xValue: number }, train: Train): void => {
     const intersectTrains = this.trains.filter((item) => {
       if (item === train)
         return false
 
-      return isIntersection([event.nextX, event.nextX + train.width], [item.x, item.x + item.width])
+      return isIntersection([event.xValue, event.xValue + train.width], [item.x, item.x + item.width])
     })
 
     if (intersectTrains.length === 0) {
@@ -69,7 +71,7 @@ export class Rail extends EventBus<RailEvents> {
 
     const [minialXTrain] = intersectTrains.sort((a, b) => a.x - b.x)
 
-    if (event.nextX <= minialXTrain.x) {
+    if (event.xValue <= minialXTrain.x) {
       train.updateState('translucent')
     }
     else {
@@ -84,7 +86,7 @@ export class Rail extends EventBus<RailEvents> {
     // 拖拽结束后
     // static 状态, 更新x的值为 container 的x
     if (train.status === 'static')
-      train.updateX(train.container.x)
+      train.updatePos(train.container.x)
 
     this.insertTrain(train)
 
@@ -172,7 +174,7 @@ export class Rail extends EventBus<RailEvents> {
         intersectTrains
           .reverse() // 这里反转一下是为了让与当前元素相交的元素保持原有的顺序
           .forEach((item) => {
-            item.updateX(item.x + (minialXTrain.x + minialXTrain.width - item.x))
+            item.updatePos(item.x + (minialXTrain.x + minialXTrain.width - item.x))
             this.insertTrain(item)
           })
 
@@ -191,23 +193,30 @@ export class Rail extends EventBus<RailEvents> {
     this.container.addChild(body)
   }
 
+  addDraggingTrain(): void {
+    if (!this.state.trainDragging)
+      return
+
+    const atTrain = this.state.atDragTrain!
+
+    atTrain.updateState('normal')
+
+    this.insertTrain(this.state.atDragTrain!)
+  }
+
   private _bindEvents(): void {
     this.container.eventMode = 'static'
 
-    this.container.on('pointerenter', () => {
-      // 表示拖拽了train到当前rail, 将它插入到指定位置
-      if (!this.state.trainDragging)
-        return
-
-      this.insertTrain(this.state.atDragTrain!)
-    })
-
-    this.container.on('pointerleave', () => {
+    this.container.on('pointerleave', (e) => {
       // 如果是train正在拖拽状态, 那么需要将这个train从当前rail中移除
       if (!this.state.trainDragging)
         return
 
-      this.removeTrain(this.state.atDragTrain!)
+      const atTrain = this.state.atDragTrain!
+
+      this.emit('trainLeave', atTrain, e)
+
+      this.removeTrain(atTrain)
     })
   }
 }
