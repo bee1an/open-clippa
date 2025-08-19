@@ -39,23 +39,18 @@ export class Rail extends EventBus<RailEvents> {
 
     this._drawBody()
 
-    option.trainsOption.forEach((item) => {
-      this.trains.push(this._createTrain(item))
-    })
+    option.trainsOption.forEach(item => this.insertTrain(new Train(item)))
 
     this._bindEvents()
   }
 
-  private _createTrain(option: TrainOption): Train {
-    const train = new Train(option)
-
-    this._bindTrainMoveEvents(train)
-
-    this.container.addChild(train.container)
-
-    return train
-  }
-
+  /**
+   * 每一次拖拽前对事件进行拦截
+   *
+   * 判断是否在当前rail中是否有train与当前拖拽的train相交
+   * 如果相交的状态当前train的x小于相交的train的x, 则将当前train设置为半透明态
+   * 否则将当前train设置为静态态, 并且将当前train的x设置为相交的train的x + 相交的train的width
+   */
   private _trainBeforeMoveHandle = (event: { xValue: number }, train: Train): void => {
     const intersectTrains = this.trains.filter((item) => {
       if (item === train)
@@ -77,21 +72,16 @@ export class Rail extends EventBus<RailEvents> {
     else {
       train.updateState('static')
 
+      // 将拖拽的train的位置停靠在相交的train的后面
       if (train.container.x !== minialXTrain.x + minialXTrain.width)
         train.container.x = minialXTrain.x + minialXTrain.width
     }
   }
 
   private _trainMoveEndHandle = (train: Train): void => {
-    // 拖拽结束后
-    // static 状态, 更新x的值为 container 的x
-    if (train.status === 'static')
-      train.updatePos(train.container.x)
-
     this.insertTrain(train)
 
     this.updateTrainsPos()
-    train.updateState('normal')
   }
 
   private _bindTrainMoveEvents(train: Train): void {
@@ -116,6 +106,7 @@ export class Rail extends EventBus<RailEvents> {
       this.trains.splice(index, 1)
     }
     else {
+      train.parent = this
       // 渲染并绑定事件
       this.container.addChild(train.container)
       this._bindTrainMoveEvents(train)
@@ -139,6 +130,7 @@ export class Rail extends EventBus<RailEvents> {
     const index = this.trains.findIndex(item => item === train)
     this.trains.splice(index, 1)
     this.container.removeChild(train.container)
+    train.parent = null
 
     this._unbindTrainMoveEvents(train)
   }
@@ -191,17 +183,6 @@ export class Rail extends EventBus<RailEvents> {
     body.fill(RAIL_COLOR)
 
     this.container.addChild(body)
-  }
-
-  addDraggingTrain(): void {
-    if (!this.state.trainDragging)
-      return
-
-    const atTrain = this.state.atDragTrain!
-
-    atTrain.updateState('normal')
-
-    this.insertTrain(this.state.atDragTrain!)
   }
 
   private _bindEvents(): void {

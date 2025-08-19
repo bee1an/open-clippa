@@ -1,3 +1,4 @@
+import type { Rail } from './rail'
 import { drag, EventBus } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
@@ -30,7 +31,11 @@ export type TrainEvents = {
   moveEnd: [target: Train]
 }
 
-export type TrainState = 'normal' | 'static' | 'translucent' | 'free'
+export type TrainDragStatus
+  = | 'normal' // 常规态
+    | 'static' // 静态
+    | 'translucent' // 半透明
+    | 'free' // 游离
 
 let i = 0
 export class Train extends EventBus<TrainEvents> {
@@ -42,9 +47,11 @@ export class Train extends EventBus<TrainEvents> {
 
   y: number = 2
 
-  status: TrainState = 'normal'
+  dragStatus: TrainDragStatus = 'normal'
 
   state: State = State.getInstance()
+
+  parent: Rail | null = null
 
   constructor(option: TrainOption) {
     i++
@@ -102,25 +109,41 @@ export class Train extends EventBus<TrainEvents> {
     this.container.addChild(text)
   }
 
+  /**
+   * 记录拖拽前的状态
+   *
+   * 如果拖转结束后train的状态是游离态, 那么会将train恢复为这个状态
+   * 这里不要y的原因是, y在常态下固定为2
+   */
+  private _recordWhenDrag: { x: number, parent: Rail } | null = null
   private _bindDrag(traget: Graphics): void {
     drag(traget, {
       down: () => {
         this.state.setTrainDragging(true)
         this.state.setDraggingTrain(this)
+
+        this._recordWhenDrag = {
+          x: this.x,
+          parent: this.parent!,
+        }
+
         this.emit('moveStart')
       },
       move: (_, { dx, dy }) => {
         const site = { xValue: this.x + dx, yValue: this.y + dy }
         this.emit('beforeMove', site, this)
 
-        if (this.status !== 'static') {
+        if (this.dragStatus !== 'static') {
+          // 静态态不允许移动
           this.container.x = site.xValue
         }
 
-        if (this.status === 'free') {
+        if (this.dragStatus === 'free') {
+          // 游离态时将设置y的值
           this.container.y = site.yValue
         }
         else {
+          // 否则y为固定值
           this.container.y = 2
         }
 
@@ -130,6 +153,20 @@ export class Train extends EventBus<TrainEvents> {
       up: () => {
         this.state.setTrainDragging(false)
         this.state.setDraggingTrain(null)
+
+        if (this.dragStatus === 'static') {
+          this.updatePos(this.container.x)
+        }
+        else if (this.dragStatus === 'free') {
+          // 如果是游离态, 恢复train为拖拽前的状态
+          this._recordWhenDrag!.parent.insertTrain(this)
+          this.updatePos(this._recordWhenDrag!.x, 2)
+        }
+
+        // 拖拽结束后将y值还原
+        this.y = 2
+
+        this.updateState('normal')
         this.emit('moveEnd', this)
       },
     })
@@ -158,11 +195,11 @@ export class Train extends EventBus<TrainEvents> {
   }
 
   updatePos(x?: number, y?: number): void {
-    if (x) {
+    if (typeof x === 'number') {
       this.x = this.container.x = x
     }
 
-    if (y) {
+    if (typeof y === 'number') {
       this.y = this.container.y = y
     }
   }
@@ -170,10 +207,10 @@ export class Train extends EventBus<TrainEvents> {
   /**
    * 修改状态
    */
-  updateState(state: TrainState): void {
-    this.status = state
+  updateState(state: TrainDragStatus): void {
+    this.dragStatus = state
 
-    if (state === 'translucent') {
+    if (state === 'translucent' || state === 'free') {
       this.container.alpha = 0.5
       return
     }
