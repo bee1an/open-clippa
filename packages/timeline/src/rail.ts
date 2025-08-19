@@ -94,6 +94,95 @@ export class Rail extends EventBus<RailEvents> {
     train.off('moveEnd', this._trainMoveEndHandle)
   }
 
+  private _trainBeforeLeftResizeHandle = (event: {
+    xValue: number
+    wValue: number
+    disdrawable: boolean
+  }, train: Train): void => {
+    const [intersectTrain] = this.trains.filter((item) => {
+      if (item.x >= train.container.x)
+        return false
+
+      return isIntersection([train.x, train.x + train.width], [item.x, item.x + item.width])
+    })
+
+    if (intersectTrain) {
+      event.disdrawable = true
+
+      train.updateWidth(
+        train.container.x + train.container.width - (intersectTrain.x + intersectTrain.width),
+      )
+
+      train.container.x = intersectTrain.x + intersectTrain.width
+    }
+  }
+
+  private _rightTrains: Train[] | null = null
+  private _trainRightResizeStartHandle = (train: Train): void => {
+    this._rightTrains = this.trains.filter(item => item.x >= train.container.x)
+  }
+
+  private _trainBeforeRightResizeHandle = (): void => {
+    if (!this._rightTrains)
+      return
+
+    let i = 0
+    while (true) {
+      if (i === this._rightTrains.length - 1)
+        break
+
+      const { container, width } = this._rightTrains[i]
+
+      const rightX = container.x + width
+
+      const { x } = this._rightTrains[i + 1]
+
+      if (rightX < x) {
+        break
+      }
+      else {
+        this._rightTrains[i + 1].container.x = rightX
+      }
+
+      i++
+    }
+
+    // const [intersectTrain] = this.trains.filter((item) => {
+    //   if (item.x <= train.container.x)
+    //     return false
+
+    //   return isIntersection([train.x, train.x + train.width], [item.x, item.x + item.width])
+    // })
+
+    // if (intersectTrain) {
+    //   event.disdrawable = true
+
+    //   train.updateSlotWidth(intersectTrain.x - train.x)
+    // }
+  }
+
+  private _trainRightResizeEndHandle = (): void => {
+    this._rightTrains?.forEach((item) => {
+      item.x = item.container.x
+    })
+
+    this._rightTrains = null
+  }
+
+  private _bindResizeEvents(train: Train): void {
+    train.on('beforeLeftResize', this._trainBeforeLeftResizeHandle)
+    train.on('rightResizeStart', this._trainRightResizeStartHandle)
+    train.on('beforeRightResize', this._trainBeforeRightResizeHandle)
+    train.on('rightResizeEnd', this._trainRightResizeEndHandle)
+  }
+
+  private _unbindResizeEvents(train: Train): void {
+    train.off('beforeLeftResize', this._trainBeforeLeftResizeHandle)
+    train.off('rightResizeStart', this._trainRightResizeStartHandle)
+    train.off('beforeRightResize', this._trainBeforeRightResizeHandle)
+    train.off('rightResizeEnd', this._trainRightResizeEndHandle)
+  }
+
   /**
    * 插入train到指定位置, 也可以排序已存在的train
    *
@@ -110,6 +199,7 @@ export class Rail extends EventBus<RailEvents> {
       // 渲染并绑定事件
       this.container.addChild(train.container)
       this._bindTrainMoveEvents(train)
+      this._bindResizeEvents(train)
     }
 
     // 寻找插入的位置
@@ -133,6 +223,7 @@ export class Rail extends EventBus<RailEvents> {
     train.parent = null
 
     this._unbindTrainMoveEvents(train)
+    this._unbindResizeEvents(train)
   }
 
   /**
