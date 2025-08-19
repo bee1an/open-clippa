@@ -1,5 +1,5 @@
 import type { Rail } from './rail'
-import { drag, EventBus, getPxByMs } from '@clippa/utils'
+import { drag, EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
 
@@ -77,23 +77,17 @@ export class Train extends EventBus<TrainEvents> {
 
   duration: number
 
-  private _pxPerMs: number
-
   constructor(option: TrainOption) {
     i++
     super()
     this.state = State.getInstance()
     this.state.on('updatedPxPerMs', (pxPerMs) => {
-      this._pxPerMs = pxPerMs
-
       this.updatePos(getPxByMs(option.start, pxPerMs))
       this.updateWidth(getPxByMs(option.duration, pxPerMs))
     })
 
-    this._pxPerMs = this.state.pxPerMs
-
-    this.x = getPxByMs(option.start, this._pxPerMs)
-    this.width = getPxByMs(option.duration, this._pxPerMs)
+    this.x = getPxByMs(option.start, this.state.pxPerMs)
+    this.width = getPxByMs(option.duration, this.state.pxPerMs)
     this.start = option.start
     this.duration = option.duration
 
@@ -157,17 +151,6 @@ export class Train extends EventBus<TrainEvents> {
     this._bindDrag(this._slot)
   }
 
-  updateWidth(width: number): void {
-    if (width === this.container.width)
-      return
-
-    this.width = width
-
-    this._drawSlot()
-
-    this._rightResizer.x = width - RESIZE_TRIGGER_WIDTH
-  }
-
   /**
    * 记录拖拽前的状态
    *
@@ -214,12 +197,15 @@ export class Train extends EventBus<TrainEvents> {
         this.state.setDraggingTrain(null)
 
         if (this.dragStatus === 'static') {
-          this.updatePos(this.container.x)
+          this.updatePos(this.container.x, undefined, true)
         }
         else if (this.dragStatus === 'free') {
           // 如果是游离态, 恢复train为拖拽前的状态
           this._recordWhenDrag!.parent.insertTrain(this)
-          this.updatePos(this._recordWhenDrag!.x, 2)
+          this.updatePos(this._recordWhenDrag!.x, 2, true)
+        }
+        else {
+          this.updateStart(getPxByMs(this.x, this.state.pxPerMs))
         }
 
         // 拖拽结束后将y值还原
@@ -254,6 +240,9 @@ export class Train extends EventBus<TrainEvents> {
       up: () => {
         this.width = this.container.width
         this.x = this.container.x
+
+        this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
+        this.updateDuration(getMsByPx(this.width, this.state.pxPerMs))
       },
     })
   }
@@ -280,18 +269,55 @@ export class Train extends EventBus<TrainEvents> {
 
       up: () => {
         this.width = this.container.width
+        this.updateDuration(getMsByPx(this.width, this.state.pxPerMs))
+
         this.emit('rightResizeEnd', this)
       },
     })
   }
 
-  updatePos(x?: number, y?: number): void {
+  updateWidth(width: number, withEffect?: boolean): void {
+    if (width === this.container.width)
+      return
+
+    this.width = width
+
+    if (withEffect) {
+      this.duration = getMsByPx(this.width, this.state.pxPerMs)
+    }
+
+    this._drawSlot()
+
+    this._rightResizer.x = width - RESIZE_TRIGGER_WIDTH
+  }
+
+  updatePos(x?: number, y?: number, withEffect?: boolean): void {
     if (typeof x === 'number') {
       this.x = this.container.x = x
+
+      if (withEffect) {
+        this.start = getMsByPx(this.x, this.state.pxPerMs)
+      }
     }
 
     if (typeof y === 'number') {
       this.y = this.container.y = y
+    }
+  }
+
+  updateStart(start: number, withEffect?: boolean): void {
+    this.start = start
+
+    if (withEffect) {
+      this.x = this.container.x = getPxByMs(start, this.state.pxPerMs)
+    }
+  }
+
+  updateDuration(duration: number, withEffect?: boolean): void {
+    this.duration = duration
+
+    if (withEffect) {
+      this.updateWidth(getPxByMs(duration, this.state.pxPerMs))
     }
   }
 

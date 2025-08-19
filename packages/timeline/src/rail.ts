@@ -204,7 +204,7 @@ export class Rail extends EventBus<RailEvents> {
 
     // 寻找插入的位置
     const nextIndex = this.trains.findIndex(item =>
-      item.x >= train.x, // 这里使用 >=, 是为了让插入的优先级更高
+      item.start >= train.start, // 这里使用 >=, 是为了让插入的优先级更高
     )
 
     if (nextIndex !== -1)
@@ -230,7 +230,7 @@ export class Rail extends EventBus<RailEvents> {
    * 根据x的位置进行排序
    */
   sortTrains(): void {
-    this.trains.sort((a, b) => a.x - b.x)
+    this.trains.sort((a, b) => a.start - b.start)
   }
 
   /**
@@ -257,7 +257,7 @@ export class Rail extends EventBus<RailEvents> {
         intersectTrains
           .reverse() // 这里反转一下是为了让与当前元素相交的元素保持原有的顺序
           .forEach((item) => {
-            item.updatePos(item.x + (minialXTrain.x + minialXTrain.width - item.x))
+            item.updatePos(item.x + (minialXTrain.x + minialXTrain.width - item.x), undefined, true)
             this.insertTrain(item)
           })
 

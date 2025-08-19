@@ -34,7 +34,8 @@ export class Rails {
           y,
           trainsOption: [
             { start: 100, duration: 1000 },
-            { start: 2000, duration: 1000 },
+            { start: 2000, duration: 1500 },
+            { start: 5000, duration: 2000 },
           ],
         },
       )
