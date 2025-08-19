@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Timeline } from 'open-clippa'
 
-const libretto = new Timeline({ id: 'libretto' })
+const timeline = new Timeline({ id: 'timeline', duration: 60 * 1000 })
 
 onMounted(() => {
-  libretto.initial()
+  timeline.initial()
 })
 
 // eslint-disable-next-line no-console
@@ -13,6 +13,6 @@ const _log = console.log
 
 <template>
   <div p-x-20px wfull>
-    <div id="libretto" wfull h-200px bg-blue resize-y overflow-hidden />
+    <div id="timeline" wfull h-200px bg-blue resize-y overflow-hidden />
   </div>
 </template>

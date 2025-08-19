@@ -7,6 +7,7 @@ import { State } from './state'
 
 export interface TimelineOption {
   id: string
+  duration: number
 }
 
 export class Timeline {
@@ -15,9 +16,18 @@ export class Timeline {
   cursor?: Cursor
   scroller: ScrollBox = new ScrollBox({ viewportWidth: 0, viewportHeight: 0 })
   rails?: Rails
+
   state: State = State.getInstance()
 
-  constructor(private _option: TimelineOption) {}
+  duration: number
+
+  scale: number = 1
+
+  width: number = 0
+
+  constructor(private _option: TimelineOption) {
+    this.duration = _option.duration
+  }
 
   async initial(): Promise<void> {
     const { id } = this._option
@@ -35,6 +45,7 @@ export class Timeline {
       resizeTo: wrapper,
       backgroundColor: '#393941',
       height: 200,
+      antialias: true,
     })
 
     app.stage.addChild(this.scroller.wrapper)
@@ -43,30 +54,50 @@ export class Timeline {
     new ResizeObserver(() => {
       app.resize()
 
-      this.ruler?.updateWidth(app.stage.width)
-      this.ruler?.updateScreenWidth(app.screen.width)
+      this._updateChildrenSize()
 
-      this.cursor?.updateWidth(app.stage.width)
-      this.cursor?.updateScreenWidth(app.screen.width)
-      this.cursor?.updateHeight(app.screen.height)
-
-      this.scroller.updateViewportSize(app.screen.width, app.screen.height)
+      this.scroller.once('render', () => {
+        this.width = this.scroller.width
+      })
     }).observe(wrapper)
 
     wrapper.appendChild(app.canvas)
 
     this._createRuler()
 
-    this._crateRails()
+    this._createRails()
 
     this._createCursor()
+
+    this._updateChildrenSize()
+
+    this.scroller.once('render', () => {
+      this.width = this.scroller.width
+      this.ruler?.updateWidth(this.width)
+      this.cursor?.updateWidth(this.width)
+    })
+  }
+
+  private _updateChildrenSize(): void {
+    if (!this.app)
+      return
+
+    const screenWidth = this.app.screen.width
+    const screenHeight = this.app.screen.height
+
+    // this.ruler?.updateScreenWidth(screenWidth)
+
+    this.cursor?.updateScreenWidth(screenWidth)
+    this.cursor?.updateScreenHeight(screenHeight)
+
+    this.scroller.updateViewportSize(screenWidth, screenHeight)
   }
 
   private _createRuler(): void {
     this.ruler = new Ruler({
       width: this.app!.stage.width,
       screenWidth: this.app!.screen.width,
-      duration: 1000 * 60,
+      duration: this.duration,
     })
     this.scroller.container.addChild(this.ruler.container)
 
@@ -80,12 +111,12 @@ export class Timeline {
       width: this.app!.stage.width,
       screenWidth: this.app!.screen.width,
       height: this.app!.screen.height,
-      duration: 1000 * 60,
+      duration: this.duration,
     })
     this.scroller.container.addChild(this.cursor.container)
   }
 
-  private _crateRails(): void {
+  private _createRails(): void {
     this.rails = new Rails({ width: Math.max(this.app!.stage.width, this.app!.screen.width) })
 
     this.scroller.container.addChild(this.rails.container)

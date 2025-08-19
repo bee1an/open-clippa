@@ -99,7 +99,7 @@ export class Cursor {
     this.screenWidth = width
   }
 
-  updateHeight(height: number): void {
+  updateScreenHeight(height: number): void {
     this._drawBody(height)
   }
 

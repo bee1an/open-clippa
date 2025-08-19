@@ -1,4 +1,5 @@
 import type { FederatedPointerEvent } from 'pixi.js'
+import { EventBus } from 'open-clippa'
 import { Container, Graphics } from 'pixi.js'
 
 export const SCROLLBAR_WIDTH = 10
@@ -29,7 +30,11 @@ interface DrawScrollBarHelperOption {
   click: (e: FederatedPointerEvent, scrollbar: Container, bar: Graphics) => void
 }
 
-export class ScrollBox {
+export type ScrollBoxEvents = {
+  render: []
+}
+
+export class ScrollBox extends EventBus<ScrollBoxEvents> {
   /**
    * 最外层元素, 包含容器和滚动条
    */
@@ -64,6 +69,7 @@ export class ScrollBox {
   barWidth: number
 
   constructor(option: ScrollBoxOption) {
+    super()
     this.viewportWidth = option.viewportWidth
     this.viewportHeight = option.viewportHeight
     this.railColor = option.railColor || RAIL_COLOR
@@ -295,6 +301,8 @@ export class ScrollBox {
     this._drawView()
     this._drawScrollXBar()
     this._drawScrollYBar()
+
+    this.emit('render')
   }
 
   private _queueRenderId?: number
