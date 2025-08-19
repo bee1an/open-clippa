@@ -7,7 +7,7 @@ import { Train } from './train'
 
 export const RAIL_HEIGHT = 40
 
-export const RAIL_COLOR = '#5f5f63ff'
+export const RAIL_COLOR = '#5f5f63aa'
 
 export interface RailOption {
   width: number
@@ -37,7 +37,7 @@ export class Rail extends EventBus<RailEvents> {
 
     this.container = new Container({ y: this.y })
 
-    this._drawBody()
+    this._drawBg()
 
     option.trainsOption.forEach(item => this.insertTrain(new Train(item)))
 
@@ -183,6 +183,39 @@ export class Rail extends EventBus<RailEvents> {
     train.off('rightResizeEnd', this._trainRightResizeEndHandle)
   }
 
+  private _bg: Graphics | null = null
+  private _drawBg(): void {
+    const bg = new Graphics()
+
+    bg.rect(0, 0, this.width, RAIL_HEIGHT)
+    bg.fill(RAIL_COLOR)
+
+    if (this._bg) {
+      this.container.replaceChild(this._bg, bg)
+    }
+    else {
+      this.container.addChild(bg)
+    }
+
+    this._bg = bg
+  }
+
+  private _bindEvents(): void {
+    this.container.eventMode = 'static'
+
+    this.container.on('pointerleave', (e) => {
+      // 如果是train正在拖拽状态, 那么需要将这个train从当前rail中移除
+      if (!this.state.trainDragging)
+        return
+
+      const atTrain = this.state.atDragTrain!
+
+      this.emit('trainLeave', atTrain, e)
+
+      this.removeTrain(atTrain)
+    })
+  }
+
   /**
    * 插入train到指定位置, 也可以排序已存在的train
    *
@@ -267,28 +300,15 @@ export class Rail extends EventBus<RailEvents> {
       )
   }
 
-  private _drawBody(): void {
-    const body = new Graphics()
+  /**
+   * 更新rail的宽度
+   */
+  updateWidth(width: number): void {
+    if (width === this.width)
+      return
 
-    body.rect(0, 0, this.width, RAIL_HEIGHT)
-    body.fill(RAIL_COLOR)
+    this.width = width
 
-    this.container.addChild(body)
-  }
-
-  private _bindEvents(): void {
-    this.container.eventMode = 'static'
-
-    this.container.on('pointerleave', (e) => {
-      // 如果是train正在拖拽状态, 那么需要将这个train从当前rail中移除
-      if (!this.state.trainDragging)
-        return
-
-      const atTrain = this.state.atDragTrain!
-
-      this.emit('trainLeave', atTrain, e)
-
-      this.removeTrain(atTrain)
-    })
+    this._drawBg()
   }
 }

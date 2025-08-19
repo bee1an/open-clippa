@@ -69,7 +69,7 @@ export class Timeline {
 
     this._createCursor()
 
-    this._updateChildrenSize()
+    // this._updateChildrenSize()
 
     this.scroller.once('render', () => {
       this.width = this.scroller.width
@@ -96,6 +96,9 @@ export class Timeline {
     this.cursor?.updateScreenHeight(screenHeight)
 
     this.scroller.updateViewportSize(screenWidth, screenHeight)
+
+    // 不能直接用screenWidth, 是因为rails的宽度应该始终铺满整个容器
+    this.rails?.updateWidth(Math.max(this.width, screenWidth))
   }
 
   private _createRuler(): void {

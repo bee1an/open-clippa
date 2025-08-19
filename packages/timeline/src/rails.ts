@@ -27,7 +27,7 @@ export class Rails {
 
   private _drawBody(): void {
     let y = 0
-    for (let index = 0; index < 2; index++) {
+    for (let index = 0; index < 1; index++) {
       const rail = new Rail(
         {
           width: this.width,
@@ -81,5 +81,14 @@ export class Rails {
         atTrain.updatePos(undefined, atTrain.y - rail.y)
       }
     })
+  }
+
+  /**
+   * 更新宽度
+   */
+  updateWidth(width: number): void {
+    this.width = width
+
+    this.rails.forEach(rail => rail.updateWidth(width))
   }
 }

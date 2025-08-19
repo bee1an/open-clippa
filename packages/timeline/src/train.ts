@@ -100,6 +100,7 @@ export class Train extends EventBus<TrainEvents> {
     const text = new Text({
       text: i,
       x: 20,
+      zIndex: 1,
       style: { fontSize: 14 },
     })
     this.container.addChild(text)
@@ -123,7 +124,7 @@ export class Train extends EventBus<TrainEvents> {
     this._bindLeftResize(this._leftResizer)
 
     this._rightResizer = this._drawResizerHelper(
-      this.width - RESIZE_TRIGGER_WIDTH,
+      Math.max(this.width - RESIZE_TRIGGER_WIDTH, 0),
       0,
       RESIZE_TRIGGER_WIDTH,
       TRAIN_HEIGHT,
@@ -133,6 +134,9 @@ export class Train extends EventBus<TrainEvents> {
 
   private _slot!: Graphics
   private _drawSlot(width = this.width): void {
+    if (!width)
+      return
+
     const slot = new Graphics()
     slot.rect(RESIZE_TRIGGER_WIDTH / 2, 0, width - RESIZE_TRIGGER_WIDTH, TRAIN_HEIGHT)
     slot.fill('#c98c8c')
