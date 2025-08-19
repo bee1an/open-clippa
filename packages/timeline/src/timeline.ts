@@ -85,7 +85,7 @@ export class Timeline {
     const screenWidth = this.app.screen.width
     const screenHeight = this.app.screen.height
 
-    // this.ruler?.updateScreenWidth(screenWidth)
+    this.ruler?.updateScreenWidth(screenWidth)
 
     this.cursor?.updateScreenWidth(screenWidth)
     this.cursor?.updateScreenHeight(screenHeight)

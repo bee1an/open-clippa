@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Timeline } from 'open-clippa'
 
-const timeline = new Timeline({ id: 'timeline', duration: 60 * 1000 })
+const timeline = new Timeline({ id: 'timeline', duration: 1000 })
 
 onMounted(() => {
   timeline.initial()

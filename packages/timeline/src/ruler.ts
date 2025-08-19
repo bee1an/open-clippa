@@ -19,20 +19,35 @@ export type RulerEvents = {
   seek: [number]
 }
 
+/**
+ * 基准刻度
+ */
+const basicTicks = [1000, 2000, 5000]
+
+const ticks: number [] = []
+
+for (let index = 0; index < 3; index++) {
+  basicTicks.forEach((tick) => {
+    ticks.push(tick * 10 ** index)
+  })
+}
+
+export const MINIMUM_DURATION = 0 // TODO
+
 export class Ruler extends EventBus<RulerEvents> {
   container: Container
   private _bg?: Graphics
   duration: number
 
-  scale: number = 1
   width: number
   screenWidth: number
 
   constructor(option: RulerOption) {
     super()
-    this.duration = Math.max(option.duration, 2500)
+    this.duration = option.duration
     this.width = option.width
     this.screenWidth = option.screenWidth
+
     const container = new Container()
     this.container = container
     container.cursor = 'pointer'
@@ -50,16 +65,16 @@ export class Ruler extends EventBus<RulerEvents> {
    */
   updateWidth(width: number): void {
     this.width = width
-    this.queueResize()
+    this.queueRender()
   }
 
-  updateScreenWidth(width: number): void {
-    this.screenWidth = width
-    this.queueResize()
+  updateScreenWidth(screenWidth: number): void {
+    this.screenWidth = screenWidth
+    this.queueRender()
   }
 
   private _requestAnimationFrameId: number | null = null
-  queueResize(): void {
+  queueRender(): void {
     this._requestAnimationFrameId && cancelAnimationFrame(this._requestAnimationFrameId)
 
     this._requestAnimationFrameId = requestAnimationFrame(() => {
@@ -104,7 +119,7 @@ export class Ruler extends EventBus<RulerEvents> {
     this.container.addChild(graphics)
   }
 
-  private _drawTextTime(x: number): Text {
+  private _drawTextTime(x: number, content: string): Text {
     const text = new Text({
       style: {
         fontSize: TICK_FONT_SIZE,
@@ -112,6 +127,7 @@ export class Ruler extends EventBus<RulerEvents> {
       },
       x,
       y: RULER_HEIGHT / 2,
+      text: content,
     })
 
     text.anchor.set(0.5)
@@ -121,45 +137,44 @@ export class Ruler extends EventBus<RulerEvents> {
     return text
   }
 
+  private _getGap(tick: number): number {
+    return (tick / Math.max(this.duration, MINIMUM_DURATION)) * this.width
+  }
+
   private _minTickSpacingPx = 120
-  private get _tickGap(): number {
-    const screenDuration = (this.screenWidth / this.width) * this.duration
+  private get _tick(): number {
+    const tick = ticks.find((tick) => {
+      return this._getGap(tick) >= this._minTickSpacingPx
+    }) || ticks[ticks.length - 1]
 
-    if (screenDuration < 9000) {
-      return Math.max(this.screenWidth / (Math.floor(screenDuration / 1000)), this._minTickSpacingPx)
-    }
-
-    return Math.max(this.screenWidth / 9, this._minTickSpacingPx)
+    return tick
   }
 
   private _timeTexts: Text[] = []
   private _drawTick(): void {
     this._timeTexts.length = 0
-
-    const gap = this._tickGap
     let x = 0
-    let i = 0
+    const tick = this._tick
+    const gap = this._getGap(tick)
 
     const dotGap = gap / (DOT_NUM + 1)
-    for (; i < (this.screenWidth / gap) - 1; i++) {
+
+    const drawDotGroup = (): void => {
       Array.from({ length: DOT_NUM }, (_, index): void => {
         this._drawDot(x + dotGap * (index + 1))
         return void 0
       })
+    }
+
+    for (let i = 0; i < Math.max(this.screenWidth, this.width) / gap - 1; i++) {
+      drawDotGroup()
 
       x += gap
-      const timeText = this._drawTextTime(x)
+      const timeText = this._drawTextTime(x, ms2TimeStr((i + 1) * tick))
       this._timeTexts.push(timeText)
     }
 
-    Array.from({ length: DOT_NUM }, (_, index): void => {
-      this._drawDot(x + dotGap * (index + 1))
-      return void 0
-    })
-
-    this._timeTexts.forEach((text) => {
-      text.text = ms2TimeStr(text.x / this.width * this.duration)
-    })
+    drawDotGroup()
   }
 
   private _bindPointerdown(): void {
