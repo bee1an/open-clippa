@@ -73,9 +73,14 @@ export class Timeline {
 
     this.scroller.once('render', () => {
       this.width = this.scroller.width
+      this._updatePxPerMs(this.width / this.duration)
       this.ruler?.updateWidth(this.width)
       this.cursor?.updateWidth(this.width)
     })
+  }
+
+  private _updatePxPerMs(pxPerMs: number): void {
+    this.state.updatePxPerMs(pxPerMs)
   }
 
   private _updateChildrenSize(): void {
@@ -117,7 +122,9 @@ export class Timeline {
   }
 
   private _createRails(): void {
-    this.rails = new Rails({ width: Math.max(this.app!.stage.width, this.app!.screen.width) })
+    this.rails = new Rails({
+      width: Math.max(this.app!.stage.width, this.app!.screen.width),
+    })
 
     this.scroller.container.addChild(this.rails.container)
   }

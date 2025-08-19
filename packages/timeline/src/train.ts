@@ -1,5 +1,5 @@
 import type { Rail } from './rail'
-import { drag, EventBus } from '@clippa/utils'
+import { drag, EventBus, getPxByMs } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
 
@@ -8,8 +8,8 @@ export const TRAIN_HEIGHT = 36
 export const RESIZE_TRIGGER_WIDTH = 16
 
 export interface TrainOption {
-  x: number
-  width: number
+  start: number
+  duration: number
 }
 
 export type TrainEvents = {
@@ -69,15 +69,33 @@ export class Train extends EventBus<TrainEvents> {
 
   dragStatus: TrainDragStatus = 'normal'
 
-  state: State = State.getInstance()
+  state: State
 
   parent: Rail | null = null
+
+  start: number
+
+  duration: number
+
+  private _pxPerMs: number
 
   constructor(option: TrainOption) {
     i++
     super()
-    this.x = option.x
-    this.width = option.width
+    this.state = State.getInstance()
+    this.state.on('updatedPxPerMs', (pxPerMs) => {
+      this._pxPerMs = pxPerMs
+
+      this.updatePos(getPxByMs(option.start, pxPerMs))
+      this.updateWidth(getPxByMs(option.duration, pxPerMs))
+    })
+
+    this._pxPerMs = this.state.pxPerMs
+
+    this.x = getPxByMs(option.start, this._pxPerMs)
+    this.width = getPxByMs(option.duration, this._pxPerMs)
+    this.start = option.start
+    this.duration = option.duration
 
     this.container = new Container({ x: this.x, y: this.y })
 
@@ -143,7 +161,9 @@ export class Train extends EventBus<TrainEvents> {
     if (width === this.container.width)
       return
 
-    this._drawSlot(width)
+    this.width = width
+
+    this._drawSlot()
 
     this._rightResizer.x = width - RESIZE_TRIGGER_WIDTH
   }
@@ -294,8 +314,8 @@ export class Train extends EventBus<TrainEvents> {
    */
   toJson(): TrainOption {
     return {
-      x: this.x,
-      width: this.width,
+      start: this.start,
+      duration: this.duration,
     }
   }
 }

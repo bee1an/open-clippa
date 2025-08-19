@@ -15,6 +15,7 @@ export class Rails {
   state: State = State.getInstance()
 
   width: number
+
   constructor(option: RailsOption) {
     this.width = option.width
     this.container = new Container({ y: RULER_HEIGHT })
@@ -26,15 +27,14 @@ export class Rails {
 
   private _drawBody(): void {
     let y = 0
-    for (let index = 0; index < 1; index++) {
+    for (let index = 0; index < 2; index++) {
       const rail = new Rail(
         {
           width: this.width,
           y,
           trainsOption: [
-            { x: 100, width: 100 },
-            { x: 300, width: 150 },
-            { x: 500, width: 120 },
+            { start: 100, duration: 1000 },
+            { start: 2000, duration: 1000 },
           ],
         },
       )

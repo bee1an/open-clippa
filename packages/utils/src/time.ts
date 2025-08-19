@@ -19,3 +19,29 @@ export function ms2TimeStr(ms: number): `${string}:${string}:${string}` | `${str
   const pad = (num: number): string => num.toString().padStart(2, '0')
   return h ? `${pad(h)}:${pad(mPlace)}:${pad(sPlace)}` : `${pad(m)}:${pad(sPlace)}`
 }
+
+/**
+ * 将毫秒数转换为对应的像素数
+ *
+ * @param ms 毫秒数
+ * @param pxPerMs 1毫秒对应的像素数
+ */
+export function getPxByMs(
+  ms: number,
+  pxPerMs: number,
+): number {
+  return ms * pxPerMs
+}
+
+/**
+ * 将像素数转换为对应的毫秒数
+ *
+ * @param px 像素数
+ * @param pxPerMs 1毫秒对应的像素数
+ */
+export function getMsByPx(
+  px: number,
+  pxPerMs: number,
+): number {
+  return px / pxPerMs
+}

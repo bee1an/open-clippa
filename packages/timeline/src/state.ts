@@ -1,6 +1,11 @@
 import type { Train } from './train'
+import { EventBus } from '@clippa/utils'
 
-export class State {
+export type StateEvents = {
+  updatedPxPerMs: [number]
+}
+
+export class State extends EventBus<StateEvents> {
   private static _instance: State | null = null
 
   static getInstance(): State {
@@ -10,7 +15,7 @@ export class State {
     return State._instance
   }
 
-  private constructor() {}
+  private constructor() { super() }
 
   /**
    * 当前train是否在拖拽中
@@ -29,5 +34,14 @@ export class State {
   atDragTrain: Train | null = null
   setDraggingTrain(train: Train | null): void {
     this.atDragTrain = train
+  }
+
+  /**
+   * 每ms对应的px
+   */
+  pxPerMs: number = 0
+  updatePxPerMs(pxPerMs: number): void {
+    this.pxPerMs = pxPerMs
+    this.emit('updatedPxPerMs', pxPerMs)
   }
 }
