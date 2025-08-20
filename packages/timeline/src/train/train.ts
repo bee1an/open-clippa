@@ -173,6 +173,7 @@ export class Train extends EventBus<TrainEvents> {
 
         // 拖拽结束后将y值还原
         this.y = 2
+        this.updatePos(undefined, this.y)
 
         this.updateState('normal')
         this.emit('moveEnd', this)

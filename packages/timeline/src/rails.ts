@@ -1,18 +1,34 @@
+import type { FederatedPointerEvent } from 'pixi.js'
+import type { TrainOption } from './train'
 import { getPxByMs } from '@clippa/utils'
 import { Container } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
+import { GAP, RailGap } from './railGap'
 import { RULER_HEIGHT } from './ruler'
 import { State } from './state'
 
 export interface RailsOption {
   screenWidth: number
   duration: number
+  maxZIndex: number
 }
 
 export class Rails {
   container: Container
 
+  /**
+   * sort by zIndex
+   *
+   * 由大到小
+   */
   rails: Rail[] = []
+
+  /**
+   * sort by zIndex
+   *
+   * 由大到小
+   */
+  railGaps: RailGap[] = []
 
   state: State
 
@@ -20,6 +36,8 @@ export class Rails {
   screenWidth: number
 
   duration: number
+
+  maxZIndex: number
 
   constructor(option: RailsOption) {
     const processWidth = (): void => {
@@ -36,6 +54,8 @@ export class Rails {
     this.duration = option.duration
     processWidth()
     this.screenWidth = option.screenWidth
+    this.maxZIndex = option.maxZIndex
+
     this.container = new Container({ y: RULER_HEIGHT })
 
     this._drawBody()
@@ -43,44 +63,85 @@ export class Rails {
     this._bindEvents()
   }
 
+  private _createRail(zIndex: number, trainsOptions: TrainOption[] = []): Rail {
+    const y = (this.maxZIndex - zIndex) * (RAIL_HEIGHT + GAP) + GAP
+
+    const rail = new Rail(
+      {
+        width: Math.max(this.width, this.screenWidth),
+        y,
+        duration: this.duration,
+        zIndex,
+        trainsOption: trainsOptions,
+      },
+    )
+
+    rail.on('trainLeave', (train) => {
+      train.updatePos(undefined, rail.y + train.y)
+      train.updateState('free')
+
+      this.container.addChild(train.container)
+    })
+
+    this._insertRailByZIndex(rail, zIndex)
+
+    this.container.addChild(rail.container)
+
+    return rail
+  }
+
+  private _createRailGap(zIndex: number): RailGap {
+    const y = (this.maxZIndex - (zIndex - 1)) * (RAIL_HEIGHT + GAP)
+
+    const gap = new RailGap({
+      y,
+      width: Math.max(this.width, this.screenWidth),
+      zIndex,
+    })
+
+    this._insertGapByZIndex(gap, zIndex)
+
+    this.container.addChild(gap.container)
+
+    return gap
+  }
+
   private _drawBody(): void {
-    let y = 0
-    for (let index = 0; index < 1; index++) {
-      const rail = new Rail(
-        {
-          width: this.width,
-          y,
-          duration: this.duration,
-          trainsOption: [
-            { start: 100, duration: 1000 },
-            { start: 2000, duration: 1500 },
-            { start: 5000, duration: 2000 },
-          ],
-        },
-      )
+    this._createRailGap(this.maxZIndex + 1)
 
-      this.rails.push(rail)
+    for (let index = 0; index <= this.maxZIndex; index++) {
+      const zIndex = this.maxZIndex - index
 
-      this.container.addChild(rail.container)
-      y += RAIL_HEIGHT + 10
+      this._createRail(this.maxZIndex - index, [
+        { start: 500, duration: 1000 },
+        { start: 2000, duration: 1500 },
+        { start: 5000, duration: 2000 },
+      ])
+
+      this._createRailGap(zIndex)
     }
   }
 
+  private _insertGapByZIndex(gap: RailGap, zIndex: number): void {
+    this.railGaps.splice((this.maxZIndex - zIndex) + 1, 0, gap)
+  }
+
+  private _insertRailByZIndex(rail: Rail, zIndex: number): void {
+    this.rails.splice(this.maxZIndex - zIndex, 0, rail)
+  }
+
   private _bindEvents(): void {
-    this.rails.forEach((rail) => {
-      // 如果有train离开, 则将这个train设置为游离状态
-      rail.on('trainLeave', (train) => {
-        train.updatePos(undefined, rail.y + train.y)
-        train.updateState('free')
-
-        this.container.addChild(train.container)
-      })
-    })
-
     this.container.eventMode = 'static'
+    let timeId: number
     this.container.on('pointermove', (e) => {
       if (!this.state.trainDragging)
         return
+
+      clearTimeout(timeId)
+
+      timeId = window.setTimeout(() => {
+        this._stayWhenDragging(e)
+      }, 500)
 
       const { x, y } = e.getLocalPosition(this.container)
 
@@ -98,12 +159,78 @@ export class Rails {
 
         atTrain.updateState('normal')
         atTrain.updatePos(undefined, atTrain.y - rail.y)
+
+        this.railGaps.forEach(gap => gap.setActive(false))
       }
+    })
+
+    this.container.on('pointerup', () => {
+      if (!this.state.trainDragging)
+        return
+
+      const gap = this.railGaps.find(gap => gap.active)
+
+      if (!gap)
+        return
+
+      gap.setActive(false)
+
+      const { zIndex } = gap
+
+      this.rails.forEach((rail) => {
+        if (rail.zIndex >= zIndex) {
+          rail.updateZIndex(rail.zIndex + 1)
+        }
+        else {
+          rail.updateY(rail.y + RAIL_HEIGHT + GAP)
+        }
+      })
+
+      this.railGaps.forEach((railGap) => {
+        if (railGap.zIndex >= zIndex) {
+          railGap.updateZIndex(railGap.zIndex + 1)
+        }
+        else {
+          railGap.updateY(railGap.y + RAIL_HEIGHT + GAP)
+        }
+      })
+
+      this.maxZIndex = Math.max(...this.rails.map(i => i.zIndex), zIndex)
+
+      const rail = this._createRail(zIndex)
+      this._createRailGap(zIndex)
+
+      const atTrain = this.state.atDragTrain!
+
+      this.state.atDragTrain?.parent?.removeTrain(atTrain)
+
+      rail.insertTrain(atTrain)
+
+      atTrain.updateState('normal')
+
+      // console.log('', this.rails.map(i => i.zIndex), this.railGaps.map(i => i.zIndex))
     })
   }
 
+  getRailByZIndex(zIndex: number): Rail {
+    return this.rails[this.maxZIndex - zIndex]
+  }
+
+  private _stayWhenDragging(e: FederatedPointerEvent): void {
+    const { x, y } = e.getLocalPosition(this.container)
+
+    const gap = this.railGaps.find((gap) => {
+      const bounds = gap.container.getLocalBounds()
+      bounds.y = gap.y
+
+      return gap.container.getLocalBounds().containsPoint(x, y)
+    })
+
+    gap?.setActive(true)
+  }
+
   /**
-   * 更新宽度
+   * 更新屏幕宽度
    */
   updateScreenWidth(screenWidth: number): void {
     this.screenWidth = screenWidth
@@ -121,8 +248,11 @@ export class Rails {
   }
 
   update(): void {
-    this.rails.forEach((rail) => {
-      rail.updateWidth(Math.max(this.width, this.screenWidth))
-    })
+    const helper = (instance: any): void => {
+      instance.updateWidth(Math.max(this.width, this.screenWidth))
+    }
+
+    this.rails.forEach(helper)
+    this.railGaps.forEach(helper)
   }
 }

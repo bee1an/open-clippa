@@ -13,6 +13,6 @@ const _log = console.log
 
 <template>
   <div p-x-20px wfull>
-    <div id="timeline" wfull h-200px bg-blue resize-y overflow-hidden />
+    <div id="timeline" wfull h-300px bg-blue resize-y overflow-hidden />
   </div>
 </template>

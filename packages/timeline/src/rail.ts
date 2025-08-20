@@ -18,22 +18,26 @@ export interface RailOption {
   width: number
   y: number
   duration: number
+  zIndex: number
   trainsOption: TrainOption[]
 }
 
 export type RailEvents = {
   trainLeave: [Train, FederatedPointerEvent]
+  trainBeforeMoveEnd: [Train]
 }
 
 export class Rail extends EventBus<RailEvents> {
   container: Container
   width: number
   y: number
+
   /**
    * trains, is sorted
    */
   trains: Train[] = []
   duration: number
+  zIndex: number
   state: State = State.getInstance()
 
   constructor(option: RailOption) {
@@ -41,6 +45,7 @@ export class Rail extends EventBus<RailEvents> {
     this.width = option.width
     this.y = option.y
     this.duration = option.duration
+    this.zIndex = option.zIndex
 
     this.container = new Container({ y: this.y })
 
@@ -317,5 +322,23 @@ export class Rail extends EventBus<RailEvents> {
     this.width = width
 
     this._drawBg()
+  }
+
+  updateY(y: number): void {
+    if (y === this.y)
+      return
+
+    this.y = y
+
+    this.container.y = y
+  }
+
+  updateZIndex(zIndex: number): void {
+    if (zIndex === this.zIndex)
+      return
+
+    this.zIndex = zIndex
+
+    // TODO
   }
 }

@@ -115,6 +115,7 @@ export class Timeline {
     this.rails = new Rails({
       screenWidth: this.app!.screen.width,
       duration: this.duration,
+      maxZIndex: 2,
     })
 
     this.scroller.container.addChild(this.rails.container)
