@@ -163,7 +163,12 @@ export class Train extends EventBus<TrainEvents> {
           this.updatePos(this._recordWhenDrag!.x, 2, true)
         }
         else {
-          this.updateStart(getPxByMs(this.x, this.state.pxPerMs))
+          if (this.x !== this.container.x) {
+            this.updatePos(this.container.x, undefined, true)
+          }
+          else {
+            this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
+          }
         }
 
         // 拖拽结束后将y值还原

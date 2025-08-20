@@ -131,7 +131,7 @@ export class Ruler extends EventBus<RulerEvents> {
   private _bgByDuration?: Graphics
   private _drawBgByDuration(): void {
     const bg = new Graphics()
-    bg.rect(0, 0, getPxByMs(this.duration, this.state.pxPerMs), RULER_HEIGHT)
+    bg.roundRect(0, 0, getPxByMs(this.duration, this.state.pxPerMs), RULER_HEIGHT, 8)
     bg.fill('#2c1d47')
 
     if (this._bgByDuration) {
