@@ -10,8 +10,14 @@ export const RAIL_HEIGHT = 40
 export const RAIL_COLOR = '#5f5f63aa'
 
 export interface RailOption {
+  /**
+   * 宽度
+   *
+   * 需要保留这个参数, 这个宽度不全部受时间影响
+   */
   width: number
   y: number
+  duration: number
   trainsOption: TrainOption[]
 }
 
@@ -27,13 +33,14 @@ export class Rail extends EventBus<RailEvents> {
    * trains, is sorted
    */
   trains: Train[] = []
-
+  duration: number
   state: State = State.getInstance()
 
   constructor(option: RailOption) {
     super()
     this.width = option.width
     this.y = option.y
+    this.duration = option.duration
 
     this.container = new Container({ y: this.y })
 

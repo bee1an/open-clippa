@@ -1,10 +1,12 @@
+import { getPxByMs } from '@clippa/utils'
 import { Container } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
 import { RULER_HEIGHT } from './ruler'
 import { State } from './state'
 
 export interface RailsOption {
-  width: number
+  screenWidth: number
+  duration: number
 }
 
 export class Rails {
@@ -12,12 +14,28 @@ export class Rails {
 
   rails: Rail[] = []
 
-  state: State = State.getInstance()
+  state: State
 
-  width: number
+  width!: number
+  screenWidth: number
+
+  duration: number
 
   constructor(option: RailsOption) {
-    this.width = option.width
+    const processWidth = (): void => {
+      this.width = getPxByMs(this.duration, this.state.pxPerMs)
+    }
+
+    this.state = State.getInstance()
+    this.state.on('updatedPxPerMs', () => {
+      processWidth()
+
+      this.queueUpdate()
+    })
+
+    this.duration = option.duration
+    processWidth()
+    this.screenWidth = option.screenWidth
     this.container = new Container({ y: RULER_HEIGHT })
 
     this._drawBody()
@@ -32,6 +50,7 @@ export class Rails {
         {
           width: this.width,
           y,
+          duration: this.duration,
           trainsOption: [
             { start: 100, duration: 1000 },
             { start: 2000, duration: 1500 },
@@ -86,9 +105,24 @@ export class Rails {
   /**
    * 更新宽度
    */
-  updateWidth(width: number): void {
-    this.width = width
+  updateScreenWidth(screenWidth: number): void {
+    this.screenWidth = screenWidth
 
-    this.rails.forEach(rail => rail.updateWidth(width))
+    this.queueUpdate()
+  }
+
+  private _requestAnimationFrameId: number | null = null
+  queueUpdate(): void {
+    this._requestAnimationFrameId && cancelAnimationFrame(this._requestAnimationFrameId)
+
+    this._requestAnimationFrameId = requestAnimationFrame(() => {
+      this.update()
+    })
+  }
+
+  update(): void {
+    this.rails.forEach((rail) => {
+      rail.updateWidth(Math.max(this.width, this.screenWidth))
+    })
   }
 }

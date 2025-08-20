@@ -1,5 +1,6 @@
-import { EventBus, ms2TimeStr } from '@clippa/utils'
+import { EventBus, getPxByMs, ms2TimeStr } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
+import { State } from './state'
 
 export const RULER_HEIGHT = 28
 
@@ -10,13 +11,14 @@ export const DOT_NUM = 3
 export const TICK_FONT_SIZE = 10
 
 export interface RulerOption {
-  width: number
   screenWidth: number
   duration: number
 }
 
 export type RulerEvents = {
   seek: [number]
+
+  render: []
 }
 
 /**
@@ -36,16 +38,29 @@ export const MINIMUM_DURATION = 0 // TODO
 
 export class Ruler extends EventBus<RulerEvents> {
   container: Container
-  private _bg?: Graphics
   duration: number
 
-  width: number
+  width!: number
   screenWidth: number
+
+  state: State
 
   constructor(option: RulerOption) {
     super()
+
+    const processWidth = (): void => {
+      this.width = getPxByMs(this.duration, this.state.pxPerMs)
+    }
+
+    this.state = State.getInstance()
+    this.state.on('updatedPxPerMs', () => {
+      processWidth()
+
+      this.queueRender()
+    })
+
     this.duration = option.duration
-    this.width = option.width
+    processWidth()
     this.screenWidth = option.screenWidth
 
     const container = new Container()
@@ -60,13 +75,11 @@ export class Ruler extends EventBus<RulerEvents> {
 
   /**
    * Updates the width of the ruler and re-renders the component.
-   *
-   * @param width - The new width to set for the ruler.
    */
-  updateWidth(width: number): void {
-    this.width = width
-    this.queueRender()
-  }
+  // updateWidth(width: number): void {
+  //   this.width = width
+  //   this.queueRender()
+  // }
 
   updateScreenWidth(screenWidth: number): void {
     this.screenWidth = screenWidth
@@ -92,31 +105,53 @@ export class Ruler extends EventBus<RulerEvents> {
     if (this.width === 0)
       return
 
-    this.container.removeChildren()
     this._drawBg()
+    this._drawBgByDuration()
     this._drawTick()
+
+    this.emit('render')
   }
 
+  private _bg?: Graphics
   private _drawBg(): void {
+    const bg = new Graphics()
+    bg.rect(0, 0, this.width, RULER_HEIGHT)
+    bg.fill('#52521101')
+
     if (this._bg) {
-      this._bg.width = this.width
-      this.container.addChild(this._bg)
-      return
+      this.container.replaceChild(this._bg, bg)
+    }
+    else {
+      this.container.addChild(bg)
     }
 
-    this._bg = new Graphics()
-    this._bg.rect(0, 0, this.width, RULER_HEIGHT)
-    this._bg.fill('#52521101')
-    this.container.addChild(this._bg)
+    this._bg = bg
   }
 
-  private _drawDot(x: number, color: string = '#505067'): void {
+  private _bgByDuration?: Graphics
+  private _drawBgByDuration(): void {
+    const bg = new Graphics()
+    bg.rect(0, 0, getPxByMs(this.duration, this.state.pxPerMs), RULER_HEIGHT)
+    bg.fill('#2c1d47')
+
+    if (this._bgByDuration) {
+      this.container.replaceChild(this._bgByDuration, bg)
+    }
+    else {
+      this.container.addChild(bg)
+    }
+
+    this._bgByDuration = bg
+  }
+
+  private _drawDot(x: number, color: string = '#505067'): Graphics {
     const graphics = new Graphics()
 
-    graphics.circle(x, RULER_HEIGHT / 2, DOT_RADIUS)
+    graphics.circle(0, 0, DOT_RADIUS)
+    graphics.position.set(x, RULER_HEIGHT / 2)
     graphics.fill(color)
 
-    this.container.addChild(graphics)
+    return graphics
   }
 
   private _drawTextTime(x: number, content: string): Text {
@@ -131,8 +166,6 @@ export class Ruler extends EventBus<RulerEvents> {
     })
 
     text.anchor.set(0.5)
-
-    this.container.addChild(text)
 
     return text
   }
@@ -150,31 +183,61 @@ export class Ruler extends EventBus<RulerEvents> {
     return tick
   }
 
-  private _timeTexts: Text[] = []
+  private _ticksWrapper?: Container
   private _drawTick(): void {
-    this._timeTexts.length = 0
+    const ticksWrapper = new Container()
+
     let x = 0
     const tick = this._tick
     const gap = this._getGap(tick)
 
     const dotGap = gap / (DOT_NUM + 1)
 
+    const rightLimitX = Math.max(this.screenWidth, this.width)
+
     const drawDotGroup = (): void => {
-      Array.from({ length: DOT_NUM }, (_, index): void => {
-        this._drawDot(x + dotGap * (index + 1))
-        return void 0
-      })
+      for (let index = 0; index < DOT_NUM; index++) {
+        const dot = this._drawDot(x + dotGap * (index + 1))
+
+        const dotRightX = dot.x + dot.width
+
+        if (dotRightX < rightLimitX) {
+          ticksWrapper!.addChild(this._drawDot(x + dotGap * (index + 1)))
+        }
+        else {
+          break
+        }
+      }
     }
 
-    for (let i = 0; i < Math.max(this.screenWidth, this.width) / gap - 1; i++) {
+    // 如果width < screenWidth, 会补足screenWidth, 防止出现空隙
+    for (let i = 0; i < rightLimitX / gap - 1; i++) {
       drawDotGroup()
 
       x += gap
-      const timeText = this._drawTextTime(x, ms2TimeStr((i + 1) * tick))
-      this._timeTexts.push(timeText)
+
+      const text = this._drawTextTime(x, ms2TimeStr((i + 1) * tick))
+
+      const textRightX = text.x + text.width
+
+      if (textRightX < rightLimitX) {
+        ticksWrapper.addChild(text)
+      }
+      else {
+        break
+      }
     }
 
     drawDotGroup()
+
+    if (this._ticksWrapper) {
+      this.container.replaceChild(this._ticksWrapper, ticksWrapper)
+    }
+    else {
+      this.container.addChild(ticksWrapper)
+    }
+
+    this._ticksWrapper = ticksWrapper
   }
 
   private _bindPointerdown(): void {

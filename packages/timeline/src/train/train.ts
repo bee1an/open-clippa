@@ -147,6 +147,8 @@ export class Train extends EventBus<TrainEvents> {
 
         this.x = site.xValue
         this.y = site.yValue
+
+        this.emit('afterMove', this)
       },
       up: () => {
         this.state.setTrainDragging(false)

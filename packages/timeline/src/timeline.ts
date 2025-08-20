@@ -21,7 +21,7 @@ export class Timeline {
 
   duration: number
 
-  scale: number = 1
+  scale: number = 0.8
 
   width: number = 0
 
@@ -55,10 +55,6 @@ export class Timeline {
       app.resize()
 
       this._updateChildrenSize()
-
-      this.scroller.once('render', () => {
-        this.width = this.scroller.width
-      })
     }).observe(wrapper)
 
     wrapper.appendChild(app.canvas)
@@ -69,17 +65,13 @@ export class Timeline {
 
     this._createCursor()
 
-    // this._updateChildrenSize()
-
-    this.scroller.once('render', () => {
-      this.width = this.scroller.width
-      this._updatePxPerMs(this.width / this.duration)
-      this.ruler?.updateWidth(this.width)
-      this.cursor?.updateWidth(this.width)
-    })
+    this._updatePxPerMs((app.screen.width / this.duration) * this.scale)
   }
 
   private _updatePxPerMs(pxPerMs: number): void {
+    if (pxPerMs === this.state.pxPerMs)
+      return
+
     this.state.updatePxPerMs(pxPerMs)
   }
 
@@ -95,15 +87,16 @@ export class Timeline {
     this.cursor?.updateScreenWidth(screenWidth)
     this.cursor?.updateScreenHeight(screenHeight)
 
-    this.scroller.updateViewportSize(screenWidth, screenHeight)
+    this.rails?.updateScreenWidth(screenWidth)
 
-    // 不能直接用screenWidth, 是因为rails的宽度应该始终铺满整个容器
-    this.rails?.updateWidth(Math.max(this.width, screenWidth))
+    requestAnimationFrame(() => {
+      // container不会马上更新size
+      this.scroller.updateViewportSize(screenWidth, screenHeight)
+    })
   }
 
   private _createRuler(): void {
     this.ruler = new Ruler({
-      width: this.app!.stage.width,
       screenWidth: this.app!.screen.width,
       duration: this.duration,
     })
@@ -112,23 +105,27 @@ export class Timeline {
     this.ruler.on('seek', (seekTime: number) => {
       this.cursor?.seek(seekTime)
     })
+
+    this.ruler.on('render', () => {
+      this.scroller.nextRender(() => this.scroller.update())
+    })
+  }
+
+  private _createRails(): void {
+    this.rails = new Rails({
+      screenWidth: this.app!.screen.width,
+      duration: this.duration,
+    })
+
+    this.scroller.container.addChild(this.rails.container)
   }
 
   private _createCursor(): void {
     this.cursor = new Cursor({
-      width: this.app!.stage.width,
       screenWidth: this.app!.screen.width,
       height: this.app!.screen.height,
       duration: this.duration,
     })
     this.scroller.container.addChild(this.cursor.container)
-  }
-
-  private _createRails(): void {
-    this.rails = new Rails({
-      width: Math.max(this.app!.stage.width, this.app!.screen.width),
-    })
-
-    this.scroller.container.addChild(this.rails.container)
   }
 }

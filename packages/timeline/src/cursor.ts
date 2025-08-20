@@ -1,9 +1,10 @@
+import { getPxByMs } from 'open-clippa'
 import { Container, Graphics } from 'pixi.js'
+import { State } from './state'
 
 export interface CursorOption {
   duration: number
   height: number
-  width: number
   screenWidth: number
 }
 
@@ -12,12 +13,22 @@ export class Cursor {
   currentTime: number = 0
   duration: number
 
-  width: number
+  width!: number
   screenWidth: number
 
+  state: State
+
   constructor(option: CursorOption) {
+    this.state = State.getInstance()
+    const processWidth = (): void => {
+      this.width = getPxByMs(this.duration, this.state.pxPerMs)
+    }
+
+    this.state.on('updatedPxPerMs', processWidth)
+
     this.duration = option.duration
-    this.width = option.width
+    processWidth()
+
     this.screenWidth = option.screenWidth
 
     this.container = new Container()

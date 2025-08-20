@@ -19,6 +19,11 @@ export type TrainEvents = {
   beforeMove: [{ xValue: number }, target: Train]
 
   /**
+   * 每一次移动后
+   */
+  afterMove: [target: Train]
+
+  /**
    * 拖拽结束
    */
   moveEnd: [target: Train]

@@ -7,6 +7,8 @@ export const SCROLLBAR_HEIGHT = 10
 export const RAIL_COLOR = '#7d6f7cff'
 export const TRIGGER_COLOR = '#d4d3cdff'
 
+export type Anyfn = (...args: any[]) => any // TODO
+
 export interface ScrollBoxOption {
   /**
    * 可视区域宽度
@@ -80,11 +82,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this.wrapper.addChild(this.container)
 
     this.container.on('childAdded', () => {
-      this.updateSize(this.container.width, this.container.height)
+      this._updateSize(this.container.width, this.container.height)
     })
 
     this.container.on('childRemoved', () => {
-      this.updateSize(this.container.width, this.container.height)
+      this._updateSize(this.container.width, this.container.height)
     })
 
     this.render()
@@ -265,7 +267,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   /**
    * Update the size
    */
-  updateSize(w?: number, h?: number): void {
+  private _updateSize(w?: number, h?: number): void {
     if (w) {
       this.width = w
     }
@@ -274,6 +276,26 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     }
 
     this.queueRender()
+  }
+
+  /**
+   * Updates the size of the viewport if the size of the container has changed.
+   */
+  update(): void {
+    const { width: containerWidth, height: containerHeight } = this.container.getSize()
+    if (containerWidth !== this.width || containerHeight !== this.height) {
+      this._updateSize(containerWidth, containerHeight)
+    }
+  }
+
+  nextRender(fn?: Anyfn): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.container.onRender = () => {
+        fn?.()
+        this.container.onRender = null as any
+        resolve()
+      }
+    })
   }
 
   /**
