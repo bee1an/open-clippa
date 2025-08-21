@@ -1,10 +1,10 @@
-import type { FederatedPointerEvent } from 'pixi.js'
+import type { Container, FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
-import { getPxByMs } from '@clippa/utils'
-import { Container } from 'pixi.js'
+import { EventBus, getPxByMs } from '@clippa/utils'
 import { Rail, RAIL_HEIGHT } from './rail'
 import { GAP, RailGap } from './railGap'
 import { RULER_HEIGHT } from './ruler'
+import { ScrollBox } from './scrollBox'
 import { State } from './state'
 
 export interface RailsOption {
@@ -13,8 +13,16 @@ export interface RailsOption {
   maxZIndex: number
 }
 
-export class Rails {
-  container: Container
+export type RailsEvents = {
+  scrollbarVisibleChanged: [visible: boolean, width: number]
+}
+
+export class Rails extends EventBus<RailsEvents> {
+  scrollBox: ScrollBox
+
+  get container(): Container {
+    return this.scrollBox.container
+  }
 
   /**
    * sort by zIndex
@@ -40,6 +48,7 @@ export class Rails {
   maxZIndex: number
 
   constructor(option: RailsOption) {
+    super()
     const processWidth = (): void => {
       this.width = getPxByMs(this.duration, this.state.pxPerMs)
     }
@@ -56,7 +65,13 @@ export class Rails {
     this.screenWidth = option.screenWidth
     this.maxZIndex = option.maxZIndex
 
-    this.container = new Container({ y: RULER_HEIGHT })
+    this.scrollBox = new ScrollBox({ hideXBar: true })
+
+    this.scrollBox.on('toggleYBarVisible', (visible) => {
+      this.emit('scrollbarVisibleChanged', visible, this.scrollBox.barWidth)
+    })
+
+    this.container.y = RULER_HEIGHT
 
     this._drawBody()
 
@@ -285,6 +300,26 @@ export class Rails {
    */
   updateScreenWidth(screenWidth: number): void {
     this.screenWidth = screenWidth
+
+    this.scrollBox.updateViewportSize(screenWidth)
+
+    this.update()
+  }
+
+  updateScreenHeight(screenHeight: number): void {
+    this.scrollBox.updateViewportSize(undefined, screenHeight - RULER_HEIGHT)
+
+    this.scrollBox.update()
+  }
+
+  updateScreenSize(screenWidth?: number, screenHeight?: number): void {
+    if (screenWidth) {
+      this.screenWidth = screenWidth
+    }
+
+    this.scrollBox.updateViewportSize(this.screenWidth, screenHeight && (screenHeight - RULER_HEIGHT))
+
+    this.scrollBox.update()
 
     this.update()
   }

@@ -13,19 +13,21 @@ export interface ScrollBoxOption {
   /**
    * 可视区域宽度
    */
-  viewportWidth: number
+  viewportWidth?: number
   /**
    * 可视区域高度
    */
-  viewportHeight: number
+  viewportHeight?: number
   /**
    * 是否禁用x轴方向
    */
-  xDisable?: boolean
+  hideXBar?: boolean
   /**
    * 是否禁用y轴方向
    */
-  yDisable?: boolean
+  hideYBar?: boolean
+
+  scrollMore?: { x?: number, y?: number }
 
   railColor?: string
   triggerColor?: string
@@ -43,6 +45,12 @@ interface DrawScrollBarHelperOption {
 
 export type ScrollBoxEvents = {
   render: []
+
+  toggleXBarVisible: [boolean]
+
+  toggleYBarVisible: [boolean]
+
+  scroll: [{ x: number, y: number }]
 }
 
 class ContainerProxy<C extends ContainerChild = ContainerChild> extends Container<C> {
@@ -89,28 +97,37 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   /**
    * 是否禁用x轴方向
    */
-  xDisable: boolean
+  hideXBar: boolean
   /**
    * 是否禁用y轴方向
    */
-  yDisable: boolean
+  hideYBar: boolean
+
+  private _isXBarVisible: boolean = false
+
+  private _isYBarVisible: boolean = false
+
+  scrollMore?: { x?: number, y?: number }
 
   railColor: string
   triggerColor: string
   barHeight: number
   barWidth: number
 
-  constructor(option: ScrollBoxOption) {
+  constructor(option?: ScrollBoxOption) {
+    option ??= {}
+
     super()
 
     this._wrapper = new Container()
 
     this.container = new ContainerProxy(this._wrapper)
 
-    this.viewportWidth = option.viewportWidth
-    this.viewportHeight = option.viewportHeight
-    this.xDisable = option.xDisable ?? false
-    this.yDisable = option.yDisable ?? false
+    this.viewportWidth = option.viewportWidth ?? 0
+    this.viewportHeight = option.viewportHeight ?? 0
+    this.hideXBar = option.hideXBar ?? false
+    this.hideYBar = option.hideYBar ?? false
+    this.scrollMore = option.scrollMore
 
     this.railColor = option.railColor ?? RAIL_COLOR
     this.triggerColor = option.triggerColor ?? TRIGGER_COLOR
@@ -139,15 +156,18 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.container.removeChild(this._viewportMask)
     }
 
+    const w = this.viewportWidth
+    const h = this.viewportHeight
+
     const view = new Graphics()
     this._viewportMask = view
-    view.rect(0, 0, this.viewportWidth, this.viewportHeight)
+    view.rect(0, 0, w, h)
     view.fill('transparent')
     this.container.mask = view
     this.container.rawAddChild(view)
   }
 
-  private _drawScrollbarHelper(option: DrawScrollBarHelperOption): Container {
+  private _drawScrollbarHelper(option: DrawScrollBarHelperOption): [Container, Graphics] {
     const { rail: railOption, bar: barOption, down, move, click } = option
 
     const scrollbar = new Container()
@@ -187,10 +207,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     scrollbar.addChild(rail)
     scrollbar.addChild(trigger)
 
-    return scrollbar
+    return [scrollbar, trigger]
   }
 
   private _scrollbarXBar?: Container
+  private _scrollbarXTrigger?: Graphics
   private _drawScrollXBar(): void {
     if (!this.viewportWidth)
       return
@@ -199,32 +220,30 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.container.removeChild(this._scrollbarXBar)
     }
 
+    const isXBarVisible = this._isXBarVisible
+    this._isXBarVisible = !this.hideXBar && this.width > this.viewportWidth
+
+    if (isXBarVisible !== this._isXBarVisible) {
+      this.emit('toggleXBarVisible', this._isXBarVisible)
+    }
+
     if (this.width <= this.viewportWidth) {
       return
     }
 
-    const stepRatio = this.viewportWidth / this.width
+    const scrollMore = this.scrollMore?.x ?? 0
+
+    const stepRatio = this.viewportWidth / (this.width + scrollMore)
 
     let x: number
-    const move = (e: { x: number }, _: Container, trigger: Graphics): void => {
-      let dx = e.x - x!
+    const move = (e: { x: number }): void => {
+      const dx = e.x - x!
 
-      // left limit
-      if (trigger.x + dx < 0) {
-        dx = -trigger.x
-      }
-
-      // right limit
-      if (trigger.x + dx + trigger.width > this.viewportWidth) {
-        dx = this.viewportWidth - trigger.x - trigger.width
-      }
-
-      trigger.x += dx
-      this._wrapper.x -= dx / stepRatio
+      this._scrollX(dx)
 
       x += dx
     }
-    this._scrollbarXBar = this._drawScrollbarHelper({
+    [this._scrollbarXBar, this._scrollbarXTrigger] = this._drawScrollbarHelper({
       rail: [0, this.viewportHeight - this.barHeight, this.viewportWidth, this.barHeight],
       bar: [0, this.viewportHeight - this.barHeight, stepRatio * this.viewportWidth, this.barHeight, this.barHeight / 2],
       down: (e) => {
@@ -239,14 +258,39 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
         const moveX = Math.max(Math.min(clickX - barCenterX, trigger.width), -trigger.width)
 
         x = trigger.x
-        move({ x: x + moveX }, scrollbar, trigger)
+        move({ x: x + moveX })
       },
     })
+
+    this._scrollbarXBar.visible = !this.hideXBar
 
     this.container.rawAddChild(this._scrollbarXBar)
   }
 
+  private _scrollX(dx: number): void {
+    const trigger = this._scrollbarXTrigger!
+
+    const scrollMore = this.scrollMore?.x ?? 0
+    const stepRatio = this.viewportWidth / (this.width + scrollMore)
+
+    // left limit
+    if (trigger.x + dx < 0) {
+      dx = -trigger.x
+    }
+
+    // right limit
+    if (trigger.x + dx + trigger.width > this.viewportWidth) {
+      dx = this.viewportWidth - trigger.x - trigger.width
+    }
+
+    trigger.x += dx
+    this._wrapper.x -= dx / stepRatio
+
+    this.emit('scroll', { x: dx, y: 0 })
+  }
+
   private _scrollbarYBar?: Container
+  private _scrollbarYTrigger?: Graphics
   private _drawScrollYBar(): void {
     if (!this.viewportHeight)
       return
@@ -255,32 +299,30 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.container.removeChild(this._scrollbarYBar)
     }
 
+    const isYBarVisible = this._isYBarVisible
+    this._isYBarVisible = !this.hideYBar && this.height > this.viewportHeight
+
+    if (isYBarVisible !== this._isYBarVisible) {
+      this.emit('toggleYBarVisible', this._isYBarVisible)
+    }
+
     if (this.height <= this.viewportHeight) {
       return
     }
 
-    const stepRatio = this.viewportHeight / this.height
+    const scrollMore = this.scrollMore?.y ?? 0
+
+    const stepRatio = this.viewportHeight / (this.height + scrollMore)
 
     let y: number
-    const move = (e: { y: number }, _: Container, trigger: Graphics): void => {
-      let dy = e.y - y!
+    const move = (e: { y: number }): void => {
+      const dy = e.y - y!
 
-      // top limit
-      if (trigger.y + dy < 0) {
-        dy = -trigger.y
-      }
-
-      // bottom limit
-      if (trigger.y + dy + trigger.height > this.viewportHeight) {
-        dy = this.viewportHeight - trigger.y - trigger.height
-      }
-
-      trigger.y += dy
-      this._wrapper.y -= dy / stepRatio
+      this._scrollY(dy)
 
       y += dy
     }
-    this._scrollbarYBar = this._drawScrollbarHelper({
+    [this._scrollbarYBar, this._scrollbarYTrigger] = this._drawScrollbarHelper({
       rail: [this.viewportWidth - this.barWidth, 0, this.barWidth, this.viewportHeight],
       bar: [this.viewportWidth - this.barWidth, 0, this.barWidth, stepRatio * this.viewportHeight, this.barWidth / 2],
       down: (e) => {
@@ -295,11 +337,46 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
         const moveY = Math.max(Math.min(clickY - barCenterY, trigger.height), -trigger.height)
 
         y = trigger.y
-        move({ y: y + moveY }, scrollbar, trigger)
+        move({ y: y + moveY })
       },
     })
 
+    this._scrollbarYBar.visible = !this.hideYBar
+
     this.container.rawAddChild(this._scrollbarYBar)
+  }
+
+  private _scrollY(dy: number): void {
+    const trigger = this._scrollbarYTrigger!
+
+    const scrollMore = this.scrollMore?.y ?? 0
+
+    const stepRatio = this.viewportHeight / (this.height + scrollMore)
+
+    // top limit
+    if (trigger.y + dy < 0) {
+      dy = -trigger.y
+    }
+
+    // bottom limit
+    if (trigger.y + dy + trigger.height > this.viewportHeight) {
+      dy = this.viewportHeight - trigger.y - trigger.height
+    }
+
+    trigger.y += dy
+    this._wrapper.y -= dy / stepRatio
+
+    this.emit('scroll', { x: 0, y: dy })
+  }
+
+  scroll({ x, y }: { x?: number, y?: number }): void {
+    if (x) {
+      this._scrollX(x)
+    }
+
+    if (y) {
+      this._scrollY(y)
+    }
   }
 
   /**
@@ -324,6 +401,25 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     if (containerWidth !== this.width || containerHeight !== this.height) {
       this._updateSize(containerWidth, containerHeight)
     }
+  }
+
+  updateScrollMore(scrollMore: { x?: number, y?: number }): void {
+    const { x, y } = scrollMore
+
+    let needRerender = false
+    this.scrollMore ??= {}
+
+    if (typeof x === 'number' && x !== this.scrollMore.x) {
+      this.scrollMore.x = x
+      needRerender = true
+    }
+
+    if (typeof y === 'number' && y !== this.scrollMore.y) {
+      this.scrollMore.y = y
+      needRerender = true
+    }
+
+    needRerender && this.queueRender()
   }
 
   nextRender(fn?: Anyfn): Promise<void> {
@@ -362,11 +458,9 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   render(): void {
     this._drawView()
 
-    if (!this.xDisable)
-      this._drawScrollXBar()
+    this._drawScrollXBar()
 
-    if (!this.yDisable)
-      this._drawScrollYBar()
+    this._drawScrollYBar()
 
     this.emit('render')
   }

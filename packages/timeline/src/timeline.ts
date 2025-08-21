@@ -1,4 +1,4 @@
-import { Application } from 'pixi.js'
+import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Rails } from './rails'
 import { Ruler } from './ruler'
@@ -15,14 +15,15 @@ export class Timeline {
   app?: Application
   ruler?: Ruler
   cursor?: Cursor
-  scroller: ScrollBox = new ScrollBox({ viewportWidth: 0, viewportHeight: 0 })
+  scroller: ScrollBox = new ScrollBox({ hideYBar: true })
   rails?: Rails
+  container = new Container()
 
   state: State = State.getInstance()
 
   duration: number
 
-  scale: number = 0.8
+  scale: number = 1.2
 
   width: number = 0
 
@@ -49,7 +50,7 @@ export class Timeline {
       antialias: true,
     })
 
-    app.stage.addChild(this.scroller.container)
+    app.stage.addChild(this.container)
 
     const queueRun = new QueueRun(() => {
       app.resize()
@@ -63,9 +64,18 @@ export class Timeline {
 
     this._createRuler()
 
+    this._createCursor()
+
     this._createRails()
 
-    this._createCursor()
+    this.scroller.on('toggleXBarVisible', (visible) => {
+      this.rails?.scrollBox.updateScrollMore({ y: visible ? this.scroller.barHeight : 0 })
+    })
+
+    this.scroller.on('scroll', ({ x }) => {
+      this.rails?.scrollBox.scroll({ x })
+    })
+    this.container.addChild(this.scroller.container)
 
     this._updatePxPerMs((app.screen.width / this.duration) * this.scale)
   }
@@ -89,7 +99,10 @@ export class Timeline {
     this.cursor?.updateScreenWidth(screenWidth)
     this.cursor?.updateScreenHeight(screenHeight)
 
-    this.rails?.updateScreenWidth(screenWidth)
+    this.rails?.updateScreenSize(
+      screenWidth,
+      screenHeight,
+    )
 
     this.scroller.updateViewportSize(screenWidth, screenHeight)
     this.scroller.update()
@@ -111,10 +124,16 @@ export class Timeline {
     this.rails = new Rails({
       screenWidth: this.app!.screen.width,
       duration: this.duration,
-      maxZIndex: 2,
+      maxZIndex: 6,
     })
 
-    this.scroller.container.addChild(this.rails.container)
+    this.rails.on('scrollbarVisibleChanged', (visible, barWidth) => {
+      this.rails?.scrollBox.updateScrollMore({ x: visible ? barWidth : 0 })
+      this.scroller.updateScrollMore({ x: visible ? barWidth : 0 })
+    })
+
+    // this.scroller.container.addChild(this.rails.container)
+    this.container.addChild(this.rails.container)
   }
 
   private _createCursor(): void {

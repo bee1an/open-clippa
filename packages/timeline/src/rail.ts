@@ -199,7 +199,7 @@ export class Rail extends EventBus<RailEvents> {
   private _drawBg(): void {
     const bg = new Graphics()
 
-    bg.rect(0, 0, this.width, RAIL_HEIGHT)
+    bg.roundRect(0, 0, this.width, RAIL_HEIGHT, 8)
     bg.fill(RAIL_COLOR)
 
     if (this._bg) {
