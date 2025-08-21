@@ -292,6 +292,8 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     return new Promise<void>((resolve) => {
       this.container.onRender = () => {
         fn?.()
+
+        // [ ]: https://github.com/pixijs/pixijs/pull/11627
         this.container.onRender = null as any
         resolve()
       }

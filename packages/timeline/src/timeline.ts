@@ -4,6 +4,7 @@ import { Rails } from './rails'
 import { Ruler } from './ruler'
 import { ScrollBox } from './scrollBox'
 import { State } from './state'
+import { QueueRun } from './utils'
 
 export interface TimelineOption {
   id: string
@@ -50,12 +51,13 @@ export class Timeline {
 
     app.stage.addChild(this.scroller.wrapper)
 
-    // https://github.com/pixijs/pixijs/issues/11427
-    new ResizeObserver(() => {
+    const queueRun = new QueueRun(() => {
       app.resize()
-
       this._updateChildrenSize()
-    }).observe(wrapper)
+    })
+
+    // https://github.com/pixijs/pixijs/issues/11427
+    new ResizeObserver(() => queueRun.queueRun()).observe(wrapper)
 
     wrapper.appendChild(app.canvas)
 
@@ -89,10 +91,8 @@ export class Timeline {
 
     this.rails?.updateScreenWidth(screenWidth)
 
-    requestAnimationFrame(() => {
-      // container不会马上更新size
-      this.scroller.updateViewportSize(screenWidth, screenHeight)
-    })
+    this.scroller.updateViewportSize(screenWidth, screenHeight)
+    this.scroller.update()
   }
 
   private _createRuler(): void {
@@ -104,10 +104,6 @@ export class Timeline {
 
     this.ruler.on('seek', (seekTime: number) => {
       this.cursor?.seek(seekTime)
-    })
-
-    this.ruler.on('render', () => {
-      this.scroller.nextRender(() => this.scroller.update())
     })
   }
 

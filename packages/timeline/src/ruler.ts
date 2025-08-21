@@ -56,7 +56,7 @@ export class Ruler extends EventBus<RulerEvents> {
     this.state.on('updatedPxPerMs', () => {
       processWidth()
 
-      this.queueRender()
+      this.render()
     })
 
     this.duration = option.duration
@@ -73,26 +73,9 @@ export class Ruler extends EventBus<RulerEvents> {
     this.render()
   }
 
-  /**
-   * Updates the width of the ruler and re-renders the component.
-   */
-  // updateWidth(width: number): void {
-  //   this.width = width
-  //   this.queueRender()
-  // }
-
   updateScreenWidth(screenWidth: number): void {
     this.screenWidth = screenWidth
-    this.queueRender()
-  }
-
-  private _requestAnimationFrameId: number | null = null
-  queueRender(): void {
-    this._requestAnimationFrameId && cancelAnimationFrame(this._requestAnimationFrameId)
-
-    this._requestAnimationFrameId = requestAnimationFrame(() => {
-      this.render()
-    })
+    this.render()
   }
 
   /**

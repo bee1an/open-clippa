@@ -1,5 +1,4 @@
 import { Container, Graphics, Text } from 'pixi.js'
-import { QueueRun } from './utils'
 
 export const GAP = 10
 
@@ -18,15 +17,9 @@ export class RailGap {
 
   zIndex: number
 
-  private _queueRun: QueueRun
-
   private _text: Text
 
   constructor(option: RailGapOption) {
-    this._queueRun = new QueueRun(() => {
-      this._drawBody()
-    })
-
     this.y = option.y
     this.width = option.width
     this.zIndex = option.zIndex
@@ -60,12 +53,8 @@ export class RailGap {
     this._bg = bg
   }
 
-  queueRender(): void {
-    this._queueRun.queueRun()
-  }
-
   render(): void {
-    this._queueRun.run()
+    this._drawBody()
   }
 
   setActive(active: boolean): void {
@@ -79,7 +68,7 @@ export class RailGap {
   updateWidth(width: number): void {
     this.width = width
 
-    this.queueRender()
+    this.render()
   }
 
   updateY(y: number): void {

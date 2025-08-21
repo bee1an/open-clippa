@@ -48,7 +48,7 @@ export class Rails {
     this.state.on('updatedPxPerMs', () => {
       processWidth()
 
-      this.queueUpdate()
+      this.update()
     })
 
     this.duration = option.duration
@@ -286,20 +286,11 @@ export class Rails {
   updateScreenWidth(screenWidth: number): void {
     this.screenWidth = screenWidth
 
-    this.queueUpdate()
-  }
-
-  private _requestAnimationFrameId: number | null = null
-  queueUpdate(): void {
-    this._requestAnimationFrameId && cancelAnimationFrame(this._requestAnimationFrameId)
-
-    this._requestAnimationFrameId = requestAnimationFrame(() => {
-      this.update()
-    })
+    this.update()
   }
 
   update(): void {
-    const helper = (instance: any): void => {
+    const helper = (instance: Rail | RailGap): void => {
       instance.updateWidth(Math.max(this.width, this.screenWidth))
     }
 
