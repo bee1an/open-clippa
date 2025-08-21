@@ -113,8 +113,8 @@ export class Rails {
       const zIndex = this.maxZIndex - index
 
       this._createRail(this.maxZIndex - index, [
-        { start: 500, duration: 1000 },
-        { start: 2000, duration: 1500 },
+        // { start: 500, duration: 1000 },
+        // { start: 2000, duration: 1500 },
         { start: 5000, duration: 2000 },
       ])
 
@@ -168,48 +168,99 @@ export class Rails {
       if (!this.state.trainDragging)
         return
 
+      clearTimeout(timeId)
+
       const gap = this.railGaps.find(gap => gap.active)
-
-      if (!gap)
-        return
-
-      gap.setActive(false)
-
-      const { zIndex } = gap
-
-      this.rails.forEach((rail) => {
-        if (rail.zIndex >= zIndex) {
-          rail.updateZIndex(rail.zIndex + 1)
-        }
-        else {
-          rail.updateY(rail.y + RAIL_HEIGHT + GAP)
-        }
-      })
-
-      this.railGaps.forEach((railGap) => {
-        if (railGap.zIndex >= zIndex) {
-          railGap.updateZIndex(railGap.zIndex + 1)
-        }
-        else {
-          railGap.updateY(railGap.y + RAIL_HEIGHT + GAP)
-        }
-      })
-
-      this.maxZIndex = Math.max(...this.rails.map(i => i.zIndex), zIndex)
-
-      const rail = this._createRail(zIndex)
-      this._createRailGap(zIndex)
 
       const atTrain = this.state.atDragTrain!
 
-      this.state.atDragTrain?.parent?.removeTrain(atTrain)
+      if (gap) {
+        gap.setActive(false)
 
-      rail.insertTrain(atTrain)
+        const { zIndex } = gap
 
-      atTrain.updateState('normal')
+        /* update other zIndex */
+        this.rails.forEach((rail) => {
+          if (rail.zIndex >= zIndex) {
+            rail.updateZIndex(rail.zIndex + 1)
+          }
+          else {
+            rail.updateY(rail.y + RAIL_HEIGHT + GAP)
+          }
+        })
+
+        this.railGaps.forEach((railGap) => {
+          if (railGap.zIndex >= zIndex) {
+            railGap.updateZIndex(railGap.zIndex + 1)
+          }
+          else {
+            railGap.updateY(railGap.y + RAIL_HEIGHT + GAP)
+          }
+        })
+
+        this.maxZIndex = Math.max(this.rails[0].zIndex, zIndex)
+
+        /* move train to new rail */
+        const rail = this._createRail(zIndex)
+        this._createRailGap(zIndex)
+
+        rail.insertTrain(atTrain)
+
+        atTrain.updateState('normal')
+      }
+
+      if (atTrain.dragStatus === 'free')
+        return
+
+      /* check rail whether need to remove */
+      const emptyRail = this.rails.find(rail => rail.trains.length === 0)
+
+      if (emptyRail)
+        this.removeRail(emptyRail)
 
       // console.log('', this.rails.map(i => i.zIndex), this.railGaps.map(i => i.zIndex))
     })
+  }
+
+  /**
+   * 移除rail, 伴随移除gap的副作用
+   */
+  removeRail(rail: Rail): void {
+    const { zIndex } = rail
+
+    this.rails = this.rails.filter((item) => {
+      if (item.zIndex > zIndex) {
+        // filter with update
+        item.updateZIndex(item.zIndex - 1)
+      }
+      else {
+        item.updateY(item.y - RAIL_HEIGHT - GAP)
+      }
+
+      return item !== rail
+    })
+
+    this.maxZIndex = this.rails[0].zIndex
+
+    this.railGaps = this.railGaps.filter((item) => {
+      const itemZIndex = item.zIndex
+
+      if (item.zIndex > zIndex) {
+        // filter with update
+        item.updateZIndex(item.zIndex - 1)
+      }
+      else {
+        item.updateY(item.y - RAIL_HEIGHT - GAP)
+      }
+
+      // with remove
+      if (itemZIndex === zIndex)
+        this.container.removeChild(item.container)
+
+      return itemZIndex !== zIndex
+    })
+
+    this.container.removeChild(rail.container)
   }
 
   getRailByZIndex(zIndex: number): Rail {
