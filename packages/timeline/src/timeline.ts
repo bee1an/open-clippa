@@ -49,7 +49,7 @@ export class Timeline {
       antialias: true,
     })
 
-    app.stage.addChild(this.scroller.wrapper)
+    app.stage.addChild(this.scroller.container)
 
     const queueRun = new QueueRun(() => {
       app.resize()

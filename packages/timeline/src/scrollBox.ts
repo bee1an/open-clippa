@@ -1,4 +1,4 @@
-import type { FederatedPointerEvent } from 'pixi.js'
+import type { ContainerChild, FederatedPointerEvent, IRenderLayer } from 'pixi.js'
 import { EventBus } from 'open-clippa'
 import { Container, Graphics } from 'pixi.js'
 
@@ -18,6 +18,15 @@ export interface ScrollBoxOption {
    * 可视区域高度
    */
   viewportHeight: number
+  /**
+   * 是否禁用x轴方向
+   */
+  xDisable?: boolean
+  /**
+   * 是否禁用y轴方向
+   */
+  yDisable?: boolean
+
   railColor?: string
   triggerColor?: string
   barHeight?: number
@@ -36,18 +45,30 @@ export type ScrollBoxEvents = {
   render: []
 }
 
+class ContainerProxy<C extends ContainerChild = ContainerChild> extends Container<C> {
+  constructor(private _proxy: any) { super() }
+
+  rawAddChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+    return super.addChild(...children)
+  }
+
+  addChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+    return this._proxy.addChild(...children)
+  }
+}
+
 export class ScrollBox extends EventBus<ScrollBoxEvents> {
   /**
    * 最外层元素, 包含容器和滚动条
    */
-  wrapper: Container = new Container()
+  container: ContainerProxy
 
   /**
    * 容器, 将内容添加到这个容器
    *
    * 内部监听这个容器子节点新增, 删除, 动态修改width和height
    */
-  container: Container = new Container()
+  private _wrapper: Container
 
   /**
    * 实例宽度
@@ -65,6 +86,15 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    * 可视区域高度
    */
   viewportHeight: number
+  /**
+   * 是否禁用x轴方向
+   */
+  xDisable: boolean
+  /**
+   * 是否禁用y轴方向
+   */
+  yDisable: boolean
+
   railColor: string
   triggerColor: string
   barHeight: number
@@ -72,21 +102,29 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
   constructor(option: ScrollBoxOption) {
     super()
+
+    this._wrapper = new Container()
+
+    this.container = new ContainerProxy(this._wrapper)
+
     this.viewportWidth = option.viewportWidth
     this.viewportHeight = option.viewportHeight
-    this.railColor = option.railColor || RAIL_COLOR
-    this.triggerColor = option.triggerColor || TRIGGER_COLOR
-    this.barHeight = option.barHeight || SCROLLBAR_HEIGHT
-    this.barWidth = option.barWidth || SCROLLBAR_WIDTH
+    this.xDisable = option.xDisable ?? false
+    this.yDisable = option.yDisable ?? false
 
-    this.wrapper.addChild(this.container)
+    this.railColor = option.railColor ?? RAIL_COLOR
+    this.triggerColor = option.triggerColor ?? TRIGGER_COLOR
+    this.barHeight = option.barHeight ?? SCROLLBAR_HEIGHT
+    this.barWidth = option.barWidth ?? SCROLLBAR_WIDTH
 
-    this.container.on('childAdded', () => {
-      this._updateSize(this.container.width, this.container.height)
+    this.container.rawAddChild(this._wrapper)
+
+    this._wrapper.on('childAdded', () => {
+      this._updateSize(this._wrapper.width, this._wrapper.height)
     })
 
-    this.container.on('childRemoved', () => {
-      this._updateSize(this.container.width, this.container.height)
+    this._wrapper.on('childRemoved', () => {
+      this._updateSize(this._wrapper.width, this._wrapper.height)
     })
 
     this.render()
@@ -98,15 +136,15 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       return
 
     if (this._viewportMask) {
-      this.wrapper.removeChild(this._viewportMask)
+      this.container.removeChild(this._viewportMask)
     }
 
     const view = new Graphics()
     this._viewportMask = view
     view.rect(0, 0, this.viewportWidth, this.viewportHeight)
     view.fill('transparent')
-    this.wrapper.mask = view
-    this.wrapper.addChild(view)
+    this.container.mask = view
+    this.container.rawAddChild(view)
   }
 
   private _drawScrollbarHelper(option: DrawScrollBarHelperOption): Container {
@@ -158,7 +196,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       return
 
     if (this._scrollbarXBar) {
-      this.wrapper.removeChild(this._scrollbarXBar)
+      this.container.removeChild(this._scrollbarXBar)
     }
 
     if (this.width <= this.viewportWidth) {
@@ -182,7 +220,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       }
 
       trigger.x += dx
-      this.container.x -= dx / stepRatio
+      this._wrapper.x -= dx / stepRatio
 
       x += dx
     }
@@ -205,7 +243,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       },
     })
 
-    this.wrapper.addChild(this._scrollbarXBar)
+    this.container.rawAddChild(this._scrollbarXBar)
   }
 
   private _scrollbarYBar?: Container
@@ -214,7 +252,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       return
 
     if (this._scrollbarYBar) {
-      this.wrapper.removeChild(this._scrollbarYBar)
+      this.container.removeChild(this._scrollbarYBar)
     }
 
     if (this.height <= this.viewportHeight) {
@@ -238,7 +276,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       }
 
       trigger.y += dy
-      this.container.y -= dy / stepRatio
+      this._wrapper.y -= dy / stepRatio
 
       y += dy
     }
@@ -261,7 +299,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       },
     })
 
-    this.wrapper.addChild(this._scrollbarYBar)
+    this.container.rawAddChild(this._scrollbarYBar)
   }
 
   /**
@@ -282,7 +320,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    * Updates the size of the viewport if the size of the container has changed.
    */
   update(): void {
-    const { width: containerWidth, height: containerHeight } = this.container.getSize()
+    const { width: containerWidth, height: containerHeight } = this._wrapper.getSize()
     if (containerWidth !== this.width || containerHeight !== this.height) {
       this._updateSize(containerWidth, containerHeight)
     }
@@ -290,11 +328,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
   nextRender(fn?: Anyfn): Promise<void> {
     return new Promise<void>((resolve) => {
-      this.container.onRender = () => {
+      this._wrapper.onRender = () => {
         fn?.()
 
         // [ ]: https://github.com/pixijs/pixijs/pull/11627
-        this.container.onRender = null as any
+        this._wrapper.onRender = null as any
         resolve()
       }
     })
@@ -323,8 +361,12 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    */
   render(): void {
     this._drawView()
-    this._drawScrollXBar()
-    this._drawScrollYBar()
+
+    if (!this.xDisable)
+      this._drawScrollXBar()
+
+    if (!this.yDisable)
+      this._drawScrollYBar()
 
     this.emit('render')
   }
