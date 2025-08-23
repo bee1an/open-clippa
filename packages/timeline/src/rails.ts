@@ -47,6 +47,8 @@ export class Rails extends EventBus<RailsEvents> {
 
   maxZIndex: number
 
+  offsetX: number = 0
+
   constructor(option: RailsOption) {
     super()
     const processWidth = (): void => {
@@ -324,9 +326,13 @@ export class Rails extends EventBus<RailsEvents> {
     this.update()
   }
 
+  updateOffsetX(offsetX: number): void {
+    this.offsetX = offsetX
+  }
+
   update(): void {
     const helper = (instance: Rail | RailGap): void => {
-      instance.updateWidth(Math.max(this.width, this.screenWidth))
+      instance.updateWidth(Math.max(this.width, this.screenWidth - this.offsetX))
     }
 
     this.rails.forEach(helper)

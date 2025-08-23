@@ -45,6 +45,8 @@ export class Ruler extends EventBus<RulerEvents> {
 
   state: State
 
+  offsetX: number = 0
+
   constructor(option: RulerOption) {
     super()
 
@@ -76,6 +78,10 @@ export class Ruler extends EventBus<RulerEvents> {
   updateScreenWidth(screenWidth: number): void {
     this.screenWidth = screenWidth
     this.render()
+  }
+
+  updateOffsetX(offsetX: number): void {
+    this.offsetX = offsetX
   }
 
   /**
@@ -176,7 +182,7 @@ export class Ruler extends EventBus<RulerEvents> {
 
     const dotGap = gap / (DOT_NUM + 1)
 
-    const rightLimitX = Math.max(this.screenWidth, this.width)
+    const rightLimitX = Math.max(this.screenWidth - this.offsetX, this.width)
 
     const drawDotGroup = (): void => {
       for (let index = 0; index < DOT_NUM; index++) {

@@ -78,6 +78,14 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    */
   private _wrapper: Container
 
+  get offsetX(): number {
+    return this._wrapper.x
+  }
+
+  get offsetY(): number {
+    return this._wrapper.y
+  }
+
   /**
    * 实例宽度
    */
@@ -180,7 +188,10 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
     /* trigger */
     const trigger = new Graphics()
-    trigger.roundRect(...barOption)
+    trigger.roundRect(0, 0, barOption[2], barOption[3])
+    const [x, y] = barOption
+    trigger.x = x
+    trigger.y = y
     trigger.fill(this.triggerColor)
     trigger.eventMode = 'static'
     trigger.cursor = 'pointer'
@@ -243,9 +254,12 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
       x += dx
     }
-    [this._scrollbarXBar, this._scrollbarXTrigger] = this._drawScrollbarHelper({
+
+    const barX = -(this._wrapper.x / this._wrapper.width * this.viewportWidth)
+
+    ;[this._scrollbarXBar, this._scrollbarXTrigger] = this._drawScrollbarHelper({
       rail: [0, this.viewportHeight - this.barHeight, this.viewportWidth, this.barHeight],
-      bar: [0, this.viewportHeight - this.barHeight, stepRatio * this.viewportWidth, this.barHeight, this.barHeight / 2],
+      bar: [barX, this.viewportHeight - this.barHeight, stepRatio * this.viewportWidth, this.barHeight, this.barHeight / 2],
       down: (e) => {
         x = e.x
       },
@@ -322,9 +336,12 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
       y += dy
     }
-    [this._scrollbarYBar, this._scrollbarYTrigger] = this._drawScrollbarHelper({
+
+    const barY = -(this._wrapper.y / this._wrapper.height * this.viewportHeight)
+
+    ;[this._scrollbarYBar, this._scrollbarYTrigger] = this._drawScrollbarHelper({
       rail: [this.viewportWidth - this.barWidth, 0, this.barWidth, this.viewportHeight],
-      bar: [this.viewportWidth - this.barWidth, 0, this.barWidth, stepRatio * this.viewportHeight, this.barWidth / 2],
+      bar: [this.viewportWidth - this.barWidth, barY, this.barWidth, stepRatio * this.viewportHeight, this.barWidth / 2],
       down: (e) => {
         y = e.y
       },

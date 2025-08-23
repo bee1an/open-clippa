@@ -73,6 +73,9 @@ export class Timeline {
     })
 
     this.scroller.on('scroll', ({ x }) => {
+      this.ruler?.updateOffsetX(this.scroller.offsetX)
+      this.rails?.updateOffsetX(this.scroller.offsetX)
+
       this.rails?.scrollBox.scroll({ x })
     })
     this.container.addChild(this.scroller.container)
