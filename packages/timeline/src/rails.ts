@@ -48,6 +48,9 @@ export class Rails extends EventBus<RailsEvents> {
   maxZIndex: number
 
   offsetX: number = 0
+  get offsetY(): number {
+    return this.scrollBox.offsetY
+  }
 
   constructor(option: RailsOption) {
     super()
@@ -166,7 +169,7 @@ export class Rails extends EventBus<RailsEvents> {
         const bounds = rail.container.getLocalBounds()
         bounds.y = rail.y
 
-        return rail.container.getLocalBounds().containsPoint(x, y)
+        return rail.container.getLocalBounds().containsPoint(x, y - this.offsetY)
       })
 
       const atTrain = this.state.atDragTrain!
@@ -291,7 +294,7 @@ export class Rails extends EventBus<RailsEvents> {
       const bounds = gap.container.getLocalBounds()
       bounds.y = gap.y
 
-      return gap.container.getLocalBounds().containsPoint(x, y)
+      return gap.container.getLocalBounds().containsPoint(x, y - this.offsetY)
     })
 
     gap?.setActive(true)
