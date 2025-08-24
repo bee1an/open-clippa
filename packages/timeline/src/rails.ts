@@ -14,11 +14,7 @@ export interface RailsOption {
 }
 
 export type RailsEvents = {
-  scrollbarVisibleChanged: [visible: boolean, width: number]
-
-  railAdded: []
-
-  railRemoved: []
+  scroll: [{ x: number, y: number }]
 }
 
 export class Rails extends EventBus<RailsEvents> {
@@ -51,7 +47,10 @@ export class Rails extends EventBus<RailsEvents> {
 
   maxZIndex: number
 
-  offsetX: number = 0
+  get offsetX(): number {
+    return this.scrollBox.offsetX
+  }
+
   get offsetY(): number {
     return this.scrollBox.offsetY
   }
@@ -74,11 +73,17 @@ export class Rails extends EventBus<RailsEvents> {
     this.screenWidth = option.screenWidth
     this.maxZIndex = option.maxZIndex
 
-    this.scrollBox = new ScrollBox({ hideXBar: true })
+    this.scrollBox = new ScrollBox()
+
+    this.scrollBox.on('toggleXBarVisible', (visible) => {
+      this.scrollBox.updateScrollMore({ y: visible ? this.scrollBox.barHeight : 0 })
+    })
 
     this.scrollBox.on('toggleYBarVisible', (visible) => {
-      this.emit('scrollbarVisibleChanged', visible, this.scrollBox.barWidth)
+      this.scrollBox.updateScrollMore({ x: visible ? this.scrollBox.barWidth : 0 })
     })
+
+    this.scrollBox.on('scroll', event => this.emit('scroll', event))
 
     this.container.y = RULER_HEIGHT
 
@@ -107,11 +112,13 @@ export class Rails extends EventBus<RailsEvents> {
       this.container.addChild(train.container)
     })
 
+    rail.on('trainsPosUpdated', () => {
+      this.scrollBox.update()
+    })
+
     this._insertRailByZIndex(rail, zIndex)
 
     this.container.addChild(rail.container)
-
-    this.emit('railAdded')
 
     return rail
   }
@@ -288,8 +295,6 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.container.removeChild(rail.container)
 
-    this.emit('railRemoved')
-
     this.scrollBox.update()
   }
 
@@ -337,10 +342,6 @@ export class Rails extends EventBus<RailsEvents> {
     this.scrollBox.update()
 
     this.update()
-  }
-
-  updateOffsetX(offsetX: number): void {
-    this.offsetX = offsetX
   }
 
   update(): void {

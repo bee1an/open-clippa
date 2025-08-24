@@ -2,7 +2,6 @@ import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Rails } from './rails'
 import { Ruler } from './ruler'
-import { ScrollBox } from './scrollBox'
 import { State } from './state'
 import { QueueRun } from './utils'
 
@@ -15,9 +14,9 @@ export class Timeline {
   app?: Application
   ruler?: Ruler
   cursor?: Cursor
-  scroller: ScrollBox = new ScrollBox({ hideYBar: true })
   rails?: Rails
   container = new Container()
+  adjuster = new Container()
 
   state: State = State.getInstance()
 
@@ -68,17 +67,7 @@ export class Timeline {
 
     this._createRails()
 
-    this.scroller.on('toggleXBarVisible', (visible) => {
-      this.rails?.scrollBox.updateScrollMore({ y: visible ? this.scroller.barHeight : 0 })
-    })
-
-    this.scroller.on('scroll', ({ x }) => {
-      this.ruler?.updateOffsetX(this.scroller.offsetX)
-      this.rails?.updateOffsetX(this.scroller.offsetX)
-
-      this.rails?.scrollBox.scroll({ x })
-    })
-    this.container.addChild(this.scroller.container)
+    this.container.addChild(this.adjuster)
 
     this._updatePxPerMs((app.screen.width / this.duration) * this.scale)
   }
@@ -106,9 +95,6 @@ export class Timeline {
       screenWidth,
       screenHeight,
     )
-
-    this.scroller.updateViewportSize(screenWidth, screenHeight)
-    this.scroller.update()
   }
 
   private _createRuler(): void {
@@ -116,7 +102,7 @@ export class Timeline {
       screenWidth: this.app!.screen.width,
       duration: this.duration,
     })
-    this.scroller.container.addChild(this.ruler.container)
+    this.adjuster.addChild(this.ruler.container)
 
     this.ruler.on('seek', (seekTime: number) => {
       this.cursor?.seek(seekTime)
@@ -130,17 +116,12 @@ export class Timeline {
       maxZIndex: 6,
     })
 
-    this.rails.on('scrollbarVisibleChanged', (visible, barWidth) => {
-      this.rails?.scrollBox.updateScrollMore({ x: visible ? barWidth : 0 })
-      this.scroller.updateScrollMore({ x: visible ? barWidth : 0 })
+    this.rails.on('scroll', () => {
+      this.adjuster.x = this.rails!.offsetX
+
+      this.ruler?.updateOffsetX(this.rails!.offsetX)
     })
 
-    const updateScrollBox = (): void => this.scroller.update()
-
-    this.rails.on('railAdded', updateScrollBox)
-    this.rails.on('railRemoved', updateScrollBox)
-
-    // this.scroller.container.addChild(this.rails.container)
     this.container.addChild(this.rails.container)
   }
 
@@ -150,6 +131,6 @@ export class Timeline {
       height: this.app!.screen.height,
       duration: this.duration,
     })
-    this.scroller.container.addChild(this.cursor.container)
+    this.adjuster.addChild(this.cursor.container)
   }
 }

@@ -25,6 +25,8 @@ export interface RailOption {
 export type RailEvents = {
   trainLeave: [Train, FederatedPointerEvent]
   trainBeforeMoveEnd: [Train]
+
+  trainsPosUpdated: []
 }
 
 export class Rail extends EventBus<RailEvents> {
@@ -310,6 +312,8 @@ export class Rail extends EventBus<RailEvents> {
         return true
       },
       )
+
+    this.emit('trainsPosUpdated')
   }
 
   /**
