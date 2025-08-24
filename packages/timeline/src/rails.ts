@@ -15,6 +15,10 @@ export interface RailsOption {
 
 export type RailsEvents = {
   scrollbarVisibleChanged: [visible: boolean, width: number]
+
+  railAdded: []
+
+  railRemoved: []
 }
 
 export class Rails extends EventBus<RailsEvents> {
@@ -107,6 +111,8 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.container.addChild(rail.container)
 
+    this.emit('railAdded')
+
     return rail
   }
 
@@ -134,8 +140,8 @@ export class Rails extends EventBus<RailsEvents> {
 
       this._createRail(this.maxZIndex - index, [
         // { start: 500, duration: 1000 },
-        // { start: 2000, duration: 1500 },
-        { start: 5000, duration: 2000 },
+        { start: 2000, duration: 1500 },
+        // { start: 5000, duration: 2000 },
       ])
 
       this._createRailGap(zIndex)
@@ -248,16 +254,16 @@ export class Rails extends EventBus<RailsEvents> {
   removeRail(rail: Rail): void {
     const { zIndex } = rail
 
-    this.rails = this.rails.filter((item) => {
-      if (item.zIndex > zIndex) {
+    this.rails = this.rails.filter((curRail) => {
+      if (curRail.zIndex > zIndex) {
         // filter with update
-        item.updateZIndex(item.zIndex - 1)
+        curRail.updateZIndex(curRail.zIndex - 1)
       }
       else {
-        item.updateY(item.y - RAIL_HEIGHT - GAP)
+        curRail.updateY(curRail.y - RAIL_HEIGHT - GAP)
       }
 
-      return item !== rail
+      return curRail !== rail
     })
 
     this.maxZIndex = this.rails[0].zIndex
@@ -281,6 +287,10 @@ export class Rails extends EventBus<RailsEvents> {
     })
 
     this.container.removeChild(rail.container)
+
+    this.emit('railRemoved')
+
+    this.scrollBox.update()
   }
 
   getRailByZIndex(zIndex: number): Rail {

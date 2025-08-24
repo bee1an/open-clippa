@@ -135,6 +135,11 @@ export class Timeline {
       this.scroller.updateScrollMore({ x: visible ? barWidth : 0 })
     })
 
+    const updateScrollBox = (): void => this.scroller.update()
+
+    this.rails.on('railAdded', updateScrollBox)
+    this.rails.on('railRemoved', updateScrollBox)
+
     // this.scroller.container.addChild(this.rails.container)
     this.container.addChild(this.rails.container)
   }

@@ -63,6 +63,14 @@ class ContainerProxy<C extends ContainerChild = ContainerChild> extends Containe
   addChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
     return this._proxy.addChild(...children)
   }
+
+  rawRemoveChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+    return super.removeChild(...children)
+  }
+
+  removeChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+    return this._proxy.removeChild(...children)
+  }
 }
 
 export class ScrollBox extends EventBus<ScrollBoxEvents> {
@@ -161,7 +169,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       return
 
     if (this._viewportMask) {
-      this.container.removeChild(this._viewportMask)
+      this.container.rawRemoveChild(this._viewportMask)
     }
 
     const w = this.viewportWidth
@@ -228,7 +236,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       return
 
     if (this._scrollbarXBar) {
-      this.container.removeChild(this._scrollbarXBar)
+      this.container.rawRemoveChild(this._scrollbarXBar)
     }
 
     const isXBarVisible = this._isXBarVisible
@@ -310,7 +318,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       return
 
     if (this._scrollbarYBar) {
-      this.container.removeChild(this._scrollbarYBar)
+      this.container.rawRemoveChild(this._scrollbarYBar)
     }
 
     const isYBarVisible = this._isYBarVisible
