@@ -160,6 +160,8 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this._updateSize(this._wrapper.width, this._wrapper.height)
     })
 
+    this._bindEvents()
+
     this.render()
   }
 
@@ -290,7 +292,10 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   }
 
   private _scrollX(dx: number): void {
-    const trigger = this._scrollbarXTrigger!
+    if (!this._scrollbarXTrigger || !this._isXBarVisible)
+      return
+
+    const trigger = this._scrollbarXTrigger
 
     const scrollMore = this.scrollMore?.x ?? 0
     const stepRatio = this.viewportWidth / (this.width + scrollMore)
@@ -372,7 +377,10 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   }
 
   private _scrollY(dy: number): void {
-    const trigger = this._scrollbarYTrigger!
+    if (!this._scrollbarYTrigger || !this._isYBarVisible)
+      return
+
+    const trigger = this._scrollbarYTrigger
 
     const scrollMore = this.scrollMore?.y ?? 0
 
@@ -392,6 +400,17 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this._wrapper.y -= dy / stepRatio
 
     this.emit('scroll', { x: 0, y: dy })
+  }
+
+  private _bindEvents(): void {
+    // TODO: 触摸板
+    this.container.on('wheel', (e) => {
+      e.preventDefault()
+
+      const key = { [Math.abs(e.deltaX)]: 'x', [Math.abs(e.deltaY)]: 'y' }[Math.max(Math.abs(e.deltaY), Math.abs(e.deltaX))]
+
+      this.scroll({ [key]: e[`delta${key.toUpperCase()}` as `delta${'X' | 'Y'}`] })
+    })
   }
 
   scroll({ x, y }: { x?: number, y?: number }): void {

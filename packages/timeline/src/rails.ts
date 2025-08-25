@@ -1,6 +1,7 @@
 import type { Container, FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import { EventBus, getPxByMs } from '@clippa/utils'
+import { Graphics } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
 import { GAP, RailGap } from './railGap'
 import { RULER_HEIGHT } from './ruler'
@@ -9,6 +10,7 @@ import { State } from './state'
 
 export interface RailsOption {
   screenWidth: number
+  screenHeight: number
   duration: number
   maxZIndex: number
 }
@@ -42,6 +44,7 @@ export class Rails extends EventBus<RailsEvents> {
 
   width!: number
   screenWidth: number
+  screenHeight: number
 
   duration: number
 
@@ -71,6 +74,7 @@ export class Rails extends EventBus<RailsEvents> {
     this.duration = option.duration
     processWidth()
     this.screenWidth = option.screenWidth
+    this.screenHeight = option.screenHeight
     this.maxZIndex = option.maxZIndex
 
     this.scrollBox = new ScrollBox()
@@ -86,6 +90,8 @@ export class Rails extends EventBus<RailsEvents> {
     this.scrollBox.on('scroll', event => this.emit('scroll', event))
 
     this.container.y = RULER_HEIGHT
+
+    this._drawBg()
 
     this._drawBody()
 
@@ -153,6 +159,23 @@ export class Rails extends EventBus<RailsEvents> {
 
       this._createRailGap(zIndex)
     }
+  }
+
+  private _bg?: Graphics
+  private _drawBg(): void {
+    const bgColor = 'transparent'
+
+    const w = Math.max(this.width, this.screenWidth - this.offsetX)
+    const h = this.screenHeight - RULER_HEIGHT
+
+    if (this._bg) {
+      this._bg.clear().rect(0, 0, w, h).fill(bgColor)
+      return
+    }
+
+    this._bg = new Graphics()
+    this._bg.rect(0, 0, w, h).fill(bgColor)
+    this.container.addChild(this._bg)
   }
 
   private _insertGapByZIndex(gap: RailGap, zIndex: number): void {
@@ -323,13 +346,19 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.scrollBox.updateViewportSize(screenWidth)
 
+    this.scrollBox.update()
+
     this.update()
   }
 
   updateScreenHeight(screenHeight: number): void {
+    this.screenHeight = screenHeight
+
     this.scrollBox.updateViewportSize(undefined, screenHeight - RULER_HEIGHT)
 
     this.scrollBox.update()
+
+    this.update()
   }
 
   updateScreenSize(screenWidth?: number, screenHeight?: number): void {
@@ -337,7 +366,11 @@ export class Rails extends EventBus<RailsEvents> {
       this.screenWidth = screenWidth
     }
 
-    this.scrollBox.updateViewportSize(this.screenWidth, screenHeight && (screenHeight - RULER_HEIGHT))
+    if (screenHeight) {
+      this.screenHeight = screenHeight
+    }
+
+    this.scrollBox.updateViewportSize(this.screenWidth, this.screenHeight - RULER_HEIGHT)
 
     this.scrollBox.update()
 
@@ -345,6 +378,8 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   update(): void {
+    this._drawBg()
+
     const helper = (instance: Rail | RailGap): void => {
       instance.updateWidth(Math.max(this.width, this.screenWidth - this.offsetX))
     }

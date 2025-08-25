@@ -112,8 +112,9 @@ export class Timeline {
   private _createRails(): void {
     this.rails = new Rails({
       screenWidth: this.app!.screen.width,
+      screenHeight: this.app!.screen.height,
       duration: this.duration,
-      maxZIndex: 6,
+      maxZIndex: 3,
     })
 
     this.rails.on('scroll', () => {
