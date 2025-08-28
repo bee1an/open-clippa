@@ -252,7 +252,7 @@ export class Rails extends EventBus<RailsEvents> {
         const bounds = rail.container.getLocalBounds()
         bounds.y = rail.y
 
-        return rail.container.getLocalBounds().containsPoint(x, y - this.offsetY)
+        return rail.container.getLocalBounds().containsPoint(x, y)
       })
 
       const atTrain = this.state.atDragTrain!
@@ -380,7 +380,7 @@ export class Rails extends EventBus<RailsEvents> {
       const bounds = gap.container.getLocalBounds()
       bounds.y = gap.y
 
-      return gap.container.getLocalBounds().containsPoint(x, y - this.offsetY)
+      return gap.container.getLocalBounds().containsPoint(x, y)
     })
 
     gap?.setActive(true)
