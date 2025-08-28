@@ -119,9 +119,9 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    */
   hideYBar: boolean
 
-  private _isXBarVisible: boolean = false
+  isXBarVisible: boolean = false
 
-  private _isYBarVisible: boolean = false
+  isYBarVisible: boolean = false
 
   scrollMore?: { x?: number, y?: number }
 
@@ -241,11 +241,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.container.rawRemoveChild(this._scrollbarXBar)
     }
 
-    const isXBarVisible = this._isXBarVisible
-    this._isXBarVisible = !this.hideXBar && this.width > this.viewportWidth
+    const isXBarVisible = this.isXBarVisible
+    this.isXBarVisible = !this.hideXBar && this.width > this.viewportWidth
 
-    if (isXBarVisible !== this._isXBarVisible) {
-      this.emit('toggleXBarVisible', this._isXBarVisible)
+    if (isXBarVisible !== this.isXBarVisible) {
+      this.emit('toggleXBarVisible', this.isXBarVisible)
     }
 
     if (this.width <= this.viewportWidth) {
@@ -292,7 +292,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   }
 
   private _scrollX(dx: number): void {
-    if (!this._scrollbarXTrigger || !this._isXBarVisible)
+    if (!this._scrollbarXTrigger || !this.isXBarVisible)
       return
 
     const trigger = this._scrollbarXTrigger
@@ -326,11 +326,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.container.rawRemoveChild(this._scrollbarYBar)
     }
 
-    const isYBarVisible = this._isYBarVisible
-    this._isYBarVisible = !this.hideYBar && this.height > this.viewportHeight
+    const isYBarVisible = this.isYBarVisible
+    this.isYBarVisible = !this.hideYBar && this.height > this.viewportHeight
 
-    if (isYBarVisible !== this._isYBarVisible) {
-      this.emit('toggleYBarVisible', this._isYBarVisible)
+    if (isYBarVisible !== this.isYBarVisible) {
+      this.emit('toggleYBarVisible', this.isYBarVisible)
     }
 
     if (this.height <= this.viewportHeight) {
@@ -377,7 +377,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   }
 
   private _scrollY(dy: number): void {
-    if (!this._scrollbarYTrigger || !this._isYBarVisible)
+    if (!this._scrollbarYTrigger || !this.isYBarVisible)
       return
 
     const trigger = this._scrollbarYTrigger

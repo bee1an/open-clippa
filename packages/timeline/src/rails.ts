@@ -1,7 +1,7 @@
-import type { Container, FederatedPointerEvent } from 'pixi.js'
+import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import { EventBus, getPxByMs } from '@clippa/utils'
-import { Graphics } from 'pixi.js'
+import { Container, Graphics } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
 import { GAP, RailGap } from './railGap'
 import { RULER_HEIGHT } from './ruler'
@@ -39,6 +39,11 @@ export class Rails extends EventBus<RailsEvents> {
    * 由大到小
    */
   railGaps: RailGap[] = []
+
+  /**
+   * include rails and railGaps
+   */
+  railsContainer: Container = new Container()
 
   state: State
 
@@ -84,18 +89,37 @@ export class Rails extends EventBus<RailsEvents> {
     })
 
     this.scrollBox.on('toggleYBarVisible', (visible) => {
+      // this._updateRailContainerY()
+
       this.scrollBox.updateScrollMore({ x: visible ? this.scrollBox.barWidth : 0 })
     })
+
+    this.railsContainer.eventMode = 'static'
 
     this.scrollBox.on('scroll', event => this.emit('scroll', event))
 
     this.container.y = RULER_HEIGHT
 
+    // TODO: maybe bug add on this local
+    // this.container.addChild(this.railsContainer)
+
     this._drawBg()
 
     this._drawBody()
 
+    this.container.addChild(this.railsContainer)
+
     this._bindEvents()
+  }
+
+  private _updateRailContainerY(): void {
+    if (this.scrollBox.isYBarVisible) {
+      this.railsContainer.y = 0
+    }
+    else {
+      // move to center y
+      this.railsContainer.y = ((this.screenHeight - RULER_HEIGHT) / 2) - this.railsContainer.height / 2
+    }
   }
 
   private _createRail(zIndex: number, trainsOptions: TrainOption[] = []): Rail {
@@ -112,7 +136,7 @@ export class Rails extends EventBus<RailsEvents> {
     )
 
     rail.on('trainLeave', (train) => {
-      train.updatePos(undefined, rail.y + train.y)
+      train.updatePos(undefined, rail.y + this.railsContainer.y + train.y)
       train.updateState('free')
 
       this.container.addChild(train.container)
@@ -124,7 +148,7 @@ export class Rails extends EventBus<RailsEvents> {
 
     this._insertRailByZIndex(rail, zIndex)
 
-    this.container.addChild(rail.container)
+    this.railsContainer.addChild(rail.container)
 
     return rail
   }
@@ -140,7 +164,7 @@ export class Rails extends EventBus<RailsEvents> {
 
     this._insertGapByZIndex(gap, zIndex)
 
-    this.container.addChild(gap.container)
+    this.railsContainer.addChild(gap.container)
 
     return gap
   }
@@ -199,7 +223,7 @@ export class Rails extends EventBus<RailsEvents> {
         this._stayWhenDragging(e)
       }, 500)
 
-      const { x, y } = e.getLocalPosition(this.container)
+      const { x, y } = e.getLocalPosition(this.railsContainer)
 
       const rail = this.rails.find((rail) => {
         const bounds = rail.container.getLocalBounds()
@@ -214,7 +238,7 @@ export class Rails extends EventBus<RailsEvents> {
         rail.insertTrain(atTrain)
 
         atTrain.updateState('normal')
-        atTrain.updatePos(undefined, atTrain.y - rail.y)
+        atTrain.updatePos(undefined, atTrain.y - (rail.y + this.railsContainer.y))
 
         this.railGaps.forEach(gap => gap.setActive(false))
       }
@@ -274,6 +298,7 @@ export class Rails extends EventBus<RailsEvents> {
       if (emptyRail)
         this.removeRail(emptyRail)
 
+      this._updateRailContainerY()
       // console.log('', this.rails.map(i => i.zIndex), this.railGaps.map(i => i.zIndex))
     })
   }
@@ -311,12 +336,12 @@ export class Rails extends EventBus<RailsEvents> {
 
       // with remove
       if (itemZIndex === zIndex)
-        this.container.removeChild(item.container)
+        this.railsContainer.removeChild(item.container)
 
       return itemZIndex !== zIndex
     })
 
-    this.container.removeChild(rail.container)
+    this.railsContainer.removeChild(rail.container)
 
     this.scrollBox.update()
   }
@@ -326,7 +351,7 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   private _stayWhenDragging(e: FederatedPointerEvent): void {
-    const { x, y } = e.getLocalPosition(this.container)
+    const { x, y } = e.getLocalPosition(this.railsContainer)
 
     const gap = this.railGaps.find((gap) => {
       const bounds = gap.container.getLocalBounds()
