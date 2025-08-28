@@ -20,14 +20,11 @@ export class Cursor {
 
   constructor(option: CursorOption) {
     this.state = State.getInstance()
-    const processWidth = (): void => {
-      this.width = getPxByMs(this.duration, this.state.pxPerMs)
-    }
 
-    this.state.on('updatedPxPerMs', processWidth)
+    this.state.on('updatedPxPerMs', () => this._processWidth())
 
     this.duration = option.duration
-    processWidth()
+    this._processWidth()
 
     this.screenWidth = option.screenWidth
 
@@ -39,6 +36,10 @@ export class Cursor {
 
     this._draw()
     this._drawBody(option.height)
+  }
+
+  private _processWidth(): void {
+    this.width = getPxByMs(this.duration, this.state.pxPerMs)
   }
 
   private _draw(): void {
@@ -112,6 +113,24 @@ export class Cursor {
 
   updateScreenHeight(height: number): void {
     this._drawBody(height)
+  }
+
+  updateScreenSize(screenWidth?: number, screenHeight?: number): void {
+    if (screenWidth) {
+      this.screenWidth = screenWidth
+    }
+
+    if (screenHeight) {
+      this._drawBody(screenHeight)
+    }
+  }
+
+  /**
+   * Update the duration of the timeline
+   */
+  updateDuration(duration: number): void {
+    this.duration = duration
+    this._processWidth()
   }
 
   seek(time: number): void {

@@ -1,5 +1,5 @@
 import type { FederatedPointerEvent } from 'pixi.js'
-import type { TrainOption } from './train'
+import type { Train, TrainOption } from './train'
 import { EventBus, getPxByMs } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
@@ -17,6 +17,13 @@ export interface RailsOption {
 
 export type RailsEvents = {
   scroll: [{ x: number, y: number }]
+
+  /**
+   * duration over timeline limit
+   *
+   * it is before update `duration`
+   */
+  durationOverLimit: [number]
 }
 
 export class Rails extends EventBus<RailsEvents> {
@@ -65,19 +72,16 @@ export class Rails extends EventBus<RailsEvents> {
 
   constructor(option: RailsOption) {
     super()
-    const processWidth = (): void => {
-      this.width = getPxByMs(this.duration, this.state.pxPerMs)
-    }
 
     this.state = State.getInstance()
     this.state.on('updatedPxPerMs', () => {
-      processWidth()
+      this._processWidth()
 
       this.update()
     })
 
     this.duration = option.duration
-    processWidth()
+    this._processWidth()
     this.screenWidth = option.screenWidth
     this.screenHeight = option.screenHeight
     this.maxZIndex = option.maxZIndex
@@ -112,6 +116,10 @@ export class Rails extends EventBus<RailsEvents> {
     this._bindEvents()
   }
 
+  private _processWidth(): void {
+    this.width = getPxByMs(this.duration, this.state.pxPerMs)
+  }
+
   private _updateRailContainerY(): void {
     if (this.scrollBox.isYBarVisible) {
       this.railsContainer.y = 0
@@ -142,9 +150,24 @@ export class Rails extends EventBus<RailsEvents> {
       this.container.addChild(train.container)
     })
 
-    rail.on('trainsPosUpdated', () => {
+    rail.on('trainMoveEnd', () => {
       this.scrollBox.update()
     })
+
+    rail.on('trainRightResizeEnd', () => {
+      this.scrollBox.update()
+    })
+
+    const updateTimelineDuration = (train: Train): void => {
+      const trainRight = train.start + train.duration
+      if (trainRight > this.duration) {
+        this.emit('durationOverLimit', trainRight)
+      }
+    }
+
+    rail.on('trainStartChanged', updateTimelineDuration)
+
+    rail.on('trainDurationChanged', updateTimelineDuration)
 
     this._insertRailByZIndex(rail, zIndex)
 
@@ -398,6 +421,16 @@ export class Rails extends EventBus<RailsEvents> {
     this.scrollBox.updateViewportSize(this.screenWidth, this.screenHeight - RULER_HEIGHT)
 
     this.scrollBox.update()
+
+    this.update()
+  }
+
+  /**
+   * Update the duration of the rail
+   */
+  updateDuration(duration: number): void {
+    this.duration = duration
+    this._processWidth()
 
     this.update()
   }

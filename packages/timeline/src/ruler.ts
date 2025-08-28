@@ -50,19 +50,15 @@ export class Ruler extends EventBus<RulerEvents> {
   constructor(option: RulerOption) {
     super()
 
-    const processWidth = (): void => {
-      this.width = getPxByMs(this.duration, this.state.pxPerMs)
-    }
-
     this.state = State.getInstance()
     this.state.on('updatedPxPerMs', () => {
-      processWidth()
+      this._processWidth()
 
       this.render()
     })
 
     this.duration = option.duration
-    processWidth()
+    this._processWidth()
     this.screenWidth = option.screenWidth
 
     const container = new Container()
@@ -75,30 +71,8 @@ export class Ruler extends EventBus<RulerEvents> {
     this.render()
   }
 
-  updateScreenWidth(screenWidth: number): void {
-    this.screenWidth = screenWidth
-    this.render()
-  }
-
-  updateOffsetX(offsetX: number): void {
-    this.offsetX = offsetX
-  }
-
-  /**
-   * Renders the ruler component.
-   *
-   * This method removes all the children of the container and then re-renders the
-   * background and tick elements.
-   */
-  render(): void {
-    if (this.width === 0)
-      return
-
-    this._drawBg()
-    this._drawBgByDuration()
-    this._drawTick()
-
-    this.emit('render')
+  private _processWidth(): void {
+    this.width = getPxByMs(this.duration, this.state.pxPerMs)
   }
 
   private _bg?: Graphics
@@ -234,5 +208,38 @@ export class Ruler extends EventBus<RulerEvents> {
       const seekTime = (e.getLocalPosition(this.container).x / this.width) * this.duration
       this.emit('seek', seekTime)
     })
+  }
+
+  updateScreenWidth(screenWidth: number): void {
+    this.screenWidth = screenWidth
+    this.render()
+  }
+
+  updateOffsetX(offsetX: number): void {
+    this.offsetX = offsetX
+  }
+
+  updateDuration(duration: number): void {
+    this.duration = duration
+    this._processWidth()
+
+    this.render()
+  }
+
+  /**
+   * Renders the ruler component.
+   *
+   * This method removes all the children of the container and then re-renders the
+   * background and tick elements.
+   */
+  render(): void {
+    if (this.width === 0)
+      return
+
+    this._drawBg()
+    this._drawBgByDuration()
+    this._drawTick()
+
+    this.emit('render')
   }
 }

@@ -10,22 +10,41 @@ export const RESIZE_TRIGGER_WIDTH = 16
 
 let i = 0
 export class Train extends EventBus<TrainEvents> {
+  /**
+   * pixi container
+   */
   container: Container
-
+  /**
+   * width based on the duration
+   */
   width: number
-
+  /**
+   * x position
+   */
   x: number = Math.random() * 300
-
+  /**
+   * y position
+   */
   y: number = 2
-
+  /**
+   * current status when dragging
+   */
   dragStatus: TrainDragStatus = 'normal'
-
+  /**
+   * global state
+   */
   state: State
-
+  /**
+   * parent rail
+   */
   parent: Rail | null = null
-
+  /**
+   * start time(ms)
+   */
   start: number
-
+  /**
+   * total duration(ms)
+   */
   duration: number
 
   constructor(option: TrainOption) {
@@ -57,6 +76,9 @@ export class Train extends EventBus<TrainEvents> {
     this.container.addChild(text)
   }
 
+  /**
+   * draw a resizer helper
+   */
   private _drawResizerHelper(...[x, _, w, h]: [x: number, y: number, w: number, h: number]): Graphics {
     const resizer = new Graphics()
     resizer.roundRect(0, 0, w, h, 6)
@@ -70,6 +92,9 @@ export class Train extends EventBus<TrainEvents> {
 
   private _leftResizer!: Graphics
   private _rightResizer!: Graphics
+  /**
+   * include left resizer and right resizer
+   */
   private _drawResizer(): void {
     this._leftResizer = this._drawResizerHelper(0, 0, RESIZE_TRIGGER_WIDTH, TRAIN_HEIGHT)
     this._bindLeftResize(this._leftResizer)
@@ -88,18 +113,28 @@ export class Train extends EventBus<TrainEvents> {
     if (!width)
       return
 
+    const x = RESIZE_TRIGGER_WIDTH / 2
+    const y = 0
+    const w = width - RESIZE_TRIGGER_WIDTH
+    const h = TRAIN_HEIGHT
+    const fill = '#c98c8c'
+
+    if (this._slot) {
+      this._slot
+        .clear()
+        .rect(x, y, w, h)
+        .fill(fill)
+
+      return
+    }
+
     const slot = new Graphics()
-    slot.rect(RESIZE_TRIGGER_WIDTH / 2, 0, width - RESIZE_TRIGGER_WIDTH, TRAIN_HEIGHT)
-    slot.fill('#c98c8c')
+    slot.rect(x, y, w, h)
+      .fill(fill)
     slot.eventMode = 'static'
     slot.cursor = 'move'
 
-    if (this._slot) {
-      this.container.replaceChild(this._slot, slot)
-    }
-    else {
-      this.container.addChild(slot)
-    }
+    this.container.addChild(slot)
 
     this._slot = slot
 
@@ -113,6 +148,9 @@ export class Train extends EventBus<TrainEvents> {
    * 这里不要y的原因是, y在常态下固定为2
    */
   private _recordWhenDrag: { x: number, parent: Rail } | null = null
+  /**
+   * bind drag event
+   */
   private _bindDrag(traget: Graphics): void {
     drag(traget, {
       down: () => {
@@ -181,6 +219,9 @@ export class Train extends EventBus<TrainEvents> {
     })
   }
 
+  /**
+   * bind left risize handle
+   */
   private _bindLeftResize(traget: Graphics): void {
     drag(traget, {
       move: (_, { dx }) => {
@@ -211,6 +252,9 @@ export class Train extends EventBus<TrainEvents> {
     })
   }
 
+  /**
+   * bind right resize handle
+   */
   private _bindRightResize(traget: Graphics): void {
     drag(traget, {
       down: () => {
@@ -240,6 +284,11 @@ export class Train extends EventBus<TrainEvents> {
     })
   }
 
+  /**
+   * update the width of train
+   *
+   * if `withEffect` is true, the duration will be updated accordingly
+   */
   updateWidth(width: number, withEffect?: boolean): void {
     if (width === this.container.width)
       return
@@ -247,7 +296,7 @@ export class Train extends EventBus<TrainEvents> {
     this.width = width
 
     if (withEffect) {
-      this.duration = getMsByPx(this.width, this.state.pxPerMs)
+      this.updateDuration(getMsByPx(this.width, this.state.pxPerMs))
     }
 
     this._drawSlot()
@@ -255,12 +304,17 @@ export class Train extends EventBus<TrainEvents> {
     this._rightResizer.x = width - RESIZE_TRIGGER_WIDTH
   }
 
+  /**
+   * Updates the position of train
+   *
+   * If `withEffect` is true, then the start time of the train will be updated accordingly
+   */
   updatePos(x?: number, y?: number, withEffect?: boolean): void {
     if (typeof x === 'number') {
       this.x = this.container.x = x
 
       if (withEffect) {
-        this.start = getMsByPx(this.x, this.state.pxPerMs)
+        this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
       }
     }
 
@@ -269,20 +323,34 @@ export class Train extends EventBus<TrainEvents> {
     }
   }
 
+  /**
+   * Updates the start time of the train
+   *
+   * If `withEffect` is true, then the x of the train will be updated accordingly
+   */
   updateStart(start: number, withEffect?: boolean): void {
     this.start = start
 
     if (withEffect) {
       this.x = this.container.x = getPxByMs(start, this.state.pxPerMs)
     }
+
+    this.emit('startChanged')
   }
 
+  /**
+   * Updates the duration of the train
+   *
+   * If `withEffect` is true, will call `updateWidth`
+   */
   updateDuration(duration: number, withEffect?: boolean): void {
     this.duration = duration
 
     if (withEffect) {
       this.updateWidth(getPxByMs(duration, this.state.pxPerMs))
     }
+
+    this.emit('durationChanged')
   }
 
   /**

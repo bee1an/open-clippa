@@ -27,6 +27,26 @@ export type RailEvents = {
   trainBeforeMoveEnd: [Train]
 
   trainsPosUpdated: []
+
+  /**
+   * just train right resize end trigger
+   */
+  trainRightResizeEnd: []
+
+  /**
+   * when train `moveEnd` event trigger
+   */
+  trainMoveEnd: []
+
+  /**
+   * when train `startChanged` event trigger
+   */
+  trainStartChanged: [Train]
+
+  /**
+   * when train `durationChanged` event trigger
+   */
+  trainDurationChanged: [Train]
 }
 
 export class Rail extends EventBus<RailEvents> {
@@ -96,6 +116,8 @@ export class Rail extends EventBus<RailEvents> {
     this.insertTrain(train)
 
     this.updateTrainsPos()
+
+    this.emit('trainMoveEnd')
   }
 
   private _bindTrainMoveEvents(train: Train): void {
@@ -181,6 +203,8 @@ export class Rail extends EventBus<RailEvents> {
     })
 
     this._rightTrains = null
+
+    this.emit('trainRightResizeEnd')
   }
 
   private _bindResizeEvents(train: Train): void {
@@ -247,6 +271,9 @@ export class Rail extends EventBus<RailEvents> {
       this.container.addChild(train.container)
       this._bindTrainMoveEvents(train)
       this._bindResizeEvents(train)
+
+      train.on('startChanged', () => this.emit('trainStartChanged', train))
+      train.on('durationChanged', () => this.emit('trainDurationChanged', train))
     }
 
     // 寻找插入的位置
