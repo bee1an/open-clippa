@@ -89,11 +89,13 @@ export class Rails extends EventBus<RailsEvents> {
     this.scrollBox = new ScrollBox()
 
     this.scrollBox.on('toggleXBarVisible', (visible) => {
+      this._updateRailContainerY()
+
       this.scrollBox.updateScrollMore({ y: visible ? this.scrollBox.barHeight : 0 })
     })
 
     this.scrollBox.on('toggleYBarVisible', (visible) => {
-      // this._updateRailContainerY()
+      this._updateRailContainerY()
 
       this.scrollBox.updateScrollMore({ x: visible ? this.scrollBox.barWidth : 0 })
     })
@@ -126,7 +128,7 @@ export class Rails extends EventBus<RailsEvents> {
     }
     else {
       // move to center y
-      this.railsContainer.y = ((this.screenHeight - RULER_HEIGHT) / 2) - this.railsContainer.height / 2
+      this.railsContainer.y = ((this.screenHeight - RULER_HEIGHT - (this.scrollBox.isXBarVisible ? this.scrollBox.barHeight : 0)) / 2) - this.railsContainer.height / 2
     }
   }
 
@@ -159,6 +161,7 @@ export class Rails extends EventBus<RailsEvents> {
     })
 
     const updateTimelineDuration = (train: Train): void => {
+      // TODO: 可能会影响这个rail上的所有的train
       const trainRight = train.start + train.duration
       if (trainRight > this.duration) {
         this.emit('durationOverLimit', trainRight)

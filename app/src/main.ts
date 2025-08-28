@@ -6,9 +6,7 @@ import App from './App.vue'
 import 'virtual:uno.css'
 
 createApp(App)
-  .use(
-    yyCraft,
-  )
+  .use(yyCraft)
   .use(
     createRouter({
       history: createWebHistory(import.meta.env.BASE_URL),

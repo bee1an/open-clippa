@@ -76,14 +76,14 @@ export class Timeline {
     await app.init({
       resizeTo: wrapper,
       backgroundColor: '#393941',
-      height: 200,
+      height: 300,
       antialias: true,
     })
 
     app.stage.addChild(this.container)
 
     const queueRun = new QueueRun(() => {
-      app.resize()
+      app.queueResize()
       this._updateChildrenSize()
     })
 
