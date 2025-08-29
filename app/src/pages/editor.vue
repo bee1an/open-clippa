@@ -1,4 +1,6 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+
+</script>
 
 <template>
   <yy-layout w-screen>
@@ -9,11 +11,11 @@
     <yy-layout has-sider max-w-full>
       <yy-layout-sider
         w300px
-        content-class="h-[calc(100vh-50px)]"
-        collapsed-width="50"
-        bordered
-        collapsed
-      />
+        content-class="h-[calc(100vh-50px)] p-y-2"
+        collapsed-width="65"
+      >
+        <Sider />
+      </yy-layout-sider>
 
       <yy-layout overflow-hidden>
         <yy-layout-content content-class="h-[calc(100vh-350px)]">

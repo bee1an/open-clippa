@@ -9,13 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@iconify-json/carbon": "catalog:app",
     "unocss": "catalog:app",
     "vue": "catalog:app",
     "vue-router": "catalog:app",
     "yy-craft": "catalog:app"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
     "@vitejs/plugin-vue": "catalog:app",
     "@vue/tsconfig": "catalog:app",
     "unplugin-auto-import": "catalog:app",

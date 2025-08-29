@@ -9,8 +9,11 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     Canvas: typeof import('./../src/components/canvas.vue')['default']
+    Nav: typeof import('./../src/components/sider/nav.vue')['default']
+    NavItem: typeof import('./../src/components/sider/nav-item.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    Sider: typeof import('./../src/components/sider/sider.vue')['default']
     TimelineCmp: typeof import('./../src/components/timelineCmp.vue')['default']
   }
 }
