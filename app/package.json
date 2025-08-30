@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@iconify/json": "catalog:app",
+    "pinia": "catalog:app",
     "unocss": "catalog:app",
     "vue": "catalog:app",
     "vue-router": "catalog:app",

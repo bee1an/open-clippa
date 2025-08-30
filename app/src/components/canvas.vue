@@ -1,20 +1,11 @@
 <script setup lang="ts">
-import { Director, Stage, Theater, Video } from 'open-clippa'
+import { Video } from 'open-clippa'
+import { storeToRefs } from 'pinia'
+import { useEditorStore } from '@/store'
 
-const theater = new Theater()
-
-const stage = new Stage({ id: 'canvas', width: 600, height: 350 })
-
-const director = new Director({ theater, stage })
-
-const currentTime = ref(0)
-director.on('updateCurrentTime', (t) => {
-  currentTime.value = t
-})
-const duration = ref(0)
-director.on('durationChange', (d) => {
-  duration.value = d
-})
+const editorStore = useEditorStore()
+const { currentTime, duration } = storeToRefs(editorStore)
+const { theater, director } = editorStore
 
 // function fileSelected([file]: FileList) {
 //   const video = new Video({ src: file, start: 0, duration: 5000 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePage({ redirect: '/editor' })
+definePage({ redirect: '/editor/media' })
 </script>
 
 <template>

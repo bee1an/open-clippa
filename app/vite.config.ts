@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@clippa/': `${path.resolve(__dirname, '../packages')}/`,
+      '@/': `${path.resolve(__dirname, 'src')}/`,
     },
   },
 
