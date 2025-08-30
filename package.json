@@ -6,6 +6,7 @@
     "dev": "pnpm -C app dev",
     "build": "pnpm cleanup && rolldown -c rolldown.config.ts",
     "build:app": "pnpm -C app build",
+    "preview": "pnpm -C app preview --open",
     "lint:fix": "eslint --fix .",
     "cleanup": "tsx scripts/cleanup.ts",
     "test": "vitest",

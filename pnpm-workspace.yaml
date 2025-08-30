@@ -24,7 +24,7 @@ catalog:
 
 catalogs:
   app:
-    '@iconify-json/carbon': 1.2.13
+    '@iconify/json': 2.2.379
     '@vitejs/plugin-vue': ^6.0.0
     '@vue/tsconfig': ^0.7.0
     unocss: ^66.4.1

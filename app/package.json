@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@iconify-json/carbon": "catalog:app",
+    "@iconify/json": "catalog:app",
     "unocss": "catalog:app",
     "vue": "catalog:app",
     "vue-router": "catalog:app",
