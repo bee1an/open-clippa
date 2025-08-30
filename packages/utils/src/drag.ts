@@ -1,7 +1,8 @@
-export function drag(target: {
-  on: (event: 'pointerdown', callback: (e: PointerEvent) => void) => void
+// TODO generic type
+export function drag<E extends PointerEvent = PointerEvent>(target: {
+  on: (event: 'pointerdown', callback: (e: E) => void) => void
 }, hooks: {
-  down?: (e: PointerEvent) => void
+  down?: (e: E) => void
   move?: (e: PointerEvent, option: { dx: number, dy: number }) => void
   up?: (e: PointerEvent) => void
 }): void {

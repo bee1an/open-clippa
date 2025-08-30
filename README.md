@@ -8,7 +8,7 @@ Open source clippa library
 
 [ ]: timeline
 
-- [ ]: optimize seek
+- [x]: optimize seek
 
 - [ ]: style
 

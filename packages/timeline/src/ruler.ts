@@ -1,4 +1,4 @@
-import { EventBus, getPxByMs, ms2TimeStr } from '@clippa/utils'
+import { drag, EventBus, getPxByMs, ms2TimeStr } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
 
@@ -66,7 +66,7 @@ export class Ruler extends EventBus<RulerEvents> {
     container.cursor = 'pointer'
     container.eventMode = 'static'
 
-    this._bindPointerdown()
+    this._bindEvents()
 
     this.render()
   }
@@ -203,10 +203,26 @@ export class Ruler extends EventBus<RulerEvents> {
     this._ticksWrapper = ticksWrapper
   }
 
-  private _bindPointerdown(): void {
-    this.container.on('pointerdown', (e) => {
-      const seekTime = (e.getLocalPosition(this.container).x / this.width) * this.duration
+  private _bindEvents(): void {
+    // this.container.on('pointerdown', (e) => {
+    //   const seekTime = (e.getLocalPosition(this.container).x / this.width) * this.duration
+    //   this.emit('seek', seekTime)
+    // })
+
+    let x: number
+    const seek = (): void => {
+      const seekTime = (x / this.width) * this.duration
       this.emit('seek', seekTime)
+    }
+    drag(this.container, {
+      down: (e) => {
+        x = e.getLocalPosition(this.container).x
+        seek()
+      },
+      move: (_, { dx }) => {
+        x += dx
+        seek()
+      },
     })
   }
 
