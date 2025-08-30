@@ -76,7 +76,7 @@ export class Timeline {
     await app.init({
       resizeTo: wrapper,
       backgroundColor: '#393941',
-      height: 300,
+      height: 250,
       antialias: true,
     })
 

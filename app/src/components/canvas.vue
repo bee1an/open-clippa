@@ -3,7 +3,7 @@ import { Director, Stage, Theater, Video } from 'open-clippa'
 
 const theater = new Theater()
 
-const stage = new Stage({ id: 'canvas', width: 600, height: 400 })
+const stage = new Stage({ id: 'canvas', width: 600, height: 350 })
 
 const director = new Director({ theater, stage })
 
@@ -16,10 +16,10 @@ director.on('durationChange', (d) => {
   duration.value = d
 })
 
-function fileSelected([file]: FileList) {
-  const video = new Video({ src: file, start: 0, duration: 5000 })
-  theater.hire(video)
-}
+// function fileSelected([file]: FileList) {
+//   const video = new Video({ src: file, start: 0, duration: 5000 })
+//   theater.hire(video)
+// }
 
 const video = new Video({ src: 'https://pixijs.com/assets/video.mp4', start: 0, duration: 5000 })
 theater.hire(video)
@@ -32,17 +32,17 @@ watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
 
-function seekBySlider(value: number) {
-  director.seek(value * duration.value)
-}
+// function seekBySlider(value: number) {
+//   director.seek(value * duration.value)
+// }
 </script>
 
 <template>
   <div hfull flex="~ col" items-center justify-center>
     <div id="canvas" mb-5 />
-    <div w-130 mb-2>
+    <!-- <div w-130 mb-2>
       <yy-slider v-model="sliderValue" :max="1" @change="seekBySlider" />
-    </div>
+    </div> -->
     <div text-center>
       <div mb-2 flex="~" justify-center gap-2>
         <yy-button @click="() => director.action()">
@@ -51,9 +51,9 @@ function seekBySlider(value: number) {
         <yy-button @click="() => director.stop()">
           暂停
         </yy-button>
-        <yy-upload @change="fileSelected">
+        <!-- <yy-upload @change="fileSelected">
           <yy-button>上传文件</yy-button>
-        </yy-upload>
+        </yy-upload> -->
       </div>
     </div>
     <p>

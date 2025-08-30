@@ -18,7 +18,7 @@
       </yy-layout-sider>
 
       <yy-layout overflow-hidden>
-        <yy-layout-content content-class="h-[calc(100vh-350px)]">
+        <yy-layout-content content-class="h-[calc(100vh-300px)]">
           <Canvas />
         </yy-layout-content>
         <yy-layout-footer>
