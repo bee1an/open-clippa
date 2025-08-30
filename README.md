@@ -4,23 +4,20 @@ Open source clippa library
 
 ## TODO
 
-[ ]: use facade unify timeline and canvas
+- [ ] use facade unify timeline and canvas
 
-[ ]: timeline
+- [ ] timeline
+  - [x] optimize seek
 
-- [x]: optimize seek
+  - [x] style
 
-- [x]: style
+  - [ ] optimize scroll
 
-- [ ]: optimize scroll
+  - [ ] better train resizer
 
-- [ ]: better train resizer
+  - [ ] feature hover train effect
 
-- [ ]: feature hover train effect
+  - [ ] delete tarin gap in same rail
 
-- [ ]: delete tarin gap in same rail
-
-[ ]: canvas
-
-- [ ]: text element
-  ß
+- [ ] canvas
+  - [ ] text element
