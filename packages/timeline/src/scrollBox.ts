@@ -4,8 +4,8 @@ import { Container, Graphics } from 'pixi.js'
 
 export const SCROLLBAR_WIDTH = 10
 export const SCROLLBAR_HEIGHT = 10
-export const RAIL_COLOR = '#7d6f7cff'
-export const TRIGGER_COLOR = '#d4d3cdff'
+export const RAIL_COLOR = 'transparent'
+export const TRIGGER_COLOR = '#78787f'
 
 export type Anyfn = (...args: any[]) => any // TODO
 

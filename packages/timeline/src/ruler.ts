@@ -2,13 +2,34 @@ import { drag, EventBus, getPxByMs, ms2TimeStr } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
 
+/**
+ * rail height
+ */
 export const RULER_HEIGHT = 28
-
+/**
+ * dot radius
+ */
 export const DOT_RADIUS = 1.5
-
+/**
+ * between ticks dot number
+ */
 export const DOT_NUM = 3
-
+/**
+ * tick font size
+ */
 export const TICK_FONT_SIZE = 10
+/**
+ * ruler background color
+ */
+export const RULER_FILL = '#1e1e29'
+/**
+ * time text color
+ */
+export const TICK_COLOR = '#838398'
+/**
+ * dot color
+ */
+export const DOT_FILL = '#505067'
 
 export interface RulerOption {
   screenWidth: number
@@ -79,7 +100,7 @@ export class Ruler extends EventBus<RulerEvents> {
   private _drawBg(): void {
     const bg = new Graphics()
     bg.rect(0, 0, this.width, RULER_HEIGHT)
-    bg.fill('#52521101')
+    bg.fill(RULER_FILL)
 
     if (this._bg) {
       this.container.replaceChild(this._bg, bg)
@@ -95,7 +116,7 @@ export class Ruler extends EventBus<RulerEvents> {
   private _drawBgByDuration(): void {
     const bg = new Graphics()
     bg.roundRect(0, 0, getPxByMs(this.duration, this.state.pxPerMs), RULER_HEIGHT, 8)
-    bg.fill('#2c1d47')
+    bg.fill(RULER_FILL)
 
     if (this._bgByDuration) {
       this.container.replaceChild(this._bgByDuration, bg)
@@ -107,12 +128,12 @@ export class Ruler extends EventBus<RulerEvents> {
     this._bgByDuration = bg
   }
 
-  private _drawDot(x: number, color: string = '#505067'): Graphics {
+  private _drawDot(x: number): Graphics {
     const graphics = new Graphics()
 
     graphics.circle(0, 0, DOT_RADIUS)
     graphics.position.set(x, RULER_HEIGHT / 2)
-    graphics.fill(color)
+    graphics.fill(DOT_FILL)
 
     return graphics
   }
@@ -121,7 +142,7 @@ export class Ruler extends EventBus<RulerEvents> {
     const text = new Text({
       style: {
         fontSize: TICK_FONT_SIZE,
-        fill: '#9595ac',
+        fill: TICK_COLOR,
       },
       x,
       y: RULER_HEIGHT / 2,

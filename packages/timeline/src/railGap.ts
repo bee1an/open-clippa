@@ -1,6 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js'
 
-export const GAP = 10
+export const GAP = 7
 
 export interface RailGapOption {
   y: number

@@ -10,8 +10,17 @@ Open source clippa library
 
 - [x]: optimize seek
 
-- [ ]: style
+- [x]: style
+
+- [ ]: optimize scroll
+
+- [ ]: better train resizer
+
+- [ ]: feature hover train effect
+
+- [ ]: delete tarin gap in same rail
 
 [ ]: canvas
 
 - [ ]: text element
+  ß

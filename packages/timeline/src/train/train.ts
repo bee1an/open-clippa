@@ -2,11 +2,25 @@ import type { Rail } from '../rail'
 import type { TrainDragStatus, TrainEvents, TrainOption } from './types'
 import { drag, EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
+import { RAIL_HEIGHT } from '../rail'
 import { State } from '../state'
 
-export const TRAIN_HEIGHT = 36
-
-export const RESIZE_TRIGGER_WIDTH = 16
+/**
+ * train height
+ */
+export const TRAIN_HEIGHT = 45
+/**
+ * left and right resizer width, practical width is half
+ */
+export const RESIZE_TRIGGER_WIDTH = 24
+/**
+ * resizer color
+ */
+export const RESIZE_TRIGGER_FILL = '#78787f'
+/**
+ * resizer radius
+ */
+export const RESIZE_TRIGGER_RADIUS = 8
 
 let i = 0
 export class Train extends EventBus<TrainEvents> {
@@ -25,7 +39,7 @@ export class Train extends EventBus<TrainEvents> {
   /**
    * y position
    */
-  y: number = 2
+  y: number = (RAIL_HEIGHT - TRAIN_HEIGHT) / 2
   /**
    * current status when dragging
    */
@@ -70,8 +84,9 @@ export class Train extends EventBus<TrainEvents> {
     const text = new Text({
       text: i,
       x: 20,
+      y: TRAIN_HEIGHT / 2 - 8,
       zIndex: 1,
-      style: { fontSize: 14 },
+      style: { fontSize: 14, fill: 'gray' },
     })
     this.container.addChild(text)
   }
@@ -81,9 +96,9 @@ export class Train extends EventBus<TrainEvents> {
    */
   private _drawResizerHelper(...[x, _, w, h]: [x: number, y: number, w: number, h: number]): Graphics {
     const resizer = new Graphics()
-    resizer.roundRect(0, 0, w, h, 6)
+    resizer.roundRect(0, 0, w, h, RESIZE_TRIGGER_RADIUS)
     resizer.x = x
-    resizer.fill('#6e3a3a')
+    resizer.fill(RESIZE_TRIGGER_FILL)
     resizer.eventMode = 'static'
     resizer.cursor = 'ew-resize'
     this.container.addChild(resizer)
@@ -117,7 +132,7 @@ export class Train extends EventBus<TrainEvents> {
     const y = 0
     const w = width - RESIZE_TRIGGER_WIDTH
     const h = TRAIN_HEIGHT
-    const fill = '#c98c8c'
+    const fill = '#010101'
 
     if (this._slot) {
       this._slot

@@ -109,7 +109,7 @@ export class Rails extends EventBus<RailsEvents> {
     // TODO: maybe bug add on this local
     // this.container.addChild(this.railsContainer)
 
-    this._drawBg()
+    // this._drawBg()
 
     this._drawBody()
 
@@ -439,7 +439,7 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   update(): void {
-    this._drawBg()
+    // this._drawBg()
 
     const helper = (instance: Rail | RailGap): void => {
       instance.updateWidth(Math.max(this.width, this.screenWidth - this.offsetX))

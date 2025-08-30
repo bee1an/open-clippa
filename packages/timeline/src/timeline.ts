@@ -5,6 +5,8 @@ import { Ruler } from './ruler'
 import { State } from './state'
 import { QueueRun } from './utils'
 
+export const APP_BACKGROUND_COLOR = '#1e1e29'
+
 export interface TimelineOption {
   /**
    * mount dom id
@@ -75,7 +77,7 @@ export class Timeline {
 
     await app.init({
       resizeTo: wrapper,
-      backgroundColor: '#393941',
+      backgroundColor: APP_BACKGROUND_COLOR,
       height: 250,
       antialias: true,
     })

@@ -5,9 +5,14 @@ import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
 import { Train } from './train'
 
-export const RAIL_HEIGHT = 40
-
-export const RAIL_COLOR = '#5f5f63aa'
+/**
+ * rail height
+ */
+export const RAIL_HEIGHT = 45
+/**
+ * rail background color
+ */
+export const RAIL_FILL = '#13131b'
 
 export interface RailOption {
   /**
@@ -226,7 +231,7 @@ export class Rail extends EventBus<RailEvents> {
     const bg = new Graphics()
 
     bg.roundRect(0, 0, this.width, RAIL_HEIGHT, 8)
-    bg.fill(RAIL_COLOR)
+    bg.fill(RAIL_FILL)
 
     if (this._bg) {
       this.container.replaceChild(this._bg, bg)
