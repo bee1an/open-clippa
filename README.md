@@ -11,7 +11,7 @@ Open source clippa library
 
   - [x] style
 
-  - [ ] optimize scroll
+  - [x] optimize scroll
 
   - [ ] better train resizer
 

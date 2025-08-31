@@ -403,13 +403,32 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   }
 
   private _bindEvents(): void {
-    // TODO: 触摸板
+    let lockDirection: 'x' | 'y' | null = null
     this.container.on('wheel', (e) => {
       e.preventDefault()
 
-      const key = { [Math.abs(e.deltaX)]: 'x', [Math.abs(e.deltaY)]: 'y' }[Math.max(Math.abs(e.deltaY), Math.abs(e.deltaX))]
+      const absX = Math.abs(e.deltaX)
+      const absY = Math.abs(e.deltaY)
 
-      this.scroll({ [key]: e[`delta${key.toUpperCase()}` as `delta${'X' | 'Y'}`] })
+      let direction = (absX > absY ? 'x' : 'y') as 'x' | 'y'
+
+      if (lockDirection && absX === absY) {
+        /*
+          优化触摸板, 体验更佳
+          如果滚动距离一样则沿用上一次的滚动方向
+          只有当有明显的滚动方向的改变时才会改变
+        */
+        direction = lockDirection
+      }
+
+      if (lockDirection === 'x') {
+        this.scroll({ x: e.deltaX })
+      }
+      else {
+        this.scroll({ y: e.deltaY })
+      }
+
+      lockDirection = direction
     })
   }
 

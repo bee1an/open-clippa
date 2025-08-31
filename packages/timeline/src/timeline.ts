@@ -75,6 +75,16 @@ export class Timeline {
       throw new Error('wrapper not found')
     }
 
+    // 阻止mac的双指滑动导致的回退操作
+    wrapper.addEventListener('pointerenter', () => {
+      document.body.style.setProperty('overscroll-behavior', 'none')
+      document.documentElement.style.setProperty('overscroll-behavior', 'none')
+    })
+    wrapper.addEventListener('pointerleave', () => {
+      document.body.style.removeProperty('overscroll-behavior')
+      document.documentElement.style.removeProperty('overscroll-behavior')
+    })
+
     await app.init({
       resizeTo: wrapper,
       backgroundColor: APP_BACKGROUND_COLOR,

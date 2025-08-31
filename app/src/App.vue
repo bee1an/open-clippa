@@ -9,5 +9,6 @@
 <style>
   html {
   color-scheme: dark;
+  overflow: hidden;
 }
 </style>
