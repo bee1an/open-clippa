@@ -13,11 +13,17 @@ Open source clippa library
 
   - [x] optimize scroll
 
-  - [ ] better train resizer
+  - [x] better train resizer
+
+  - [ ] active train zIndex
 
   - [ ] feature hover train effect
+
+  - [ ] train slot
 
   - [ ] delete tarin gap in same rail
 
 - [ ] canvas
   - [ ] text element
+
+- [ ] decode & encode

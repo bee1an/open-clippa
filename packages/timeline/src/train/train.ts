@@ -12,11 +12,23 @@ export const TRAIN_HEIGHT = 45
 /**
  * left and right resizer width, practical width is half
  */
-export const RESIZE_TRIGGER_WIDTH = 24
+export const RESIZE_TRIGGER_WIDTH = 30
 /**
  * resizer color
  */
-export const RESIZE_TRIGGER_FILL = '#78787f'
+export const RESIZE_TRIGGER_FILL = '#9a9a9a'
+/**
+ * resizer handler width
+ */
+export const RESIZE_HANDLER_WIDTH = 4
+/**
+ * resizer handler height
+ */
+export const RESIZE_HANDLER_HEIGHT = TRAIN_HEIGHT / 1.7
+/**
+ * resizer handler color
+ */
+export const RESIZE_HANDLER_FILL = '#21212e'
 /**
  * resizer radius
  */
@@ -94,19 +106,32 @@ export class Train extends EventBus<TrainEvents> {
   /**
    * draw a resizer helper
    */
-  private _drawResizerHelper(...[x, _, w, h]: [x: number, y: number, w: number, h: number]): Graphics {
-    const resizer = new Graphics()
-    resizer.roundRect(0, 0, w, h, RESIZE_TRIGGER_RADIUS)
+  private _drawResizerHelper(...[x, _, w, h, location = 'left']: [x: number, y: number, w: number, h: number, location?: 'left' | 'right']): Container {
+    const resizer = new Container()
     resizer.x = x
-    resizer.fill(RESIZE_TRIGGER_FILL)
     resizer.eventMode = 'static'
     resizer.cursor = 'ew-resize'
+
+    const resizerMain = new Graphics()
+    resizerMain.roundRect(0, 0, w, h, RESIZE_TRIGGER_RADIUS)
+      .fill(RESIZE_TRIGGER_FILL)
+    resizer.addChild(resizerMain)
+
+    const resizerHandler = new Graphics()
+    resizerHandler.roundRect(0, 0, RESIZE_HANDLER_WIDTH, RESIZE_HANDLER_HEIGHT, RESIZE_HANDLER_WIDTH / 2)
+      .fill(RESIZE_HANDLER_FILL)
+
+    resizerHandler.y = resizerMain.height / 2 - resizerHandler.height / 2
+    resizerHandler.x = w / 4 - resizerHandler.width / 2 + (location === 'left' ? 0 : RESIZE_TRIGGER_WIDTH / 2)
+
+    resizer.addChild(resizerHandler)
+
     this.container.addChild(resizer)
     return resizer
   }
 
-  private _leftResizer!: Graphics
-  private _rightResizer!: Graphics
+  private _leftResizer!: Container
+  private _rightResizer!: Container
   /**
    * include left resizer and right resizer
    */
@@ -119,6 +144,7 @@ export class Train extends EventBus<TrainEvents> {
       0,
       RESIZE_TRIGGER_WIDTH,
       TRAIN_HEIGHT,
+      'right',
     )
     this._bindRightResize(this._rightResizer)
   }
@@ -195,7 +221,7 @@ export class Train extends EventBus<TrainEvents> {
         }
         else {
           // 否则y为固定值
-          this.container.y = 2
+          this.container.y = (RAIL_HEIGHT - TRAIN_HEIGHT) / 2
         }
 
         this.x = site.xValue
@@ -213,7 +239,7 @@ export class Train extends EventBus<TrainEvents> {
         else if (this.dragStatus === 'free') {
           // 如果是游离态, 恢复train为拖拽前的状态
           this._recordWhenDrag!.parent.insertTrain(this)
-          this.updatePos(this._recordWhenDrag!.x, 2, true)
+          this.updatePos(this._recordWhenDrag!.x, (RAIL_HEIGHT - TRAIN_HEIGHT) / 2, true)
         }
         else {
           if (this.x !== this.container.x) {
@@ -225,7 +251,7 @@ export class Train extends EventBus<TrainEvents> {
         }
 
         // 拖拽结束后将y值还原
-        this.y = 2
+        this.y = (RAIL_HEIGHT - TRAIN_HEIGHT) / 2
         this.updatePos(undefined, this.y)
 
         this.updateState('normal')
@@ -237,7 +263,7 @@ export class Train extends EventBus<TrainEvents> {
   /**
    * bind left risize handle
    */
-  private _bindLeftResize(traget: Graphics): void {
+  private _bindLeftResize(traget: Container): void {
     drag(traget, {
       move: (_, { dx }) => {
         const site = {
@@ -270,7 +296,7 @@ export class Train extends EventBus<TrainEvents> {
   /**
    * bind right resize handle
    */
-  private _bindRightResize(traget: Graphics): void {
+  private _bindRightResize(traget: Container): void {
     drag(traget, {
       down: () => {
         this.emit('rightResizeStart', this)
