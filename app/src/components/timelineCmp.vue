@@ -6,5 +6,5 @@ onMounted(() => timeline.initial())
 </script>
 
 <template>
-  <div id="timeline" />
+  <div id="timeline" hfull />
 </template>

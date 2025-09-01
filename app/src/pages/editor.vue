@@ -17,14 +17,20 @@ definePage({ redirect: '/editor/media' })
         <Sider />
       </yy-layout-sider>
 
-      <yy-layout overflow-hidden>
-        <yy-layout-content content-class="h-[calc(100vh-300px)]">
+      <div flex-1 flex="~ col">
+        <div class="flex-1">
           <Canvas />
+        </div>
+        <ResizableTimeline />
+      </div>
+      <!-- <yy-layout overflow-hidden>
+        <yy-layout-content content-class="h-[calc(100vh-300px)]">
+
         </yy-layout-content>
         <yy-layout-footer>
-          <TimelineCmp />
+
         </yy-layout-footer>
-      </yy-layout>
+      </yy-layout> -->
     </yy-layout>
   </yy-layout>
 </template>
