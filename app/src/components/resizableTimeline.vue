@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { useEventListener, useStorage } from '@vueuse/core'
+import { onMounted, ref } from 'vue'
 import TimelineCmp from './timelineCmp.vue'
 
 // 默认高度和限制
@@ -7,27 +8,13 @@ const DEFAULT_HEIGHT = 250
 const MIN_HEIGHT = 100
 const MAX_HEIGHT = 500
 
-// 响应式数据
-const timelineHeight = ref(DEFAULT_HEIGHT)
+// 使用VueUse的useStorage来管理高度状态
+const timelineHeight = useStorage('timelineHeight', DEFAULT_HEIGHT)
+
+// 拖动状态
 const isDragging = ref(false)
 const dragStartY = ref(0)
 const dragStartHeight = ref(0)
-
-// 从localStorage恢复高度
-function loadHeightFromStorage() {
-  const savedHeight = localStorage.getItem('timelineHeight')
-  if (savedHeight) {
-    const height = Number.parseInt(savedHeight, 10)
-    if (!Number.isNaN(height) && height >= MIN_HEIGHT && height <= MAX_HEIGHT) {
-      timelineHeight.value = height
-    }
-  }
-}
-
-// 保存高度到localStorage
-function saveHeightToStorage() {
-  localStorage.setItem('timelineHeight', timelineHeight.value.toString())
-}
 
 // 开始拖动
 function startDrag(e: MouseEvent) {
@@ -35,13 +22,14 @@ function startDrag(e: MouseEvent) {
   dragStartY.value = e.clientY
   dragStartHeight.value = timelineHeight.value
 
-  // 添加全局事件监听器
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', stopDrag)
-
-  // 防止文本选择
-  document.body.style.userSelect = 'none'
-  document.body.style.cursor = 'ns-resize'
+  // 使用VueUse的事件监听器，自动管理事件绑定和解绑
+  const removeMouseMoveListener = useEventListener(document, 'mousemove', onDrag)
+  const removeMouseUpListener = useEventListener(document, 'mouseup', (event: MouseEvent) => {
+    stopDrag(event)
+    // 移除事件监听器
+    removeMouseMoveListener()
+    removeMouseUpListener()
+  })
 
   // 阻止事件冒泡
   e.preventDefault()
@@ -56,9 +44,6 @@ function onDrag(e: MouseEvent) {
   const startY = dragStartY.value
 
   // 计算高度变化
-  // 调整手柄在Timeline上方
-  // 如果当前Y大于起始Y，说明鼠标向下移动，应该减少高度
-  // 如果当前Y小于起始Y，说明鼠标向上移动，应该增加高度
   const deltaY = currentY - startY
   const newHeight = dragStartHeight.value - deltaY
 
@@ -76,17 +61,6 @@ function stopDrag(e?: MouseEvent) {
 
   isDragging.value = false
 
-  // 移除全局事件监听器
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', stopDrag)
-
-  // 恢复样式
-  document.body.style.userSelect = ''
-  document.body.style.cursor = ''
-
-  // 保存高度
-  saveHeightToStorage()
-
   // 阻止事件冒泡
   if (e) {
     e.preventDefault()
@@ -95,14 +69,12 @@ function stopDrag(e?: MouseEvent) {
 
 // 组件挂载时
 onMounted(() => {
-  loadHeightFromStorage()
-})
-
-// 组件卸载时
-onUnmounted(() => {
-  // 清理事件监听器
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', stopDrag)
+  // 使用VueUse的useStorage已经自动处理了存储的加载
+  // 但我们仍然需要确保高度在有效范围内
+  const height = timelineHeight.value
+  if (height < MIN_HEIGHT || height > MAX_HEIGHT) {
+    timelineHeight.value = DEFAULT_HEIGHT
+  }
 })
 </script>
 
