@@ -38,6 +38,7 @@
     "yaml": "catalog:"
   },
   "lint-staged": {
+    "app/**/*": "cd app && eslint --fix",
     "*": "eslint --fix"
   }
 }

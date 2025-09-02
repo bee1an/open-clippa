@@ -7,6 +7,7 @@ export default antfu({
   },
   type: 'lib',
   pnpm: true,
+  ignores: ['app/**'],
 }, {
   rules: {
     'ts/consistent-type-definitions': 'off',
