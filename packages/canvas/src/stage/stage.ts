@@ -9,6 +9,13 @@ export class Stage extends EventBus<StageEvents> {
   private _app!: Application
 
   /**
+   * 获取PIXI应用实例
+   */
+  get app(): Application {
+    return this._app
+  }
+
+  /**
    * 当前处于舞台上的表演者集合
    */
   private _performers: Set<Performer> = new Set()

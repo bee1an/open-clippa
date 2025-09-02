@@ -30,7 +30,7 @@ watch(currentTime, () => {
 
 <template>
   <div hfull flex="~ col" items-center justify-center>
-    <div id="canvas" mb-5 />
+    <div id="canvas" class="aspect-ratio-16/9 h-60%" relative mb-5 />
     <!-- <div w-130 mb-2>
       <yy-slider v-model="sliderValue" :max="1" @change="seekBySlider" />
     </div> -->
@@ -42,9 +42,6 @@ watch(currentTime, () => {
         <yy-button @click="() => director.stop()">
           暂停
         </yy-button>
-        <!-- <yy-upload @change="fileSelected">
-          <yy-button>上传文件</yy-button>
-        </yy-upload> -->
       </div>
     </div>
     <p>
@@ -52,3 +49,11 @@ watch(currentTime, () => {
     </p>
   </div>
 </template>
+
+<style>
+#canvas canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+</style>

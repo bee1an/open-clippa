@@ -18,9 +18,7 @@ definePage({ redirect: '/editor/media' })
       </yy-layout-sider>
 
       <div flex-1 flex="~ col">
-        <div class="flex-1">
-          <Canvas />
-        </div>
+        <Canvas />
         <ResizableTimeline />
       </div>
       <!-- <yy-layout overflow-hidden>
