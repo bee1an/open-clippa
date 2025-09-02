@@ -27,7 +27,7 @@ export default defineConfig({
     Vue(),
 
     AutoImport({
-      imports: ['vue'],
+      imports: ['vue', '@vueuse/core'],
       dts: 'types/auto-imports.d.ts',
     }),
 

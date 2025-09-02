@@ -1,8 +1,4 @@
 <script setup lang="ts">
-import { useEventListener, useStorage } from '@vueuse/core'
-import { onMounted, ref } from 'vue'
-import TimelineCmp from './timelineCmp.vue'
-
 // 默认高度和限制
 const DEFAULT_HEIGHT = 250
 const MIN_HEIGHT = 100
