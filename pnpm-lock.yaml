@@ -209,6 +209,8 @@ importers:
 
   packages/canvas: {}
 
+  packages/codec: {}
+
   packages/open-clippa: {}
 
   packages/performer: {}
