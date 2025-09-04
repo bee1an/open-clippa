@@ -15,6 +15,7 @@
     "commitlint": "commitlint --edit"
   },
   "dependencies": {
+    "@webav/av-cliper": "catalog:",
     "open-clippa": "workspace:^",
     "pixi.js": "catalog:"
   },

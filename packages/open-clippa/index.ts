@@ -1,4 +1,5 @@
 export * from './canvas'
+export * from './codec'
 export * from './performer'
 export * from './timeline'
 export * from './utils'

@@ -58,6 +58,9 @@ catalogs:
     '@types/node':
       specifier: ^24.1.0
       version: 24.1.0
+    '@webav/av-cliper':
+      specifier: 1.1.17
+      version: 1.1.17
     cz-git:
       specifier: ^1.12.0
       version: 1.12.0
@@ -105,6 +108,9 @@ importers:
 
   .:
     dependencies:
+      '@webav/av-cliper':
+        specifier: 'catalog:'
+        version: 1.1.17
       open-clippa:
         specifier: workspace:^
         version: link:packages/open-clippa
@@ -1234,6 +1240,15 @@ packages:
     resolution: {integrity: sha512-e89uuTLMh0U5cZ9iDpEI2senqPGfbPRTHM/0AaQkcxnpqjkZqDYP8rpfm7edOz8s+pOCOROEy1PIveSW8+fL5g==}
     peerDependencies:
       vue: ^3.5.0
+
+  '@webav/av-cliper@1.1.17':
+    resolution: {integrity: sha512-kZLSA5ECCA6kOVr+eyEkvNWDK423meS8GMfJLph34je0N0A8PUoQsuiobocMTY8+PqVTbWE8IOFUgK6AOaFFxg==}
+
+  '@webav/internal-utils@1.1.17':
+    resolution: {integrity: sha512-9dXCdU7jVIkoe1ZKgQJfb5VjBpe/576/ttZ4VaK+dYkjJ/cPmnN3I8vQMFWQ/V90Qqra0Mq2+pUgkb0DO3ofyw==}
+
+  '@webav/mp4box.js@0.5.7':
+    resolution: {integrity: sha512-KgScEtDpiLnWvj1Rj8Ri9fDWxTjfdNr7cmY/PT88EmttHh6cLxMAeyD/W8Vydes4z7qV/c5VDAaP4cTlaO0E9g==}
 
   '@webgpu/types@0.1.64':
     resolution: {integrity: sha512-84kRIAGV46LJTlJZWxShiOrNL30A+9KokD7RB3dRCIqODFjodS5tCD5yyiZ8kIReGVZSDfA3XkkwyyOIF6K62A==}
@@ -2408,6 +2423,9 @@ packages:
     resolution: {integrity: sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ==}
     engines: {node: '>=18'}
 
+  opfs-tools@0.7.2:
+    resolution: {integrity: sha512-ITMh4BnRCh/wFDFFaTsZOFLGUCoXbtn4KH1qh4S2LLF31+afqhXxz0NK74wqyRB5tbgnDD2SDcn7J4HeEVuvgg==}
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -3011,6 +3029,10 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  wave-resampler@1.0.0:
+    resolution: {integrity: sha512-bE3rbpZXuKAV52Cd8/BeJvy82ZqEHK8pPWHrZ9JioaVVTBlmWbDC+u4p9blhFcf0Skepb4hlOAHc25XfqLC48g==}
+    engines: {node: '>=8'}
 
   webpack-virtual-modules@0.6.2:
     resolution: {integrity: sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==}
@@ -4170,6 +4192,19 @@ snapshots:
   '@vueuse/shared@13.9.0(vue@3.5.18(typescript@5.8.3))':
     dependencies:
       vue: 3.5.18(typescript@5.8.3)
+
+  '@webav/av-cliper@1.1.17':
+    dependencies:
+      '@webav/internal-utils': 1.1.17
+      '@webav/mp4box.js': 0.5.7
+      opfs-tools: 0.7.2
+      wave-resampler: 1.0.0
+
+  '@webav/internal-utils@1.1.17':
+    dependencies:
+      '@webav/mp4box.js': 0.5.7
+
+  '@webav/mp4box.js@0.5.7': {}
 
   '@webgpu/types@0.1.64': {}
 
@@ -5509,6 +5544,8 @@ snapshots:
     dependencies:
       mimic-function: 5.0.1
 
+  opfs-tools@0.7.2: {}
+
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -6166,6 +6203,8 @@ snapshots:
       '@vue/shared': 3.5.18
     optionalDependencies:
       typescript: 5.8.3
+
+  wave-resampler@1.0.0: {}
 
   webpack-virtual-modules@0.6.2: {}
 

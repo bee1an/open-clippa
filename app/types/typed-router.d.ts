@@ -23,6 +23,7 @@ declare module 'vue-router/auto-routes' {
     '/editor': RouteRecordInfo<'/editor', '/editor', Record<never, never>, Record<never, never>, '/editor/media'>,
     '/editor/media': RouteRecordInfo<'/editor/media', '/editor/media', Record<never, never>, Record<never, never>>,
     '/play': RouteRecordInfo<'/play', '/play', Record<never, never>, Record<never, never>>,
+    '/playground': RouteRecordInfo<'/playground', '/playground', Record<never, never>, Record<never, never>>,
   }
 
   /**
@@ -54,6 +55,10 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/play.vue': {
       routes: '/play'
+      views: never
+    }
+    'src/pages/playground.vue': {
+      routes: '/playground'
       views: never
     }
   }
