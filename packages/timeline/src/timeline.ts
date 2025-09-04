@@ -1,3 +1,5 @@
+import type { Train } from './train'
+import { EventBus } from '@clippa/utils'
 import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Rails } from './rails'
@@ -7,18 +9,13 @@ import { QueueRun } from './utils'
 
 export const APP_BACKGROUND_COLOR = '#1e1e29'
 
-export interface TimelineOption {
-  /**
-   * mount dom id
-   */
-  id: string
-  /**
-   * total duration
-   */
-  duration: number
+export type TimlineEvents = {
+  play: []
+  pause: []
+  seeked: [time: number]
 }
 
-export class Timeline {
+export class Timeline extends EventBus<TimlineEvents> {
   /**
    * pixi application
    */
@@ -43,6 +40,7 @@ export class Timeline {
    * ruler and cursor container
    */
   adjuster = new Container()
+  currentTime: number = 0
   /**
    * timeline global state
    */
@@ -50,26 +48,80 @@ export class Timeline {
   /**
    * total duration
    */
-  duration: number
+  duration: number = 0
   /**
    * scale factor
    */
-  scale: number = 1.2
+  scale: number = 0.6
+  /**
+   * 是否播放中
+   */
+  private _playing: boolean = false
 
-  constructor(private _option: TimelineOption) {
-    this.duration = _option.duration
+  ready: Promise<void>
+  private _readyResolve
+
+  constructor() {
+    super()
+
+    const { promise, resolve } = Promise.withResolvers<void>()
+    this.ready = promise
+    this._readyResolve = resolve
   }
 
   /**
-   * initial timeline
+   * mount timeline
+   *
+   * app resize to wrapper, so wrapper is required
    */
-  async initial(): Promise<void> {
-    const { id } = this._option
+  async mount(elementId: string): Promise<void> {
+    if (this.app) {
+      this._mountWithBindEvents(elementId)
+      return
+    }
 
     const app = new Application()
     this.app = app
 
-    const wrapper = document.getElementById(id)
+    const wrapper = this._mountWithBindEvents(elementId)
+
+    await app.init({
+      resizeTo: wrapper,
+      backgroundColor: APP_BACKGROUND_COLOR,
+      height: 250,
+      antialias: true,
+    })
+    this._readyResolve()
+
+    wrapper.appendChild(app.canvas)
+
+    app.stage.addChild(this.container)
+
+    const queueRun = new QueueRun(() => {
+      app.queueResize()
+      this._updateChildrenSize()
+    })
+
+    // https://github.com/pixijs/pixijs/issues/11427
+    new ResizeObserver(() => queueRun.queueRun()).observe(wrapper)
+
+    this._createRuler()
+
+    this._createCursor()
+
+    this._createRails()
+
+    this.container.addChild(this.adjuster)
+
+    // this._updatePxPerMs((app.screen.width / this.duration) * this.scale)
+  }
+
+  private _mountWithBindEvents(elementId: string): HTMLElement {
+    if (!this.app) {
+      throw new Error('app not found')
+    }
+
+    const wrapper = document.getElementById(elementId)
 
     if (!wrapper) {
       throw new Error('wrapper not found')
@@ -85,34 +137,7 @@ export class Timeline {
       document.documentElement.style.removeProperty('overscroll-behavior')
     })
 
-    await app.init({
-      resizeTo: wrapper,
-      backgroundColor: APP_BACKGROUND_COLOR,
-      height: 250,
-      antialias: true,
-    })
-
-    app.stage.addChild(this.container)
-
-    const queueRun = new QueueRun(() => {
-      app.queueResize()
-      this._updateChildrenSize()
-    })
-
-    // https://github.com/pixijs/pixijs/issues/11427
-    new ResizeObserver(() => queueRun.queueRun()).observe(wrapper)
-
-    wrapper.appendChild(app.canvas)
-
-    this._createRuler()
-
-    this._createCursor()
-
-    this._createRails()
-
-    this.container.addChild(this.adjuster)
-
-    this._updatePxPerMs((app.screen.width / this.duration) * this.scale)
+    return wrapper
   }
 
   /**
@@ -163,7 +188,7 @@ export class Timeline {
     this.adjuster.addChild(this.ruler.container)
 
     this.ruler.on('seek', (seekTime: number) => {
-      this.cursor?.seek(seekTime)
+      this.seek(seekTime)
     })
   }
 
@@ -177,7 +202,6 @@ export class Timeline {
       screenWidth: this.app!.screen.width,
       screenHeight: this.app!.screen.height,
       duration: this.duration,
-      maxZIndex: 5,
     })
 
     this.container.addChild(this.rails.container)
@@ -213,7 +237,84 @@ export class Timeline {
    */
   updateDuration(duration: number): void {
     this.duration = duration
+
     this.ruler?.updateDuration(duration)
     this.rails?.updateDuration(duration)
+  }
+
+  private _requestAnimationFrameId?: number
+  /** 循环函数 */
+  private _start(): void {
+    const time = Date.now()
+
+    this._requestAnimationFrameId = requestAnimationFrame(() => {
+      const nextTime = Date.now()
+
+      const crt = this.currentTime + (nextTime - time)
+
+      if (crt > this.duration) {
+        this.currentTime = this.duration
+        this.pause()
+      }
+      else {
+        this.currentTime = crt
+        this._start()
+      }
+    })
+  }
+
+  play(): void {
+    if (this._playing)
+      return
+    this._playing = true
+
+    this.emit('play')
+    this._start()
+  }
+
+  private _stop(): void {
+    if (!this._playing)
+      return
+    this._playing = false
+
+    typeof this._requestAnimationFrameId === 'number'
+    && cancelAnimationFrame(this._requestAnimationFrameId)
+  }
+
+  /**
+   * 停止
+   */
+  pause(): void {
+    this._stop()
+
+    this.emit('pause')
+  }
+
+  seek(time: number, withEffect = true): void {
+    this._stop()
+
+    this.currentTime = time
+
+    withEffect && this.cursor?.seek(time)
+
+    this.emit('seeked', time)
+  }
+
+  addTrainByZIndex(train: Train, zIndex: number): void {
+    if (!this.rails) {
+      throw new Error('rails not found')
+    }
+
+    if (train.start + train.duration > this.duration) {
+      this.updateDuration(train.start + train.duration)
+    }
+
+    const rail = this.rails.getRailByZIndex(zIndex)
+
+    if (!rail) {
+      this.rails.createRailByZIndex(zIndex)
+    }
+
+    this.rails.getRailByZIndex(zIndex)!.insertTrain(train)
   }
 }

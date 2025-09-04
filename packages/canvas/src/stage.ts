@@ -1,9 +1,22 @@
 import type { Performer } from '@clippa/performer'
 import type { MaybeArray } from 'type-aide'
-import type { StageEvents } from './events'
-import type { StageOption } from './option'
 import { EventBus } from '@clippa/utils'
 import { Application } from 'pixi.js'
+
+export interface InitialOption {
+  width?: number
+
+  height?: number
+
+  resolution?: number
+}
+
+export type StageEvents = {
+  /**
+   * 延迟添加
+   */
+  delayedAdd: [Performer]
+}
 
 export class Stage extends EventBus<StageEvents> {
   private _app!: Application
@@ -23,29 +36,42 @@ export class Stage extends EventBus<StageEvents> {
     return this._performers
   }
 
-  constructor(option: StageOption) {
+  ready: Promise<void>
+  private _readyResolve
+
+  constructor() {
     super()
-    this._initial(option)
+
+    const { promise, resolve } = Promise.withResolvers<void>()
+    this.ready = promise
+    this._readyResolve = resolve
   }
 
-  private async _initial(option: StageOption): Promise<Application> {
-    const { id } = option
+  async init(option: InitialOption): Promise<Application> {
+    if (this._app)
+      return Promise.resolve(this._app)
 
     const app = new Application()
     this._app = app
 
     await app.init(option)
-
-    const theaterWrapper = document.getElementById(id)
-
-    if (theaterWrapper) {
-      theaterWrapper.appendChild(app.canvas)
-    }
-    else {
-      console.error('theaterWrapper not found')
-    }
+    this._readyResolve()
 
     return app
+  }
+
+  mount(elementId: string): void {
+    if (!this._app) {
+      throw new Error('app not found')
+    }
+
+    const element = document.getElementById(elementId)
+
+    if (!element) {
+      throw new Error('element not found')
+    }
+
+    element.appendChild(this._app.canvas)
   }
 
   /**

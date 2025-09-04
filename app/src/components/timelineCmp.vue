@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { Timeline } from 'open-clippa'
+import { useEditorStore } from '@/store'
 
-const timeline = new Timeline({ id: 'timeline', duration: 10000 })
-onMounted(() => timeline.initial())
+const editorStore = useEditorStore()
+const { clippa } = editorStore
+
+onMounted(() => clippa.timeline.mount('timeline'))
 </script>
 
 <template>

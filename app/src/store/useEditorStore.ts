@@ -1,19 +1,18 @@
-import { Director, Stage, Theater } from 'open-clippa'
+import { Clippa } from 'open-clippa'
 import { defineStore } from 'pinia'
 
 export const useEditorStore = defineStore('editor', () => {
-  const theater = markRaw(new Theater())
-  const stage = markRaw(new Stage({ id: 'canvas', width: 995, height: 995 / 16 * 9 }))
-  const director = markRaw(new Director({ theater, stage }))
+  const clippa = markRaw(new Clippa())
 
   const currentTime = ref(0)
-  director.on('updateCurrentTime', (t) => {
-    currentTime.value = t
-  })
-  const duration = ref(0)
-  director.on('durationChange', (d) => {
-    duration.value = d
+  clippa.director.on('updateCurrentTime', (time) => {
+    currentTime.value = time
   })
 
-  return { theater, director, currentTime, duration }
+  const duration = ref(0)
+  clippa.director.on('durationChange', (time) => {
+    duration.value = time
+  })
+
+  return { clippa, currentTime, duration }
 })

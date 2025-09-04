@@ -9,6 +9,8 @@ VideoSource.defaultOptions.autoPlay = false
 export interface VideoOption extends PerformerOption {
   src: string | File | Blob
 
+  zIndex: number
+
   width?: number
 
   height?: number
@@ -25,7 +27,7 @@ export class Video implements Performer {
   sprite?: Sprite
   valid: boolean = false
   error: boolean = false
-
+  zIndex: number
   /**
    * 当前播放时间
    */
@@ -41,10 +43,11 @@ export class Video implements Performer {
   playState: PlayState = PlayState.PAUSED
 
   constructor(option: VideoOption) {
-    const { start, duration, src } = option
+    const { start, duration, src, zIndex } = option
 
     this.start = start
     this.duration = duration
+    this.zIndex = zIndex
     this.src = transformSrc(src)
 
     this.load(option)

@@ -115,7 +115,7 @@ export class Director extends EventBus<DirectorEvents> {
 
       if (crt > this.duration) {
         this.currentTime = this.duration
-        this.stop()
+        this.pause()
       }
       else {
         this.currentTime = crt
@@ -129,7 +129,7 @@ export class Director extends EventBus<DirectorEvents> {
    *
    * 会在剧场对象中过滤出当前时间段的表演者
    */
-  action(): void {
+  play(): void {
     if (this._playing)
       return
     this._playing = true
@@ -153,7 +153,7 @@ export class Director extends EventBus<DirectorEvents> {
   /**
    * 停止
    */
-  stop(): void {
+  pause(): void {
     this._stop()
   }
 

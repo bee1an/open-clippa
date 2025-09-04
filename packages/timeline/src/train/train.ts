@@ -287,6 +287,11 @@ export class Train extends EventBus<TrainEvents> {
         this.width = this.container.width
         this.x = this.container.x
 
+        // TODO
+        /*
+          这里调用函数会触发事件
+          但是这里其实是一个组合事件, 而不是先修改了start, 又修改了duration
+        */
         this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
         this.updateDuration(getMsByPx(this.width, this.state.pxPerMs))
       },

@@ -12,7 +12,7 @@ export interface RailsOption {
   screenWidth: number
   screenHeight: number
   duration: number
-  maxZIndex: number
+  maxZIndex?: number
 }
 
 export type RailsEvents = {
@@ -60,7 +60,7 @@ export class Rails extends EventBus<RailsEvents> {
 
   duration: number
 
-  maxZIndex: number
+  maxZIndex: number = -1
 
   get offsetX(): number {
     return this.scrollBox.offsetX
@@ -84,7 +84,6 @@ export class Rails extends EventBus<RailsEvents> {
     this._processWidth()
     this.screenWidth = option.screenWidth
     this.screenHeight = option.screenHeight
-    this.maxZIndex = option.maxZIndex
 
     this.scrollBox = new ScrollBox()
 
@@ -201,11 +200,7 @@ export class Rails extends EventBus<RailsEvents> {
     for (let index = 0; index <= this.maxZIndex; index++) {
       const zIndex = this.maxZIndex - index
 
-      this._createRail(this.maxZIndex - index, [
-        // { start: 500, duration: 1000 },
-        { start: 2000, duration: 1500 },
-        // { start: 5000, duration: 2000 },
-      ])
+      this._createRail(zIndex)
 
       this._createRailGap(zIndex)
     }
@@ -285,30 +280,7 @@ export class Rails extends EventBus<RailsEvents> {
 
         const { zIndex } = gap
 
-        /* update other zIndex */
-        this.rails.forEach((rail) => {
-          if (rail.zIndex >= zIndex) {
-            rail.updateZIndex(rail.zIndex + 1)
-          }
-          else {
-            rail.updateY(rail.y + RAIL_HEIGHT + GAP)
-          }
-        })
-
-        this.railGaps.forEach((railGap) => {
-          if (railGap.zIndex >= zIndex) {
-            railGap.updateZIndex(railGap.zIndex + 1)
-          }
-          else {
-            railGap.updateY(railGap.y + RAIL_HEIGHT + GAP)
-          }
-        })
-
-        this.maxZIndex = Math.max(this.rails[0].zIndex, zIndex)
-
-        /* move train to new rail */
-        const rail = this._createRail(zIndex)
-        this._createRailGap(zIndex)
+        const rail = this.createRailByZIndex(zIndex)
 
         rail.insertTrain(atTrain)
 
@@ -327,6 +299,46 @@ export class Rails extends EventBus<RailsEvents> {
       this._updateRailContainerY()
       // console.log('', this.rails.map(i => i.zIndex), this.railGaps.map(i => i.zIndex))
     })
+  }
+
+  /**
+   * create rail and rail gap by zIndex with update rail container
+   */
+  createRailByZIndex(zIndex: number): Rail {
+    const rail = this._createRailByZIndexRaw(zIndex)
+    this._updateRailContainerY()
+    return rail
+  }
+
+  /**
+   * create rail by zIndex with rail gap
+   */
+  private _createRailByZIndexRaw(zIndex: number): Rail {
+    /* update other zIndex */
+    this.rails.forEach((rail) => {
+      if (rail.zIndex >= zIndex) {
+        rail.updateZIndex(rail.zIndex + 1)
+      }
+      else {
+        rail.updateY(rail.y + RAIL_HEIGHT + GAP)
+      }
+    })
+
+    this.railGaps.forEach((railGap) => {
+      if (railGap.zIndex >= zIndex) {
+        railGap.updateZIndex(railGap.zIndex + 1)
+      }
+      else {
+        railGap.updateY(railGap.y + RAIL_HEIGHT + GAP)
+      }
+    })
+
+    this.maxZIndex = Math.max(this.rails[0]?.zIndex ?? 0, zIndex)
+
+    const rail = this._createRail(zIndex)
+    this._createRailGap(zIndex)
+
+    return rail
   }
 
   /**
@@ -372,7 +384,7 @@ export class Rails extends EventBus<RailsEvents> {
     this.scrollBox.update()
   }
 
-  getRailByZIndex(zIndex: number): Rail {
+  getRailByZIndex(zIndex: number): Rail | undefined {
     return this.rails[this.maxZIndex - zIndex]
   }
 

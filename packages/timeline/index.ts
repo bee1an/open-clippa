@@ -1,1 +1,7 @@
+export * from './src/cursor'
+export * from './src/rail'
+export * from './src/railGap'
+export * from './src/rails'
+export * from './src/scrollBox'
 export * from './src/timeline'
+export * from './src/train'

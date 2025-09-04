@@ -39,7 +39,7 @@ export class State extends EventBus<StateEvents> {
   /**
    * 每ms对应的px
    */
-  pxPerMs: number = 0
+  pxPerMs: number = 0.1
   updatePxPerMs(pxPerMs: number): void {
     this.pxPerMs = pxPerMs
     this.emit('updatedPxPerMs', pxPerMs)
