@@ -1,4 +1,6 @@
-import { MP4Clip } from '@webav/av-cliper'
+import { Log, MP4Clip } from '@webav/av-cliper'
+
+Log.setLogLevel(Log.warn)
 
 export interface Tick {
   video?: VideoFrame
