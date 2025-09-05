@@ -1,4 +1,4 @@
-import { getPxByMs } from 'open-clippa'
+import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
 
@@ -8,7 +8,11 @@ export interface CursorOption {
   screenWidth: number
 }
 
-export class Cursor {
+export type CursorEvents = {
+  seek: [number]
+}
+
+export class Cursor extends EventBus<CursorEvents> {
   container: Container
   currentTime: number = 0
   duration: number
@@ -18,7 +22,12 @@ export class Cursor {
 
   state: State
 
+  get pxPerMs(): number {
+    return this.state.pxPerMs
+  }
+
   constructor(option: CursorOption) {
+    super()
     this.state = State.getInstance()
 
     this.state.on('updatedPxPerMs', () => this._processWidth())
@@ -88,7 +97,9 @@ export class Cursor {
 
       // TODO: 右边界判断
 
-      this.currentTime = (this.container.x / this.container.width) * this.duration
+      this.currentTime = getMsByPx(this.container.x, this.pxPerMs)
+
+      this.emit('seek', this.currentTime)
     }
 
     const up = (): void => {

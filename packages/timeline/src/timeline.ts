@@ -227,6 +227,10 @@ export class Timeline extends EventBus<TimlineEvents> {
       duration: this.duration,
     })
     this.adjuster.addChild(this.cursor.container)
+
+    this.cursor.on('seek', (seekTime: number) => {
+      this.seek(seekTime, false)
+    })
   }
 
   /**
@@ -240,6 +244,7 @@ export class Timeline extends EventBus<TimlineEvents> {
 
     this.ruler?.updateDuration(duration)
     this.rails?.updateDuration(duration)
+    this.cursor?.updateDuration(duration)
   }
 
   private _requestAnimationFrameId?: number
@@ -260,6 +265,8 @@ export class Timeline extends EventBus<TimlineEvents> {
         this.currentTime = crt
         this._start()
       }
+
+      this.cursor!.seek(this.currentTime)
     })
   }
 

@@ -6,7 +6,7 @@ Clippa timeline component
 
 Cursor
 
-- [ ] move with currentTime change
+- [x] move with currentTime change
 
 - [ ] drag emit `updateCurrentTime` event, not emit `seek` event
 
@@ -27,3 +27,5 @@ Ungrouped
 - [ ] train slot
 
 - [ ] delete tarin gap in same rail
+
+- [ ] cancel playback flow

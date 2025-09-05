@@ -5,13 +5,13 @@ import { useVideoFiles } from '@/composables/useVideoFiles'
 import { useEditorStore } from '@/store'
 
 const editorStore = useEditorStore()
-const { theater } = editorStore
+const { clippa } = editorStore
 const { filterVideoFiles, handleDroppedFiles } = useVideoFiles()
 const { isDragging, onDragEnter, onDragLeave, onDragOver, onDrop } = useDragDrop()
 
 function fileSelected([file]: FileList) {
-  const video = new Video({ src: file, start: 0, duration: 5000 })
-  theater.hire(video)
+  const video = new Video({ src: file, start: 0, duration: 5000, zIndex: 0 })
+  clippa.hire(video)
 }
 
 async function handleFiles(files: FileList) {
@@ -20,8 +20,8 @@ async function handleFiles(files: FileList) {
 
   // 批量处理视频文件
   videoFiles.forEach((file) => {
-    const video = new Video({ src: file, start: 0, duration: 5000 })
-    theater.hire(video)
+    const video = new Video({ src: file, start: 0, duration: 5000, zIndex: 0 })
+    clippa.hire(video)
   })
 }
 
