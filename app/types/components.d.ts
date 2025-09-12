@@ -11,6 +11,7 @@ declare module 'vue' {
     Canvas: typeof import('./../src/components/canvas.vue')['default']
     Nav: typeof import('./../src/components/sider/nav.vue')['default']
     NavItem: typeof import('./../src/components/sider/nav-item.vue')['default']
+    PlaybackControls: typeof import('./../src/components/playbackControls.vue')['default']
     ResizableTimeline: typeof import('./../src/components/resizableTimeline.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

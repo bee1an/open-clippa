@@ -77,17 +77,16 @@ onMounted(() => {
 <template>
   <div w-full>
     <div
-      h-10px
-      bg="#333"
+      h-2px
+      bg="transparent"
       cursor="ns-resize"
-      flex="~ justify-center items-center"
-      relative
-      transition="~ background-color-200"
-      hover:bg="#444"
+      w-full
+      transition="~ all-200"
+      hover:bg="#ffffff"
       @mousedown="startDrag"
-    >
-      <div w-40px h-2px bg="#888" rounded-1px />
-    </div>
+    />
+
+    <PlaybackControls />
 
     <div
       w-full

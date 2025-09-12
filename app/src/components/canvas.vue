@@ -29,6 +29,7 @@ const video1 = new Video(
 )
 
 const sliderValue = ref(0)
+
 watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
@@ -49,19 +50,6 @@ onMounted(async () => {
     <!-- <div w-130 mb-2>
       <yy-slider v-model="sliderValue" :max="1" @change="seekBySlider" />
     </div> -->
-    <div text-center>
-      <div mb-2 flex="~" justify-center gap-2>
-        <yy-button @click="() => clippa.play()">
-          开始
-        </yy-button>
-        <yy-button @click="() => clippa.pause()">
-          暂停
-        </yy-button>
-      </div>
-    </div>
-    <p>
-      {{ currentTime }} / {{ duration }}
-    </p>
   </div>
 </template>
 
