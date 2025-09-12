@@ -83,6 +83,7 @@ onMounted(() => {
       w-full
       transition="~ all-200"
       hover:bg="#ffffff"
+      border="t-1 solid #444444"
       @mousedown="startDrag"
     />
 

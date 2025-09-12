@@ -17,7 +17,7 @@ definePage({ redirect: '/editor/media' })
         <Sider />
       </yy-layout-sider>
 
-      <div flex-1 flex="~ col" relative>
+      <div flex-1 flex="~ col" relative bg="#1e1e29">
         <Canvas />
         <ResizableTimeline />
         <!-- <KeyboardShortcutsHelp /> -->

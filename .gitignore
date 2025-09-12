@@ -139,3 +139,8 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+
+# custom
+QWEN.md
+CLAUDE.md
