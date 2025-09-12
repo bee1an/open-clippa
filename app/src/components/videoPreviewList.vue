@@ -39,15 +39,11 @@ function handleAddToTimeline(videoFile: VideoFile) {
 <template>
   <div class="video-list-container" h-full>
     <!-- 视频列表 -->
-    <div class="video-list" flex-1 overflow-y-auto>
-      <div v-if="mediaStore.videoFiles.length === 0" class="empty-state">
-        <div class="empty-content" flex="~ col" items-center justify-center h-full text-center p-8>
-          <div class="i-carbon-video text-4xl text-gray-500 mb-4" />
-          <h3 text-lg font-medium text-gray-400 mb-2>
-            暂无视频文件
-          </h3>
+    <div class="video-list" flex-1 overflow-y-auto hfull p-x-4>
+      <div v-if="mediaStore.videoFiles.length === 0" class="empty-state flex items-center justify-center">
+        <div class="empty-content text-center">
           <p text-sm text-gray-500>
-            点击上方的"导入媒体"按钮或拖拽视频文件到此处开始使用
+            从设备拖放介质以导入
           </p>
         </div>
       </div>
@@ -116,7 +112,7 @@ function handleAddToTimeline(videoFile: VideoFile) {
 }
 
 .empty-state {
-  height: 100%;
+  min-height: 100%;
 }
 
 .loading-indicator {

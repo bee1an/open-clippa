@@ -23,6 +23,7 @@
     "unplugin-auto-import": "catalog:app",
     "unplugin-vue-router": "catalog:app",
     "vite": "catalog:app",
+    "vite-plugin-vue-devtools": "catalog:app",
     "vue-tsc": "catalog:app"
   }
 }

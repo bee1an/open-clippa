@@ -57,18 +57,22 @@ function onDragDrop(event: DragEvent) {
     @dragenter="onDragEnter"
     @dragleave="onDragLeave"
   >
+    <div p-4 p-b-0>
+      你的媒体
+    </div>
+
     <!-- 上传区域 -->
     <div class="upload-section" p-4 border-b border="#2a2a3a">
-      <yy-upload @change="fileSelected">
+      <yy-upload wfull @change="fileSelected">
+        <!-- w-full 不生效, 因为使用了unset -->
         <yy-button
           type="primary"
-          w-full
+          style="width: 100%;"
           :class="{
             'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20': isDragging,
           }"
         >
           <div flex items-center gap-2>
-            <div i-material-symbols-upload-file></div>
             <span>导入媒体</span>
           </div>
         </yy-button>
@@ -97,7 +101,7 @@ function onDragDrop(event: DragEvent) {
         border="1px solid #ffffff0d"
         transform-gpu transition-all duration-200
       >
-        <div class="i-carbon-cloud-upload text-xl"></div>
+        <div class="i-carbon-cloud-upload text-xl" />
         <span>拖入视频文件或文件夹</span>
       </div>
     </div>

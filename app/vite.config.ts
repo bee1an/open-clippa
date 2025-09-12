@@ -5,6 +5,7 @@ import AutoImport from 'unplugin-auto-import/vite'
 import VueComponents from 'unplugin-vue-components/vite'
 import VueRouter from 'unplugin-vue-router/vite'
 import { defineConfig } from 'vite'
+import VueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -20,6 +21,7 @@ export default defineConfig({
   },
 
   plugins: [
+
     VueRouter({
       dts: 'types/typed-router.d.ts',
     }),
@@ -36,5 +38,7 @@ export default defineConfig({
     }),
 
     UnoCSS(),
+
+    VueDevTools(),
   ],
 })

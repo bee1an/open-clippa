@@ -11,7 +11,7 @@ declare module 'vue' {
     AppLogo: typeof import('./../src/components/appLogo.vue')['default']
     AppLogoLarge: typeof import('./../src/components/appLogoLarge.vue')['default']
     Canvas: typeof import('./../src/components/canvas.vue')['default']
-    KeyboardShortcutsHelp: typeof import('../src/components/keyboardShortcutsHelp.vue')['default']
+    KeyboardShortcutsHelp: typeof import('./../src/components/keyboardShortcutsHelp.vue')['default']
     Nav: typeof import('./../src/components/sider/nav.vue')['default']
     NavItem: typeof import('./../src/components/sider/nav-item.vue')['default']
     PlaybackControls: typeof import('./../src/components/playbackControls.vue')['default']
@@ -20,8 +20,8 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     Sider: typeof import('./../src/components/sider/sider.vue')['default']
     TimelineWrapper: typeof import('./../src/components/timelineWrapper.vue')['default']
-    VideoPreviewCard: typeof import('../src/components/videoPreviewCard.vue')['default']
-    VideoPreviewList: typeof import('../src/components/videoPreviewList.vue')['default']
-    VideoPreviewModal: typeof import('../src/components/videoPreviewModal.vue')['default']
+    VideoPreviewCard: typeof import('./../src/components/videoPreviewCard.vue')['default']
+    VideoPreviewList: typeof import('./../src/components/videoPreviewList.vue')['default']
+    VideoPreviewModal: typeof import('./../src/components/videoPreviewModal.vue')['default']
   }
 }
