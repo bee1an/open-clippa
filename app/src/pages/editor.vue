@@ -4,8 +4,8 @@ definePage({ redirect: '/editor/media' })
 
 <template>
   <yy-layout w-screen>
-    <yy-layout-header h50px bordered flex items-center pl-2>
-      open-clippa
+    <yy-layout-header h50px bordered flex items-center px-4>
+      <AppLogo size="md" />
     </yy-layout-header>
 
     <yy-layout has-sider max-w-full>

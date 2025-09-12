@@ -36,7 +36,8 @@ const shortcuts = [
   <!-- 帮助面板 -->
   <div
     v-if="showHelp"
-    fixed inset-0 bg="black/50" flex items-center justify-center z-100
+    class="bg-black/50 z-100"
+    fixed inset-0 flex items-center justify-center
     @click="showHelp = false"
   >
     <div

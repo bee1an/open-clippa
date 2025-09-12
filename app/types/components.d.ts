@@ -8,8 +8,10 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AppLogo: typeof import('./../src/components/appLogo.vue')['default']
+    AppLogoLarge: typeof import('./../src/components/appLogoLarge.vue')['default']
     Canvas: typeof import('./../src/components/canvas.vue')['default']
-    KeyboardShortcutsHelp: typeof import('../src/components/keyboardShortcutsHelp.vue')['default']
+    KeyboardShortcutsHelp: typeof import('./../src/components/KeyboardShortcutsHelp.vue')['default']
     Nav: typeof import('./../src/components/sider/nav.vue')['default']
     NavItem: typeof import('./../src/components/sider/nav-item.vue')['default']
     PlaybackControls: typeof import('./../src/components/playbackControls.vue')['default']

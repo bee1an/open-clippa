@@ -70,7 +70,7 @@ function onDragDrop(event: DragEvent) {
           }"
         >
           <div flex items-center gap-2>
-            <div i-material-symbols-upload-file />
+            <div i-material-symbols-upload-file></div>
             <span>导入媒体</span>
           </div>
         </yy-button>
@@ -80,34 +80,18 @@ function onDragDrop(event: DragEvent) {
     <!-- 拖拽遮罩层 -->
     <div
       v-if="isDragging"
-      absolute
-      inset-0
-      bg="#13131b/80"
-      backdrop-blur-sm
-      flex
-      items-center
-      justify-center
-      p-t-2xl
-      z-20
+      class="bg-#13131b/80 pt-2xl z-20"
+      absolute inset-0 backdrop-blur-sm flex items-center justify-center
       @dragenter="onDragEnter"
       @dragover="onDragOver"
       @dragleave="onDragLeave"
       @drop="onDragDrop"
     >
       <div
-        text-base
-        font-normal
-        text-blue-400
-        bg="#13131b/90"
-        px-6
-        py-3
-        border-rd-xl
+        class="bg-#13131b/90"
+        text-base font-normal text-blue-400 px-6 py-3 border-rd-xl shadow-xl
+        flex items-center gap-3 max-w-fit
         border="1px solid #ffffff0d"
-        shadow-xl
-        flex
-        items-center
-        gap-3
-        max-w-fit
         transform-gpu
         transition-all
         duration-200
