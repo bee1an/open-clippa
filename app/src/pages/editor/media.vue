@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import { Video } from 'open-clippa'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useVideoFiles } from '@/composables/useVideoFiles'
-import { useEditorStore } from '@/store'
+import { useMediaStore } from '@/store/useMediaStore'
 
-const editorStore = useEditorStore()
-const { clippa } = editorStore
+const mediaStore = useMediaStore()
 const { filterVideoFiles, handleDroppedFiles } = useVideoFiles()
 const { isDragging, onDragEnter, onDragLeave, onDragOver, onDrop } = useDragDrop()
 
 function fileSelected([file]: FileList) {
-  const video = new Video({ src: file, start: 0, duration: 5000, zIndex: 0 })
-  clippa.hire(video)
+  // 添加到媒体库
+  mediaStore.addVideoFile(file)
 }
 
 async function handleFiles(files: FileList) {
   // 过滤出视频文件
   const videoFiles = filterVideoFiles(files)
 
-  // 批量处理视频文件
+  // 批量添加到媒体库
   videoFiles.forEach((file) => {
-    const video = new Video({ src: file, start: 0, duration: 5000, zIndex: 0 })
-    clippa.hire(video)
+    mediaStore.addVideoFile(file)
   })
 }
 
@@ -50,8 +47,8 @@ function onDragDrop(event: DragEvent) {
 
 <template>
   <div
-    p-t-2xl hfull
-    relative
+    class="media-page"
+    hfull flex="~ col" relative
     :class="{
       'border-2 border-dashed border-blue-500 bg-blue-500/10 transition-all duration-200': isDragging,
     }"
@@ -60,11 +57,12 @@ function onDragDrop(event: DragEvent) {
     @dragenter="onDragEnter"
     @dragleave="onDragLeave"
   >
-    <div flex justify-center>
-      <yy-upload style="width: 80%;" @change="fileSelected">
+    <!-- 上传区域 -->
+    <div class="upload-section" p-4 border-b border="#2a2a3a">
+      <yy-upload @change="fileSelected">
         <yy-button
-          style="width: 100%;"
           type="primary"
+          w-full
           :class="{
             'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20': isDragging,
           }"
@@ -77,10 +75,15 @@ function onDragDrop(event: DragEvent) {
       </yy-upload>
     </div>
 
+    <!-- 视频预览列表 -->
+    <div class="preview-section" flex-1 overflow-hidden>
+      <VideoPreviewList />
+    </div>
+
     <!-- 拖拽遮罩层 -->
     <div
       v-if="isDragging"
-      class="bg-#13131b/80 pt-2xl z-20"
+      class="drag-overlay bg-#13131b/80 z-20"
       absolute inset-0 backdrop-blur-sm flex items-center justify-center
       @dragenter="onDragEnter"
       @dragover="onDragOver"
@@ -88,14 +91,13 @@ function onDragDrop(event: DragEvent) {
       @drop="onDragDrop"
     >
       <div
-        class="bg-#13131b/90"
+        class="drag-message bg-#13131b/90"
         text-base font-normal text-blue-400 px-6 py-3 border-rd-xl shadow-xl
         flex items-center gap-3 max-w-fit
         border="1px solid #ffffff0d"
-        transform-gpu
-        transition-all
-        duration-200
+        transform-gpu transition-all duration-200
       >
+        <div class="i-carbon-cloud-upload text-xl"></div>
         <span>拖入视频文件或文件夹</span>
       </div>
     </div>
