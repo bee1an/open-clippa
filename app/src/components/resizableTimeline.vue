@@ -93,7 +93,7 @@ onMounted(() => {
       overflow-hidden
       :style="{ height: `${timelineHeight}px` }"
     >
-      <TimelineCmp />
+      <TimelineWrapper />
     </div>
   </div>
 </template>

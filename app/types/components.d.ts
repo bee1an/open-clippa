@@ -16,6 +16,6 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Sider: typeof import('./../src/components/sider/sider.vue')['default']
-    TimelineCmp: typeof import('./../src/components/timelineCmp.vue')['default']
+    TimelineWrapper: typeof import('./../src/components/timelineWrapper.vue')['default']
   }
 }
