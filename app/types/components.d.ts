@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     Canvas: typeof import('./../src/components/canvas.vue')['default']
+    KeyboardShortcutsHelp: typeof import('../src/components/keyboardShortcutsHelp.vue')['default']
     Nav: typeof import('./../src/components/sider/nav.vue')['default']
     NavItem: typeof import('./../src/components/sider/nav-item.vue')['default']
     PlaybackControls: typeof import('./../src/components/playbackControls.vue')['default']

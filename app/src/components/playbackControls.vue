@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useEditorStore } from '@/store'
 
 const editorStore = useEditorStore()
 const { currentTime, duration } = storeToRefs(editorStore)
-const { clippa } = editorStore
 
-const isPlaying = ref(false)
+// 使用键盘快捷键 composable
+const {
+  isPlaying,
+  isFullscreen,
+  togglePlayPause,
+  handleRewind,
+  handleFastForward,
+  toggleFullscreen,
+} = useKeyboardShortcuts()
 
 // 时间格式化函数
 function formatTime(ms: number) {
@@ -18,35 +26,6 @@ function formatTime(ms: number) {
 
 const formattedCurrentTime = computed(() => formatTime(currentTime.value))
 const formattedDuration = computed(() => formatTime(duration.value))
-
-function handlePlay() {
-  clippa.play()
-  isPlaying.value = true
-}
-
-function handlePause() {
-  clippa.pause()
-  isPlaying.value = false
-}
-
-function togglePlayPause() {
-  if (isPlaying.value) {
-    handlePause()
-  }
-  else {
-    handlePlay()
-  }
-}
-
-function handleRewind() {
-  const newTime = Math.max(0, currentTime.value - 10000) // 快退10秒
-  clippa.seek(newTime)
-}
-
-function handleFastForward() {
-  const newTime = Math.min(duration.value, currentTime.value + 10000) // 快进10秒
-  clippa.seek(newTime)
-}
 </script>
 
 <template>
@@ -54,7 +33,7 @@ function handleFastForward() {
     <!-- 快退按钮 -->
     <button
       flex items-center justify-center w-6 h-6 rounded hover:bg="#13131b" transition-all duration-200 border-none
-      outline-none cursor-pointer group title="快退 10 秒" @click="handleRewind"
+      outline-none cursor-pointer group title="快退 10 秒 (←)" @click="handleRewind"
     >
       <div class="i-carbon-skip-back" text-xs text="#838398" group-hover:text-white transition-colors />
     </button>
@@ -63,7 +42,7 @@ function handleFastForward() {
     <button
       flex items-center justify-center w-10 h-10 rounded-full bg="#13131b" hover:bg="#505067" hover:scale-110
       active:scale-95 transition-all duration-200 border-none outline-none cursor-pointer group relative overflow-hidden
-      mx-2 :title="isPlaying ? '暂停' : '播放'" @click="togglePlayPause"
+      mx-2 :title="isPlaying ? '暂停 (空格)' : '播放 (空格)'" @click="togglePlayPause"
     >
       <div relative w-4 h-4>
         <div
@@ -82,7 +61,7 @@ function handleFastForward() {
     <!-- 快进按钮 -->
     <button
       flex items-center justify-center w-6 h-6 rounded hover:bg="#13131b" transition-all duration-200 border-none
-      outline-none cursor-pointer group title="快进 10 秒" @click="handleFastForward"
+      outline-none cursor-pointer group title="快进 10 秒 (→)" @click="handleFastForward"
     >
       <div class="i-carbon-skip-forward" text-xs text="#838398" group-hover:text-white transition-colors />
     </button>
@@ -90,5 +69,17 @@ function handleFastForward() {
     <div text-xs text="#838398" font-mono ml-2>
       {{ formattedCurrentTime }} / {{ formattedDuration }}
     </div>
+
+    <!-- 全屏按钮 -->
+    <button
+      flex items-center justify-center w-6 h-6 rounded hover:bg="#13131b" transition-all duration-200 border-none
+      outline-none cursor-pointer group ml-2 :title="isFullscreen ? '退出全屏 (Esc)' : '全屏播放 (F)'"
+      @click="toggleFullscreen"
+    >
+      <div
+        :class="isFullscreen ? 'i-carbon-minimize' : 'i-carbon-maximize'" text-xs text="#838398"
+        group-hover:text-white transition-colors
+      />
+    </button>
   </div>
 </template>
