@@ -1,1 +1,1 @@
-export * from './tickExtractor'
+export * from './frameExtractor'

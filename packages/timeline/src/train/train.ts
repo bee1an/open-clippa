@@ -21,10 +21,7 @@ export const RESIZE_TRIGGER_FILL = '#9a9a9a'
  * resizer handler width
  */
 export const RESIZE_HANDLER_WIDTH = 4
-/**
- * resizer handler height
- */
-export const RESIZE_HANDLER_HEIGHT = TRAIN_HEIGHT / 1.7
+
 /**
  * resizer handler color
  */
@@ -35,7 +32,15 @@ export const RESIZE_HANDLER_FILL = '#21212e'
 export const RESIZE_TRIGGER_RADIUS = 8
 
 let i = 0
-export class Train extends EventBus<TrainEvents> {
+export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
+  /**
+   * id
+   */
+  id: string
+  /**
+   * source, for thumbnail
+   */
+  src?: string
   /**
    * pixi container
    */
@@ -51,7 +56,7 @@ export class Train extends EventBus<TrainEvents> {
   /**
    * y position
    */
-  y: number = (RAIL_HEIGHT - TRAIN_HEIGHT) / 2
+  y: number
   /**
    * current status when dragging
    */
@@ -72,6 +77,14 @@ export class Train extends EventBus<TrainEvents> {
    * total duration(ms)
    */
   duration: number
+  /**
+   * train height
+   */
+  height: number
+  /**
+   * resizer handler height
+   */
+  private _resizeHandlerHeight: number
 
   constructor(option: TrainOption) {
     i++
@@ -82,10 +95,14 @@ export class Train extends EventBus<TrainEvents> {
       this.updateWidth(getPxByMs(option.duration, pxPerMs))
     })
 
+    this.id = option.id
     this.x = getPxByMs(option.start, this.state.pxPerMs)
     this.width = getPxByMs(option.duration, this.state.pxPerMs)
     this.start = option.start
     this.duration = option.duration
+    this.height = option.height ?? TRAIN_HEIGHT
+    this._resizeHandlerHeight = this.height / 1.7
+    this.y = (RAIL_HEIGHT - this.height) / 2
 
     this.container = new Container({ x: this.x, y: this.y })
 
@@ -96,7 +113,7 @@ export class Train extends EventBus<TrainEvents> {
     const text = new Text({
       text: i,
       x: 20,
-      y: TRAIN_HEIGHT / 2 - 8,
+      y: this.height / 2 - 8,
       zIndex: 1,
       style: { fontSize: 14, fill: 'gray' },
     })
@@ -118,7 +135,7 @@ export class Train extends EventBus<TrainEvents> {
     resizer.addChild(resizerMain)
 
     const resizerHandler = new Graphics()
-    resizerHandler.roundRect(0, 0, RESIZE_HANDLER_WIDTH, RESIZE_HANDLER_HEIGHT, RESIZE_HANDLER_WIDTH / 2)
+    resizerHandler.roundRect(0, 0, RESIZE_HANDLER_WIDTH, this._resizeHandlerHeight, RESIZE_HANDLER_WIDTH / 2)
       .fill(RESIZE_HANDLER_FILL)
 
     resizerHandler.y = resizerMain.height / 2 - resizerHandler.height / 2
@@ -136,20 +153,22 @@ export class Train extends EventBus<TrainEvents> {
    * include left resizer and right resizer
    */
   private _drawResizer(): void {
-    this._leftResizer = this._drawResizerHelper(0, 0, RESIZE_TRIGGER_WIDTH, TRAIN_HEIGHT)
+    this._leftResizer = this._drawResizerHelper(0, 0, RESIZE_TRIGGER_WIDTH, this.height)
     this._bindLeftResize(this._leftResizer)
 
     this._rightResizer = this._drawResizerHelper(
       Math.max(this.width - RESIZE_TRIGGER_WIDTH, 0),
       0,
       RESIZE_TRIGGER_WIDTH,
-      TRAIN_HEIGHT,
+      this.height,
       'right',
     )
     this._bindRightResize(this._rightResizer)
   }
 
-  private _slot!: Graphics
+  protected _slot!: Container
+  private _slotBg!: Graphics
+  private _slotMask!: Graphics
   private _drawSlot(width = this.width): void {
     if (!width)
       return
@@ -157,28 +176,43 @@ export class Train extends EventBus<TrainEvents> {
     const x = RESIZE_TRIGGER_WIDTH / 2
     const y = 0
     const w = width - RESIZE_TRIGGER_WIDTH
-    const h = TRAIN_HEIGHT
+    const h = this.height
     const fill = '#010101'
 
     if (this._slot) {
-      this._slot
+      this._slotBg
         .clear()
-        .rect(x, y, w, h)
+        .rect(0, 0, w, h)
         .fill(fill)
 
+      this._slotMask.clear()
+        .rect(0, 0, w, h)
+        .fill('transparent')
       return
     }
 
-    const slot = new Graphics()
-    slot.rect(x, y, w, h)
+    this._slot = new Container()
+    this.container.addChild(this._slot)
+
+    this._slot.position.set(x, y)
+
+    // 创建背景
+    this._slotBg = new Graphics()
+    this._slot.addChild(this._slotBg)
+    this._slotBg.rect(0, 0, w, h)
       .fill(fill)
-    slot.eventMode = 'static'
-    slot.cursor = 'move'
 
-    this.container.addChild(slot)
+    // 创建mask
+    this._slotMask = new Graphics()
+    this._slot.addChild(this._slotMask)
+    this._slotMask.rect(0, 0, w, h)
+      .fill('transparent')
 
-    this._slot = slot
+    // 设置mask
+    this._slot.mask = this._slotMask
 
+    this._slot.eventMode = 'static'
+    this._slot.cursor = 'move'
     this._bindDrag(this._slot)
   }
 
@@ -192,7 +226,7 @@ export class Train extends EventBus<TrainEvents> {
   /**
    * bind drag event
    */
-  private _bindDrag(traget: Graphics): void {
+  private _bindDrag(traget: Container): void {
     drag(traget, {
       down: () => {
         this.state.setTrainDragging(true)
@@ -221,7 +255,7 @@ export class Train extends EventBus<TrainEvents> {
         }
         else {
           // 否则y为固定值
-          this.container.y = (RAIL_HEIGHT - TRAIN_HEIGHT) / 2
+          this.container.y = (RAIL_HEIGHT - this.height) / 2
         }
 
         this.x = site.xValue
@@ -239,7 +273,7 @@ export class Train extends EventBus<TrainEvents> {
         else if (this.dragStatus === 'free') {
           // 如果是游离态, 恢复train为拖拽前的状态
           this._recordWhenDrag!.parent.insertTrain(this)
-          this.updatePos(this._recordWhenDrag!.x, (RAIL_HEIGHT - TRAIN_HEIGHT) / 2, true)
+          this.updatePos(this._recordWhenDrag!.x, (RAIL_HEIGHT - this.height) / 2, true)
         }
         else {
           if (this.x !== this.container.x) {
@@ -251,7 +285,7 @@ export class Train extends EventBus<TrainEvents> {
         }
 
         // 拖拽结束后将y值还原
-        this.y = (RAIL_HEIGHT - TRAIN_HEIGHT) / 2
+        this.y = (RAIL_HEIGHT - this.height) / 2
         this.updatePos(undefined, this.y)
 
         this.updateState('normal')
@@ -418,8 +452,10 @@ export class Train extends EventBus<TrainEvents> {
    */
   toJson(): TrainOption {
     return {
+      id: this.id,
       start: this.start,
       duration: this.duration,
+      height: this.height,
     }
   }
 }

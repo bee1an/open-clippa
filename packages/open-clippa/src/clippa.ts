@@ -1,6 +1,6 @@
 import type { MaybeArray } from 'type-aide'
 import type { Performer } from './performer'
-import { Train } from '@clippa/timeline'
+import { VideoTrain } from '@clippa/timeline'
 import { Director, Stage, Theater } from './canvas'
 import { Timeline } from './timeline'
 
@@ -36,7 +36,15 @@ export class Clippa {
   async hire(p: Performer): Promise<void> {
     this.theater.hire(p)
 
-    this.timeline.addTrainByZIndex(new Train(p), p.zIndex)
+    // 创建VideoTrain实例，传递必要的参数
+    const videoTrain = new VideoTrain({
+      id: `video-${Date.now()}`,
+      start: p.start,
+      duration: p.duration,
+      src: (p as any).src || '',
+    })
+    this.timeline.addTrainByZIndex(videoTrain, p.zIndex)
+    await videoTrain.init()
   }
 
   /**

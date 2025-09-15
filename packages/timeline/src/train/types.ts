@@ -1,9 +1,13 @@
 import type { Train } from './train'
 
 export interface TrainOption {
+  id: string
   start: number
   duration: number
+  height?: number
 }
+
+export type ExtendTrainOption<T> = TrainOption & T
 
 export type TrainEvents = {
   /**
@@ -58,6 +62,8 @@ export type TrainEvents = {
    */
   durationChanged: []
 }
+
+export type ExtendTrainEvents<T extends { [key: string | symbol]: unknown[] }> = TrainEvents & T
 
 export type TrainDragStatus
   = | 'normal' // 常规态

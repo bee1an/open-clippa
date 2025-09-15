@@ -1,11 +1,20 @@
 <script setup lang="ts">
 definePage({ redirect: '/editor/media' })
+
+function handleExport() {
+  // 这里可以添加导出逻辑
+  console.warn('导出功能尚未实现')
+}
 </script>
 
 <template>
   <yy-layout w-screen>
     <yy-layout-header h50px bordered flex items-center px-4>
       <AppLogo size="md" />
+      <div class="flex-1" />
+      <yy-button type="primary" @click="handleExport">
+        导出
+      </yy-button>
     </yy-layout-header>
 
     <yy-layout has-sider max-w-full>

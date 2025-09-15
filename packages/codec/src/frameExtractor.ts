@@ -8,20 +8,22 @@ export interface Tick {
   state: 'success' | 'done'
 }
 
-export class TickExtractor {
-  private _clip?: MP4Clip
+export class FrameExtractor {
+  clip!: MP4Clip
 
-  constructor(private _url: string) {}
-
-  async load(): Promise<void> {
-    if (!this._clip) {
-      this._clip = new MP4Clip((await fetch(this._url)).body!)
-    }
-
-    await this._clip.ready
+  constructor(private _url: string) {
+    this.load()
   }
 
-  private _ticksCache: { [time: number]: Promise<Tick> } = {}
+  async load(): Promise<void> {
+    if (!this.clip) {
+      this.clip = new MP4Clip((await fetch(this._url)).body!)
+    }
+
+    await this.clip.ready
+  }
+
+  private _frameCache: { [time: number]: Promise<Tick> } = {}
   /**
    * Given a time in microsecond, return the frame at that time.
    *
@@ -30,11 +32,13 @@ export class TickExtractor {
    * @param time - the time of the frame to return in ms
    * @returns a promise resolving to the frame at the given time
    */
-  getTickByTime(time: number): Promise<Tick> {
-    if (!this._ticksCache[time]) {
-      this._ticksCache[time] = this._clip!.tick(time)
+  async getFrameByTime(time: number): Promise<Tick> {
+    await this.load()
+
+    if (!this._frameCache[time]) {
+      this._frameCache[time] = this.clip!.tick(time)
     }
 
-    return this._ticksCache[time]
+    return this._frameCache[time]
   }
 }
