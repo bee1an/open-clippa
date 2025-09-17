@@ -171,6 +171,21 @@ export class Rails extends EventBus<RailsEvents> {
 
     rail.on('trainDurationChanged', updateTimelineDuration)
 
+    rail.on('trainActiveChanged', (train) => {
+      // 选中时将其他train取消选中
+      if (train.active) {
+        for (let index = 0; index < this.rails.length; index++) {
+          const currentRail = this.rails[index]
+
+          const activeTrain = currentRail.trains.find(train => train.active)
+          if (activeTrain && activeTrain !== train) {
+            activeTrain.updateActive(false)
+            break
+          }
+        }
+      }
+    })
+
     this._insertRailByZIndex(rail, zIndex)
 
     this.railsContainer.addChild(rail.container)

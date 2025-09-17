@@ -32,7 +32,7 @@ export class VideoTrain extends Train<VideoTrainEvents> {
 
     const singleWidth = (width / height) * this.height
 
-    const count = Math.ceil(this._slot.width / singleWidth)
+    const count = Math.ceil(this.width / singleWidth)
 
     // 确保至少生成一个缩略图
     const actualCount = Math.max(1, count)

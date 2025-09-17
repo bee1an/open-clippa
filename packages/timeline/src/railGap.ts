@@ -24,7 +24,7 @@ export class RailGap {
     this.width = option.width
     this.zIndex = option.zIndex
 
-    this.container = new Container({ y: option.y })
+    this.container = new Container({ y: option.y, label: 'label-gap' })
 
     this._drawBody()
 

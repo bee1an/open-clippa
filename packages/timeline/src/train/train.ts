@@ -1,35 +1,19 @@
 import type { Rail } from '../rail'
 import type { TrainDragStatus, TrainEvents, TrainOption } from './types'
+import {
+  TIMELINE_RESIZE_HANDLER_FILL,
+  TIMELINE_RESIZE_HANDLER_WIDTH,
+  TIMELINE_RESIZE_TRIGGER_WIDTH,
+  TIMELINE_TRAIN_BORDER_SIZE,
+  TIMELINE_TRAIN_HEIGHT,
+  TIMELINE_TRAIN_RADIUS,
+  TIMELINE_WIDGET_ACTIVE_FILL,
+  TIMELINE_WIDGET_HOVER_FILL,
+} from '@clippa/constants'
 import { drag, EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { RAIL_HEIGHT } from '../rail'
 import { State } from '../state'
-
-/**
- * train height
- */
-export const TRAIN_HEIGHT = 45
-/**
- * left and right resizer width, practical width is half
- */
-export const RESIZE_TRIGGER_WIDTH = 30
-/**
- * resizer color
- */
-export const RESIZE_TRIGGER_FILL = '#9a9a9a'
-/**
- * resizer handler width
- */
-export const RESIZE_HANDLER_WIDTH = 4
-
-/**
- * resizer handler color
- */
-export const RESIZE_HANDLER_FILL = '#21212e'
-/**
- * resizer radius
- */
-export const RESIZE_TRIGGER_RADIUS = 8
 
 let i = 0
 export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
@@ -52,7 +36,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   /**
    * x position
    */
-  x: number = Math.random() * 300
+  x: number
   /**
    * y position
    */
@@ -86,6 +70,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    */
   private _resizeHandlerHeight: number
 
+  active = false
+
   constructor(option: TrainOption) {
     i++
     super()
@@ -100,15 +86,16 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     this.width = getPxByMs(option.duration, this.state.pxPerMs)
     this.start = option.start
     this.duration = option.duration
-    this.height = option.height ?? TRAIN_HEIGHT
+    this.height = option.height ?? TIMELINE_TRAIN_HEIGHT
     this._resizeHandlerHeight = this.height / 1.7
     this.y = (RAIL_HEIGHT - this.height) / 2
 
-    this.container = new Container({ x: this.x, y: this.y })
-
-    this._drawResizer()
-
+    this.container = new Container({ x: this.x, y: this.y, label: 'train' })
+    this.container.eventMode = 'static'
+    this._bindEvents()
     this._drawSlot()
+
+    this._drawWidget()
 
     const text = new Text({
       text: i,
@@ -120,92 +107,47 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     this.container.addChild(text)
   }
 
-  /**
-   * draw a resizer helper
-   */
-  private _drawResizerHelper(...[x, _, w, h, location = 'left']: [x: number, y: number, w: number, h: number, location?: 'left' | 'right']): Container {
-    const resizer = new Container()
-    resizer.x = x
-    resizer.eventMode = 'static'
-    resizer.cursor = 'ew-resize'
-
-    const resizerMain = new Graphics()
-    resizerMain.roundRect(0, 0, w, h, RESIZE_TRIGGER_RADIUS)
-      .fill(RESIZE_TRIGGER_FILL)
-    resizer.addChild(resizerMain)
-
-    const resizerHandler = new Graphics()
-    resizerHandler.roundRect(0, 0, RESIZE_HANDLER_WIDTH, this._resizeHandlerHeight, RESIZE_HANDLER_WIDTH / 2)
-      .fill(RESIZE_HANDLER_FILL)
-
-    resizerHandler.y = resizerMain.height / 2 - resizerHandler.height / 2
-    resizerHandler.x = w / 4 - resizerHandler.width / 2 + (location === 'left' ? 0 : RESIZE_TRIGGER_WIDTH / 2)
-
-    resizer.addChild(resizerHandler)
-
-    this.container.addChild(resizer)
-    return resizer
-  }
-
-  private _leftResizer!: Container
-  private _rightResizer!: Container
-  /**
-   * include left resizer and right resizer
-   */
-  private _drawResizer(): void {
-    this._leftResizer = this._drawResizerHelper(0, 0, RESIZE_TRIGGER_WIDTH, this.height)
-    this._bindLeftResize(this._leftResizer)
-
-    this._rightResizer = this._drawResizerHelper(
-      Math.max(this.width - RESIZE_TRIGGER_WIDTH, 0),
-      0,
-      RESIZE_TRIGGER_WIDTH,
-      this.height,
-      'right',
-    )
-    this._bindRightResize(this._rightResizer)
-  }
-
   protected _slot!: Container
   private _slotBg!: Graphics
   private _slotMask!: Graphics
+  /**
+   * draw main container
+   */
   private _drawSlot(width = this.width): void {
     if (!width)
       return
 
-    const x = RESIZE_TRIGGER_WIDTH / 2
-    const y = 0
-    const w = width - RESIZE_TRIGGER_WIDTH
+    const w = width
     const h = this.height
-    const fill = '#010101'
+    const fill = '#010101' // any color
 
     if (this._slot) {
       this._slotBg
         .clear()
-        .rect(0, 0, w, h)
+        .roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
         .fill(fill)
 
       this._slotMask.clear()
-        .rect(0, 0, w, h)
+        .roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
         .fill('transparent')
       return
     }
 
-    this._slot = new Container()
+    this._slot = new Container({ label: 'slot' })
     this.container.addChild(this._slot)
 
-    this._slot.position.set(x, y)
+    this._slot.position.set(0, 0)
 
     // 创建背景
     this._slotBg = new Graphics()
     this._slot.addChild(this._slotBg)
-    this._slotBg.rect(0, 0, w, h)
+    this._slotBg.roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
       .fill(fill)
 
     // 创建mask
     this._slotMask = new Graphics()
     this._slot.addChild(this._slotMask)
-    this._slotMask.rect(0, 0, w, h)
+    this._slotMask.roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
       .fill('transparent')
 
     // 设置mask
@@ -213,7 +155,154 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
     this._slot.eventMode = 'static'
     this._slot.cursor = 'move'
-    this._bindDrag(this._slot)
+    this._bindSlotDrag(this._slot)
+  }
+
+  /**
+   * draw a resizer helper
+   */
+  private _drawResizerHelper(...[x, _, w, h, location = 'left']: [x: number, y: number, w: number, h: number, location?: 'left' | 'right']): [Container, Graphics] {
+    const resizer = new Container({ label: `${location}-resizer` })
+    resizer.x = x
+    resizer.eventMode = 'static'
+    resizer.cursor = 'ew-resize'
+
+    const resizerMain = new Graphics()
+    resizerMain.roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
+      .fill(this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL)
+    resizer.addChild(resizerMain)
+
+    const handlerWidth = TIMELINE_RESIZE_HANDLER_WIDTH
+    const handlerHeight = this._resizeHandlerHeight
+    const handlerRadius = handlerWidth / 2
+
+    const resizerHandler = new Graphics()
+    resizerHandler.roundRect(0, 0, handlerWidth, handlerHeight, handlerRadius)
+      .fill(TIMELINE_RESIZE_HANDLER_FILL)
+
+    const handlerX = w / 4 - handlerWidth / 2 + (location === 'left' ? 0 : w / 2)
+    const handlerY = (h - handlerHeight) / 2
+    resizerHandler.position.set(handlerX, handlerY)
+    resizer.addChild(resizerHandler)
+
+    // TODO
+    /*
+      会造成一个bug, mask区域可以触发事件, resizer的可视区域反而不能触发事件
+      应该是inverse导致了计算错误
+    */
+    const maskX = location === 'left' ? w / 2 : 0
+    const mask = new Graphics({ label: 'mask' })
+    mask.rect(maskX, 0, w / 2, h).fill('transparent')
+    resizer.addChild(mask)
+    resizerMain.setMask({ mask, inverse: true })
+
+    this._widget.addChild(resizer)
+    return [resizer, resizerMain]
+  }
+
+  private _leftResizer!: Container
+  private _leftResizerMain!: Graphics
+  private _rightResizer!: Container
+  private _rightResizerMain!: Graphics
+  /**
+   * include left resizer and right resizer
+   */
+  private _drawResizer(): void {
+    const fillStyle = this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL
+    const triggerWidth = TIMELINE_RESIZE_TRIGGER_WIDTH
+    const radius = TIMELINE_TRAIN_RADIUS
+
+    if (!this._leftResizer) {
+      [this._leftResizer, this._leftResizerMain] = this._drawResizerHelper(0, 0, triggerWidth, this.height)
+      this._bindLeftResize(this._leftResizer)
+    }
+    else {
+      this._leftResizerMain
+        .clear()
+        .roundRect(0, 0, triggerWidth, this.height, radius)
+        .fill(fillStyle)
+    }
+
+    if (!this._rightResizer) {
+      const rightX = Math.max(this.width - triggerWidth, 0)
+      ;[this._rightResizer, this._rightResizerMain] = this._drawResizerHelper(
+        rightX,
+        0,
+        triggerWidth,
+        this.height,
+        'right',
+      )
+      this._bindRightResize(this._rightResizer)
+    }
+    else {
+      this._rightResizerMain
+        .clear()
+        .roundRect(0, 0, triggerWidth, this.height, radius)
+        .fill(fillStyle)
+    }
+  }
+
+  private _borderContainer!: Container
+  private _borderMain!: Graphics
+  private _borderMask!: Graphics
+  /**
+   * draw border
+   */
+  private _drawBorder(): void {
+    const { width, height } = this._slot
+
+    const update = (): void => {
+      this._borderMain
+        .roundRect(
+          -TIMELINE_TRAIN_BORDER_SIZE,
+          -TIMELINE_TRAIN_BORDER_SIZE,
+          width + TIMELINE_TRAIN_BORDER_SIZE * 2,
+          height + TIMELINE_TRAIN_BORDER_SIZE * 2,
+          TIMELINE_TRAIN_RADIUS,
+        )
+        .fill(this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL)
+
+      this._borderMask
+        .roundRect(
+          0,
+          0,
+          width,
+          height,
+          TIMELINE_TRAIN_RADIUS,
+        )
+        .fill('transparent ')
+    }
+
+    if (this._borderContainer) {
+      this._borderMain.clear()
+      this._borderMask.clear()
+
+      update()
+
+      return
+    }
+
+    this._borderContainer = new Container({ label: 'border' })
+    this._borderContainer.eventMode = 'none'
+    this._widget.addChild(this._borderContainer)
+
+    this._borderMask = new Graphics()
+    this._borderContainer.addChild(this._borderMask)
+
+    this._borderMain = new Graphics()
+    this._borderContainer.addChild(this._borderMain)
+
+    update()
+
+    this._borderMain.setMask({ mask: this._borderMask, inverse: true })
+  }
+
+  private _widget: Container = new Container({ visible: false, label: 'widget' })
+  private _drawWidget(): void {
+    this._drawResizer()
+    this._drawBorder()
+
+    this.container.addChild(this._widget)
   }
 
   /**
@@ -226,7 +315,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   /**
    * bind drag event
    */
-  private _bindDrag(traget: Container): void {
+  private _bindSlotDrag(traget: Container): void {
     drag(traget, {
       down: () => {
         this.state.setTrainDragging(true)
@@ -316,6 +405,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
           this.updateWidth(this.width)
         }
+
+        this._drawBorder()
       },
       up: () => {
         this.width = this.container.width
@@ -351,8 +442,10 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
         if (!site.disdrawable) {
           this._drawSlot()
-          traget.x = this.width - RESIZE_TRIGGER_WIDTH
+          traget.x = this.width - TIMELINE_RESIZE_TRIGGER_WIDTH
         }
+
+        this._drawBorder()
       },
 
       up: () => {
@@ -362,6 +455,41 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         this.emit('rightResizeEnd', this)
       },
     })
+  }
+
+  private _pointerIn: boolean = false
+  private _bindEvents(): void {
+    this.container.on('pointerenter', () => {
+      this._widget.visible = true
+      this._pointerIn = true
+    })
+    this.container.on('pointerleave', () => {
+      this._pointerIn = false
+
+      if (this.active)
+        return
+
+      this._widget.visible = false
+    })
+    this.container.on('pointerdown', () => {
+      this.updateActive(true)
+    })
+  }
+
+  updateActive(active: boolean): void {
+    if (active === this.active)
+      return
+
+    this.active = active
+
+    if (!this.active && !this._pointerIn) {
+      // 取消选中时, 当前鼠标并不在train内部则隐藏widget
+      this._widget.visible = false
+    }
+
+    this._drawWidget()
+
+    this.emit('activeChanged')
   }
 
   /**
@@ -381,7 +509,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
     this._drawSlot()
 
-    this._rightResizer.x = width - RESIZE_TRIGGER_WIDTH
+    this._rightResizer.x = width - TIMELINE_RESIZE_TRIGGER_WIDTH
   }
 
   /**

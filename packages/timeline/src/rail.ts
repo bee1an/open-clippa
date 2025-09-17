@@ -52,6 +52,11 @@ export type RailEvents = {
    * when train `durationChanged` event trigger
    */
   trainDurationChanged: [Train]
+
+  /**
+   * when train `activeChanged` event trigger
+   */
+  trainActiveChanged: [Train]
 }
 
 export class Rail extends EventBus<RailEvents> {
@@ -74,7 +79,7 @@ export class Rail extends EventBus<RailEvents> {
     this.duration = option.duration
     this.zIndex = option.zIndex
 
-    this.container = new Container({ y: this.y })
+    this.container = new Container({ y: this.y, label: 'rail' })
 
     this._drawBg()
 
@@ -279,6 +284,7 @@ export class Rail extends EventBus<RailEvents> {
 
       train.on('startChanged', () => this.emit('trainStartChanged', train))
       train.on('durationChanged', () => this.emit('trainDurationChanged', train))
+      train.on('activeChanged', () => this.emit('trainActiveChanged', train))
     }
 
     // 寻找插入的位置

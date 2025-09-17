@@ -29,3 +29,5 @@ Ungrouped
 - [ ] delete tarin gap in same rail
 
 - [ ] cancel playback flow
+
+- [ ] 可以考虑将active的train存入全局状态, 这样就可以减少事件的跨级发送
