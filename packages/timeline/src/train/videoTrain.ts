@@ -34,26 +34,25 @@ export class VideoTrain extends Train<VideoTrainEvents> {
 
     const count = Math.ceil(this._slot.width / singleWidth)
 
+    // 确保至少生成一个缩略图
+    const actualCount = Math.max(1, count)
+
     let i = 0
-    while (i <= count) {
-      await this.frameExctractor.getFrameByTime((duration / count) * i)
-        .then((tick) => {
-          tick.video && this._append(tick.video, singleWidth, this.height, singleWidth * i)
-        })
+    while (i <= actualCount) {
+      const time = (duration / actualCount) * i
+
+      // 抽帧必须是同步
+      const tick = await this.frameExctractor.getFrameByTime(time)
+      if (tick.video) {
+        this._append(tick.video, singleWidth, this.height, singleWidth * i)
+      }
+
       i++
     }
   }
 
   private _append(frame: VideoFrame, w: number, h: number, x: number): void {
-    // 创建canvas来绘制VideoFrame
-    const canvas = document.createElement('canvas')
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(frame, 0, 0, w, h)
-
-    // 使用canvas创建texture
-    const texture = Texture.from(canvas)
+    const texture = Texture.from(frame)
     const image = new Sprite(texture)
 
     image.setSize(w, h)

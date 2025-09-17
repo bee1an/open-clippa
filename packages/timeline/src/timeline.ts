@@ -112,8 +112,6 @@ export class Timeline extends EventBus<TimlineEvents> {
     this._createRails()
 
     this.container.addChild(this.adjuster)
-
-    // this._updatePxPerMs((app.screen.width / this.duration) * this.scale)
   }
 
   private _mountWithBindEvents(elementId: string): HTMLElement {
