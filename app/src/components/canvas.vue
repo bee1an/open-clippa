@@ -14,13 +14,13 @@ async function loadVideoWithDuration(src: string): Promise<number> {
     const video = document.createElement('video')
     video.src = src
     video.preload = 'metadata'
-    
+
     video.onloadedmetadata = () => {
       // 视频时长以毫秒为单位
       const duration = video.duration * 1000
       resolve(duration)
     }
-    
+
     video.onerror = () => {
       // 如果无法获取时长，使用默认值
       resolve(5000)
@@ -39,29 +39,27 @@ watch(currentTime, () => {
 
 onMounted(async () => {
   await clippa.ready
-  
+
   // 获取真实时长并创建视频对象
   const videoDuration = await loadVideoWithDuration('https://pixijs.com/assets/video.mp4')
   const video1Duration = await loadVideoWithDuration('/bunny.mp4')
-  
+
   video = new Video({
     src: 'https://pixijs.com/assets/video.mp4',
-    start: 0,
-    duration: videoDuration,
-    zIndex: 0,
-  })
-  
-  video1 = new Video({
-    src: '/bunny.mp4',
     start: 4000,
-    duration: video1Duration,
-    width: 300,
-    height: 200,
-    x: 100,
-    y: 100,
+    duration: videoDuration,
     zIndex: 1,
   })
-  
+
+  video1 = new Video({
+    src: '/bunny.mp4',
+    start: 0,
+    duration: video1Duration,
+    width: 995,
+    height: 560,
+    zIndex: 0,
+  })
+
   clippa.hire(video)
   clippa.hire(video1)
 

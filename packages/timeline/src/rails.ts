@@ -320,6 +320,16 @@ export class Rails extends EventBus<RailsEvents> {
    * create rail and rail gap by zIndex with update rail container
    */
   createRailByZIndex(zIndex: number): Rail {
+    if (zIndex >= this.rails.length) {
+      /**
+       * Rails只能应对rails数组连续的情况
+       * 这种情况属于越级创建, 例在zindex0未创建的情况下创建zindex1
+       */
+      for (let index = this.rails.length; index < zIndex; index++) {
+        this._createRailByZIndexRaw(index)
+      }
+    }
+
     const rail = this._createRailByZIndexRaw(zIndex)
     this._updateRailContainerY()
     return rail
