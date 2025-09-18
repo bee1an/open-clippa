@@ -186,7 +186,12 @@ export class Rails extends EventBus<RailsEvents> {
       }
     })
 
-    rail.on('insertTrain', () => this.scrollBox.update())
+    rail.on('insertTrain', () => {
+      if (this.state.trainDragging)
+        return
+
+      this.scrollBox.update()
+    })
 
     this._insertRailByZIndex(rail, zIndex)
 

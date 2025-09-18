@@ -153,11 +153,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this.container.rawAddChild(this._wrapper)
 
     this._wrapper.on('childAdded', () => {
-      this._updateSize(this._wrapper.width, this._wrapper.height)
+      // this._updateSize(this._wrapper.width, this._wrapper.height)
     })
 
     this._wrapper.on('childRemoved', () => {
-      this._updateSize(this._wrapper.width, this._wrapper.height)
+      // this._updateSize(this._wrapper.width, this._wrapper.height)
     })
 
     this._bindEvents()

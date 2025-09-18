@@ -39,6 +39,7 @@ watch(currentTime, () => {
 
 onMounted(async () => {
   await clippa.ready
+  clippa.stage.mount('canvas')
 
   // 获取真实时长并创建视频对象
   const videoDuration = await loadVideoWithDuration('https://pixijs.com/assets/video.mp4')
@@ -54,7 +55,7 @@ onMounted(async () => {
   video1 = new Video({
     src: '/bunny.mp4',
     start: 0,
-    duration: video1Duration,
+    duration: video1Duration / 3,
     width: 995,
     height: 560,
     zIndex: 0,
@@ -62,8 +63,6 @@ onMounted(async () => {
 
   clippa.hire(video)
   clippa.hire(video1)
-
-  clippa.stage.mount('canvas')
 })
 </script>
 
