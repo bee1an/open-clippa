@@ -54,11 +54,6 @@ export type RailEvents = {
   trainDurationChanged: [Train]
 
   /**
-   * when train `activeChanged` event trigger
-   */
-  trainActiveChanged: [Train]
-
-  /**
    * insert train
    */
   insertTrain: [Train]
@@ -289,7 +284,6 @@ export class Rail extends EventBus<RailEvents> {
 
       train.on('startChanged', () => this.emit('trainStartChanged', train))
       train.on('durationChanged', () => this.emit('trainDurationChanged', train))
-      train.on('activeChanged', () => this.emit('trainActiveChanged', train))
     }
 
     // 寻找插入的位置

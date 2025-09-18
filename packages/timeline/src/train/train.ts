@@ -70,7 +70,10 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    */
   private _resizeHandlerHeight: number
 
-  active = false
+  get active(): boolean {
+    const state = State.getInstance()
+    return state.activeTrain === this
+  }
 
   constructor(option: TrainOption) {
     i++
@@ -480,19 +483,27 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   }
 
   updateActive(active: boolean): void {
-    if (active === this.active)
+    const state = State.getInstance()
+
+    if (active === (state.activeTrain === this))
       return
 
-    this.active = active
+    if (active) {
+      // 取消上一个选中
+      state.activeTrain?.updateActive (false)
 
-    if (!this.active && !this._pointerIn) {
+      state.setActiveTrain(this)
+    }
+    else if (state.activeTrain === this) {
+      state.setActiveTrain(null)
+    }
+
+    if (!active && !this._pointerIn) {
       // 取消选中时, 当前鼠标并不在train内部则隐藏widget
       this._widget.visible = false
     }
 
     this._drawWidget()
-
-    this.emit('activeChanged')
   }
 
   /**

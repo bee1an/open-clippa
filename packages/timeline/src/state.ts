@@ -3,6 +3,7 @@ import { EventBus } from '@clippa/utils'
 
 export type StateEvents = {
   updatedPxPerMs: [number]
+  activeTrainChanged: [Train | null]
 }
 
 export class State extends EventBus<StateEvents> {
@@ -43,5 +44,17 @@ export class State extends EventBus<StateEvents> {
   updatePxPerMs(pxPerMs: number): void {
     this.pxPerMs = pxPerMs
     this.emit('updatedPxPerMs', pxPerMs)
+  }
+
+  /**
+   * 当前激活的train
+   */
+  activeTrain: Train | null = null
+  setActiveTrain(train: Train | null): void {
+    if (this.activeTrain === train)
+      return
+
+    this.activeTrain = train
+    this.emit('activeTrainChanged', train)
   }
 }

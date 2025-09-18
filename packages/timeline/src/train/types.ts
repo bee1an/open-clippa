@@ -61,11 +61,6 @@ export type TrainEvents = {
    * duration changed
    */
   durationChanged: []
-
-  /**
-   * active changed
-   */
-  activeChanged: []
 }
 
 export type ExtendTrainEvents<T extends { [key: string | symbol]: unknown[] }> = TrainEvents & T
