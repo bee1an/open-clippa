@@ -1,6 +1,6 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
-import { EventBus, isIntersection } from '@clippa/utils'
+import { EventBus, getMsByPx, isIntersection } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
 import { Train } from './train'
@@ -42,16 +42,6 @@ export type RailEvents = {
    * when train `moveEnd` event trigger
    */
   trainMoveEnd: []
-
-  /**
-   * when train `startChanged` event trigger
-   */
-  trainStartChanged: [Train]
-
-  /**
-   * when train `durationChanged` event trigger
-   */
-  trainDurationChanged: [Train]
 
   /**
    * insert train
@@ -164,10 +154,18 @@ export class Rail extends EventBus<RailEvents> {
   }
 
   private _rightTrains: Train[] | null = null
+  /**
+   * 收集当前resize的train右边的train集合
+   */
   private _trainRightResizeStartHandle = (train: Train): void => {
     this._rightTrains = this.trains.filter(item => item.x >= train.container.x)
   }
 
+  /**
+   * 动态调整右边train的位置
+   * 仅仅是位置, 并不会改变train的开始时间
+   * 改变开始时间将在拖拽结束时进行
+   */
   private _trainBeforeRightResizeHandle = (): void => {
     if (!this._rightTrains)
       return
@@ -192,24 +190,16 @@ export class Rail extends EventBus<RailEvents> {
 
       i++
     }
-
-    // const [intersectTrain] = this.trains.filter((item) => {
-    //   if (item.x <= train.container.x)
-    //     return false
-
-    //   return isIntersection([train.x, train.x + train.width], [item.x, item.x + item.width])
-    // })
-
-    // if (intersectTrain) {
-    //   event.disdrawable = true
-
-    //   train.updateSlotWidth(intersectTrain.x - train.x)
-    // }
   }
 
+  /**
+   * 修改右边train的位置和开始时间
+   * 发送 `trainRightResizeEnd` 事件, 父类将检测总时长是否需要更新
+   */
   private _trainRightResizeEndHandle = (): void => {
     this._rightTrains?.forEach((item) => {
       item.x = item.container.x
+      item.start = getMsByPx(item.x, this.state.pxPerMs)
     })
 
     this._rightTrains = null
@@ -281,9 +271,6 @@ export class Rail extends EventBus<RailEvents> {
       this.container.addChild(train.container)
       this._bindTrainMoveEvents(train)
       this._bindResizeEvents(train)
-
-      train.on('startChanged', () => this.emit('trainStartChanged', train))
-      train.on('durationChanged', () => this.emit('trainDurationChanged', train))
     }
 
     // 寻找插入的位置
@@ -343,7 +330,8 @@ export class Rail extends EventBus<RailEvents> {
         intersectTrains
           .reverse() // 这里反转一下是为了让与当前元素相交的元素保持原有的顺序
           .forEach((item) => {
-            item.updatePos(item.x + (minialXTrain.x + minialXTrain.width - item.x), undefined, true)
+            item.updatePos(item.x + (minialXTrain.x + minialXTrain.width - item.x), undefined)
+            item.start = getMsByPx(item.x, this.state.pxPerMs)
             this.insertTrain(item)
           })
 

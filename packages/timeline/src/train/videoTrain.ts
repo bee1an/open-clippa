@@ -1,4 +1,5 @@
 import type { ExtendTrainEvents, ExtendTrainOption } from '.'
+import { DEBUG_NO_FRAME } from '@clippa/constants'
 import { FrameExtractor } from 'open-clippa'
 import { Sprite, Texture } from 'pixi.js'
 import { Train } from '.'
@@ -26,6 +27,9 @@ export class VideoTrain extends Train<VideoTrainEvents> {
   }
 
   async generateThumnail(): Promise<void> {
+    if (DEBUG_NO_FRAME)
+      return
+
     await this.frameExctractor.load()
 
     const { width, height, duration } = this.frameExctractor.clip.meta

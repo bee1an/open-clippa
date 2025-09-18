@@ -1,5 +1,5 @@
 import type { FederatedPointerEvent } from 'pixi.js'
-import type { Train, TrainOption } from './train'
+import type { TrainOption } from './train'
 import { EventBus, getPxByMs } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
@@ -23,7 +23,7 @@ export type RailsEvents = {
    *
    * it is before update `duration`
    */
-  durationOverLimit: [number]
+  updateDuration: [number]
 }
 
 export class Rails extends EventBus<RailsEvents> {
@@ -151,25 +151,35 @@ export class Rails extends EventBus<RailsEvents> {
       this.container.addChild(train.container)
     })
 
+    // 获取所有train中最大的duration
+    const autoUpdateDuration = (): void => {
+      const duration = Math.max(
+        ...this.rails.map(
+          (rail) => {
+            return rail.trains.reduce(
+              (acc, train) => Math.max(acc, train.start + train.duration),
+              0,
+            )
+          },
+        ),
+      )
+
+      if (duration !== this.duration) {
+        this.emit('updateDuration', duration)
+      }
+    }
+
     rail.on('trainMoveEnd', () => {
+      autoUpdateDuration()
+
       this.scrollBox.update()
     })
 
     rail.on('trainRightResizeEnd', () => {
+      autoUpdateDuration()
+
       this.scrollBox.update()
     })
-
-    const updateTimelineDuration = (train: Train): void => {
-      // TODO: 可能会影响这个rail上的所有的train
-      const trainRight = train.start + train.duration
-      if (trainRight > this.duration) {
-        this.emit('durationOverLimit', trainRight)
-      }
-    }
-
-    rail.on('trainStartChanged', updateTimelineDuration)
-
-    rail.on('trainDurationChanged', updateTimelineDuration)
 
     rail.on('insertTrain', () => {
       if (this.state.trainDragging)

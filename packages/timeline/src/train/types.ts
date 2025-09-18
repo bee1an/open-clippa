@@ -51,16 +51,6 @@ export type TrainEvents = {
    * 右侧调整器pointerup
    */
   rightResizeEnd: [target: Train]
-
-  /**
-   * start changed
-   */
-  startChanged: []
-
-  /**
-   * duration changed
-   */
-  durationChanged: []
 }
 
 export type ExtendTrainEvents<T extends { [key: string | symbol]: unknown[] }> = TrainEvents & T

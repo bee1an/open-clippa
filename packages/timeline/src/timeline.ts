@@ -13,6 +13,7 @@ export type TimlineEvents = {
   play: []
   pause: []
   seeked: [time: number]
+  durationChanged: [number]
 }
 
 export class Timeline extends EventBus<TimlineEvents> {
@@ -210,7 +211,7 @@ export class Timeline extends EventBus<TimlineEvents> {
       this.ruler?.updateOffsetX(this.rails!.offsetX)
     })
 
-    this.rails.on('durationOverLimit', (duration: number) => {
+    this.rails.on('updateDuration', (duration: number) => {
       this.updateDuration(duration)
     })
   }
@@ -243,6 +244,8 @@ export class Timeline extends EventBus<TimlineEvents> {
     this.ruler?.updateDuration(duration)
     this.rails?.updateDuration(duration)
     this.cursor?.updateDuration(duration)
+
+    this.emit('durationChanged', duration)
   }
 
   private _requestAnimationFrameId?: number

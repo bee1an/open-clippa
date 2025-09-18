@@ -10,7 +10,7 @@ export const useEditorStore = defineStore('editor', () => {
   })
 
   const duration = ref(0)
-  clippa.director.on('durationChange', (time) => {
+  clippa.timeline.on('durationChanged', (time) => {
     duration.value = time
   })
 

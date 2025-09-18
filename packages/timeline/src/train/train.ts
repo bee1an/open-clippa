@@ -1,6 +1,7 @@
 import type { Rail } from '../rail'
 import type { TrainDragStatus, TrainEvents, TrainOption } from './types'
 import {
+  DEBUG,
   TIMELINE_RESIZE_HANDLER_FILL,
   TIMELINE_RESIZE_HANDLER_WIDTH,
   TIMELINE_RESIZE_TRIGGER_WIDTH,
@@ -11,11 +12,10 @@ import {
   TIMELINE_WIDGET_HOVER_FILL,
 } from '@clippa/constants'
 import { drag, EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
-import { Container, Graphics, Text } from 'pixi.js'
+import { Container, Graphics, HTMLText } from 'pixi.js'
 import { RAIL_HEIGHT } from '../rail'
 import { State } from '../state'
 
-let i = 0
 export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   /**
    * id
@@ -76,7 +76,6 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   }
 
   constructor(option: TrainOption) {
-    i++
     super()
     this.state = State.getInstance()
     this.state.on('updatedPxPerMs', (pxPerMs) => {
@@ -100,14 +99,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
     this._drawWidget()
 
-    const text = new Text({
-      text: i,
-      x: 20,
-      y: this.height / 2 - 8,
-      zIndex: 1,
-      style: { fontSize: 14, fill: 'gray' },
-    })
-    this.container.addChild(text)
+    this._debugHelper()
   }
 
   protected _slot!: Container
@@ -360,21 +352,27 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         this.state.setDraggingTrain(null)
 
         if (this.dragStatus === 'static') {
-          this.updatePos(this.container.x, undefined, true)
+          this.updatePos(this.container.x, undefined)
+
+          this.start = getMsByPx(this.x, this.state.pxPerMs)
         }
         else if (this.dragStatus === 'free') {
           // 如果是游离态, 恢复train为拖拽前的状态
           this._recordWhenDrag!.parent.insertTrain(this)
-          this.updatePos(this._recordWhenDrag!.x, (RAIL_HEIGHT - this.height) / 2, true)
+          this.updatePos(this._recordWhenDrag!.x, (RAIL_HEIGHT - this.height) / 2)
+
+          this.start = getMsByPx(this.x, this.state.pxPerMs)
         }
         else {
           if (this.x !== this.container.x) {
-            this.updatePos(this.container.x, undefined, true)
+            this.updatePos(this.container.x, undefined)
+
+            this.start = getMsByPx(this.x, this.state.pxPerMs)
           }
           else {
             const newStart = getMsByPx(this.x, this.state.pxPerMs)
             if (newStart !== this.start) {
-              this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
+              this.start = newStart
             }
           }
         }
@@ -411,20 +409,13 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
           this.updateWidth(this.width)
         }
-
-        this._drawBorder()
       },
       up: () => {
         this.width = this.container.width
         this.x = this.container.x
 
-        // TODO
-        /*
-          这里调用函数会触发事件
-          但是这里其实是一个组合事件, 而不是先修改了start, 又修改了duration
-        */
-        this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
-        this.updateDuration(getMsByPx(this.width, this.state.pxPerMs))
+        this.start = getMsByPx(this.x, this.state.pxPerMs)
+        this.duration = getMsByPx(this.width, this.state.pxPerMs)
       },
     })
   }
@@ -448,15 +439,14 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
         if (!site.disdrawable) {
           this._drawSlot()
+          this._drawBorder()
           traget.x = this.width - TIMELINE_RESIZE_TRIGGER_WIDTH
         }
-
-        this._drawBorder()
       },
 
       up: () => {
         this.width = this.container.width
-        this.updateDuration(getMsByPx(this.width, this.state.pxPerMs))
+        this.duration = getMsByPx(this.width, this.state.pxPerMs)
 
         this.emit('rightResizeEnd', this)
       },
@@ -511,17 +501,15 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    *
    * if `withEffect` is true, the duration will be updated accordingly
    */
-  updateWidth(width: number, withEffect?: boolean): void {
+  updateWidth(width: number): void {
     if (width === this.container.width)
       return
 
     this.width = width
 
-    if (withEffect) {
-      this.updateDuration(getMsByPx(this.width, this.state.pxPerMs))
-    }
-
     this._drawSlot()
+
+    this._drawBorder()
 
     this._rightResizer.x = width - TIMELINE_RESIZE_TRIGGER_WIDTH
   }
@@ -531,13 +519,9 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    *
    * If `withEffect` is true, then the start time of the train will be updated accordingly
    */
-  updatePos(x?: number, y?: number, withEffect?: boolean): void {
+  updatePos(x?: number, y?: number): void {
     if (typeof x === 'number') {
       this.x = this.container.x = x
-
-      if (withEffect) {
-        this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
-      }
     }
 
     if (typeof y === 'number') {
@@ -550,30 +534,26 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    *
    * If `withEffect` is true, then the x of the train will be updated accordingly
    */
-  updateStart(start: number, withEffect?: boolean): void {
-    this.start = start
+  // updateStart(start: number, withEffect?: boolean): void {
+  //   this.start = start
 
-    if (withEffect) {
-      this.x = this.container.x = getPxByMs(start, this.state.pxPerMs)
-    }
-
-    this.emit('startChanged')
-  }
+  //   if (withEffect) {
+  //     this.x = this.container.x = getPxByMs(start, this.state.pxPerMs)
+  //   }
+  // }
 
   /**
    * Updates the duration of the train
    *
    * If `withEffect` is true, will call `updateWidth`
    */
-  updateDuration(duration: number, withEffect?: boolean): void {
-    this.duration = duration
+  // updateDuration(duration: number, withEffect?: boolean): void {
+  //   this.duration = duration
 
-    if (withEffect) {
-      this.updateWidth(getPxByMs(duration, this.state.pxPerMs))
-    }
-
-    this.emit('durationChanged')
-  }
+  //   if (withEffect) {
+  //     this.updateWidth(getPxByMs(duration, this.state.pxPerMs))
+  //   }
+  // }
 
   /**
    * 修改状态
@@ -587,6 +567,42 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     }
 
     this.container.alpha = 1
+  }
+
+  private _debugText?: HTMLText
+  private _debugHelper(): void {
+    if (!DEBUG)
+      return
+
+    const text = ([
+      'id',
+      'start',
+      'duration',
+    ] as const).reduce(
+      (str, key) => `${str}<b style="color: red">${key.slice(0, 2)}</b>: ${this[key]} `,
+      '',
+    )
+
+    if (!this._debugText) {
+      this._debugText = new HTMLText({
+        text,
+        x: 20,
+        zIndex: 1,
+        style: { fontSize: 12, fill: '#fff' },
+        label: 'train-debug',
+        eventMode: 'none',
+      })
+    }
+    else {
+      this._debugText.text = text
+    }
+
+    this.container.addChild(this._debugText)
+    this.container.sortChildren()
+
+    requestAnimationFrame(() => {
+      this._debugHelper()
+    })
   }
 
   /**
