@@ -1,4 +1,4 @@
-import { drag, EventBus, getPxByMs, ms2TimeStr } from '@clippa/utils'
+import { drag, EventBus, getMsByPx, getPxByMs, ms2TimeStr } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
 
@@ -82,14 +82,14 @@ export class Ruler extends EventBus<RulerEvents> {
     this._processWidth()
     this.screenWidth = option.screenWidth
 
-    const container = new Container()
+    const container = new Container({ label: 'ruler' })
     this.container = container
     container.cursor = 'pointer'
     container.eventMode = 'static'
 
-    this._bindEvents()
-
     this.render()
+
+    this._bindEvents()
   }
 
   private _processWidth(): void {
@@ -98,8 +98,8 @@ export class Ruler extends EventBus<RulerEvents> {
 
   private _bg?: Graphics
   private _drawBg(): void {
-    const bg = new Graphics()
-    bg.rect(0, 0, this.width, RULER_HEIGHT)
+    const bg = new Graphics({ label: 'bg' })
+    bg.rect(0, 0, Math.max(this.width, this.screenWidth - this.offsetX), RULER_HEIGHT)
     bg.fill(RULER_FILL)
 
     if (this._bg) {
@@ -113,9 +113,15 @@ export class Ruler extends EventBus<RulerEvents> {
   }
 
   private _bgByDuration?: Graphics
+  // TODO
+  /**
+   * @deprecated
+   *
+   * 后面可以重构为对应选中的train
+   */
   private _drawBgByDuration(): void {
     const bg = new Graphics()
-    bg.roundRect(0, 0, getPxByMs(this.duration, this.state.pxPerMs), RULER_HEIGHT, 8)
+    bg.roundRect(0, 0, this.width, RULER_HEIGHT, 8)
     bg.fill(RULER_FILL)
 
     if (this._bgByDuration) {
@@ -154,14 +160,10 @@ export class Ruler extends EventBus<RulerEvents> {
     return text
   }
 
-  private _getGap(tick: number): number {
-    return (tick / Math.max(this.duration, MINIMUM_DURATION)) * this.width
-  }
-
   private _minTickSpacingPx = 120
   private get _tick(): number {
     const tick = ticks.find((tick) => {
-      return this._getGap(tick) >= this._minTickSpacingPx
+      return getPxByMs(tick, this.state.pxPerMs) >= this._minTickSpacingPx
     }) || ticks[ticks.length - 1]
 
     return tick
@@ -173,7 +175,7 @@ export class Ruler extends EventBus<RulerEvents> {
 
     let x = 0
     const tick = this._tick
-    const gap = this._getGap(tick)
+    const gap = getPxByMs(tick, this.state.pxPerMs)
 
     const dotGap = gap / (DOT_NUM + 1)
 
@@ -225,14 +227,12 @@ export class Ruler extends EventBus<RulerEvents> {
   }
 
   private _bindEvents(): void {
-    // this.container.on('pointerdown', (e) => {
-    //   const seekTime = (e.getLocalPosition(this.container).x / this.width) * this.duration
-    //   this.emit('seek', seekTime)
-    // })
-
     let x: number
     const seek = (): void => {
-      const seekTime = (x / this.width) * this.duration
+      let seekTime = getMsByPx(x, this.state.pxPerMs)
+      if (seekTime > this.duration) {
+        seekTime = this.duration
+      }
       this.emit('seek', seekTime)
     }
     drag(this.container, {
@@ -274,7 +274,6 @@ export class Ruler extends EventBus<RulerEvents> {
       return
 
     this._drawBg()
-    this._drawBgByDuration()
     this._drawTick()
 
     this.emit('render')
