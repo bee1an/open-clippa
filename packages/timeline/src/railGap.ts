@@ -1,6 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js'
 
-export const GAP = 7
+export const GAP = 9
 
 export interface RailGapOption {
   y: number
@@ -30,7 +30,7 @@ export class RailGap {
 
     this._text = new Text({
       text: this.zIndex,
-      style: { fontSize: 10, fill: 'red' },
+      style: { fontSize: 8, fill: 'red' },
     })
     this.container.addChild(this._text)
   }

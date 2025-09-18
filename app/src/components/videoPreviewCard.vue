@@ -24,7 +24,7 @@ function addToTimeline() {
     src: props.videoFile.file,
     start: 0,
     duration: props.videoFile.duration,
-    zIndex: 0,
+    zIndex: clippa.timeline.rails!.maxZIndex + 1,
   })
   clippa.hire(video)
 }
@@ -84,8 +84,8 @@ function previewVideo() {
           class="action-btn bg-black/60 hover:bg-blue-600/80"
           w-6
           h-6 rounded flex items-center justify-center text-white text-xs backdrop-blur-sm
-          @click.stop="addToTimeline" transition-all duration-200
-          title="添加到时间轴"
+          transition-all duration-200 title="添加到时间轴"
+          @click.stop="addToTimeline"
         >
           <div class="i-carbon-add" />
         </button>
@@ -94,8 +94,8 @@ function previewVideo() {
           class="action-btn bg-black/60 hover:bg-red-600/80"
           w-6
           h-6 rounded flex items-center justify-center text-white text-xs backdrop-blur-sm
-          @click.stop="removeVideo" transition-all duration-200
-          title="删除视频"
+          transition-all duration-200 title="删除视频"
+          @click.stop="removeVideo"
         >
           <div class="i-carbon-trash-can" />
         </button>

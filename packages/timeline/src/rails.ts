@@ -50,7 +50,7 @@ export class Rails extends EventBus<RailsEvents> {
   /**
    * include rails and railGaps
    */
-  railsContainer: Container = new Container()
+  railsContainer: Container = new Container({ label: 'rails' })
 
   state: State
 
@@ -108,9 +108,9 @@ export class Rails extends EventBus<RailsEvents> {
     // TODO: maybe bug add on this local
     // this.container.addChild(this.railsContainer)
 
-    // this._drawBg()
-
     this._drawBody()
+
+    this._drawFoundation()
 
     this.container.addChild(this.railsContainer)
 
@@ -129,6 +129,8 @@ export class Rails extends EventBus<RailsEvents> {
       // move to center y
       this.railsContainer.y = ((this.screenHeight - RULER_HEIGHT - (this.scrollBox.isXBarVisible ? this.scrollBox.barHeight : 0)) / 2) - this.railsContainer.height / 2
     }
+
+    this.scrollBox.update()
   }
 
   private _createRail(zIndex: number, trainsOptions: TrainOption[] = []): Rail {
@@ -223,21 +225,25 @@ export class Rails extends EventBus<RailsEvents> {
     }
   }
 
-  private _bg?: Graphics
-  private _drawBg(): void {
+  private _foundation?: Graphics
+  private _drawFoundation(): void {
     const bgColor = 'transparent'
 
     const w = Math.max(this.width, this.screenWidth - this.offsetX)
-    const h = this.screenHeight - RULER_HEIGHT
+    const h = Math.max(
+      this.railsContainer.height,
+      this.screenHeight - RULER_HEIGHT,
+    )
 
-    if (this._bg) {
-      this._bg.clear().rect(0, 0, w, h).fill(bgColor)
+    if (this._foundation) {
+      this._foundation.clear().rect(0, 0, w, h).fill(bgColor)
       return
     }
 
-    this._bg = new Graphics()
-    this._bg.rect(0, 0, w, h).fill(bgColor)
-    this.container.addChild(this._bg)
+    this._foundation = new Graphics({ label: 'foundation', eventMode: 'static' })
+
+    this._foundation.rect(0, 0, w, h).fill(bgColor)
+    this.container.addChild(this._foundation)
   }
 
   private _insertGapByZIndex(gap: RailGap, zIndex: number): void {
@@ -251,6 +257,26 @@ export class Rails extends EventBus<RailsEvents> {
   private _bindEvents(): void {
     this.container.eventMode = 'static'
     let timeId: number
+    this.container.on('pointerdown', (e) => {
+      /* train 取消选中逻辑 */
+      if (!this.state.activeTrain)
+        return
+
+      const { x, y } = e.global
+
+      let clickedTrain: undefined | boolean
+      for (const rail of this.rails) {
+        clickedTrain = rail.trains.some((train) => {
+          return train.container.getBounds().containsPoint(x, y)
+        })
+        if (clickedTrain)
+          break
+      }
+
+      if (!clickedTrain)
+        this.state.activeTrain.updateActive(false)
+    })
+
     this.container.on('pointermove', (e) => {
       if (!this.state.trainDragging)
         return
@@ -314,31 +340,13 @@ export class Rails extends EventBus<RailsEvents> {
         this.removeRail(emptyRail)
 
       this._updateRailContainerY()
-      // console.log('', this.rails.map(i => i.zIndex), this.railGaps.map(i => i.zIndex))
     })
   }
 
   /**
-   * create rail and rail gap by zIndex with update rail container
-   */
-  createRailByZIndex(zIndex: number): Rail {
-    if (zIndex >= this.rails.length) {
-      /**
-       * Rails只能应对rails数组连续的情况
-       * 这种情况属于越级创建, 例在zindex0未创建的情况下创建zindex1
-       */
-      for (let index = this.rails.length; index < zIndex; index++) {
-        this._createRailByZIndexRaw(index)
-      }
-    }
-
-    const rail = this._createRailByZIndexRaw(zIndex)
-    this._updateRailContainerY()
-    return rail
-  }
-
-  /**
-   * create rail by zIndex with rail gap
+   * 创建rail和railGap
+   *
+   *
    */
   private _createRailByZIndexRaw(zIndex: number): Rail {
     /* update other zIndex */
@@ -364,6 +372,30 @@ export class Rails extends EventBus<RailsEvents> {
 
     const rail = this._createRail(zIndex)
     this._createRailGap(zIndex)
+
+    this.scrollBox.update()
+
+    this._drawFoundation()
+    return rail
+  }
+
+  /**
+   * create rail and rail gap by zIndex with update rail container
+   */
+  createRailByZIndex(zIndex: number): Rail {
+    if (zIndex >= this.rails.length) {
+      /**
+       * Rails只能应对rails数组连续的情况
+       * 这种情况属于越级创建, 例在zindex0未创建的情况下创建zindex1
+       */
+      for (let index = this.rails.length; index < zIndex; index++) {
+        this._createRailByZIndexRaw(index)
+      }
+    }
+
+    const rail = this._createRailByZIndexRaw(zIndex)
+
+    this._updateRailContainerY()
 
     return rail
   }
@@ -409,6 +441,8 @@ export class Rails extends EventBus<RailsEvents> {
     this.railsContainer.removeChild(rail.container)
 
     this.scrollBox.update()
+
+    this._drawFoundation()
   }
 
   getRailByZIndex(zIndex: number): Rail | undefined {
@@ -478,7 +512,7 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   update(): void {
-    // this._drawBg()
+    this._drawFoundation()
 
     const helper = (instance: Rail | RailGap): void => {
       instance.updateWidth(Math.max(this.width, this.screenWidth - this.offsetX))

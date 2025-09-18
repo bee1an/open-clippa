@@ -2,15 +2,9 @@
 
 Clippa timeline component
 
-## TODO
-
-Cursor
+## Roadmap
 
 - [x] move with currentTime change
-
-- [ ] drag emit `updateCurrentTime` event, not emit `seek` event
-
-Ungrouped
 
 - [x] optimize seek
 
@@ -20,14 +14,22 @@ Ungrouped
 
 - [x] better train resizer
 
+- [x] feature hover train effect
+
+- [x] train slot
+
+- [x] move train active status in global state
+
+- [ ] auto scroll when playing
+
+- [ ] auto scroll when drag
+
+- [ ] drag emit `updateCurrentTime` event, not emit `seek` event
+
 - [ ] active train zIndex
-
-- [ ] feature hover train effect
-
-- [ ] train slot
 
 - [ ] delete tarin gap in same rail
 
-- [ ] cancel playback flow
+## FIXME
 
-- [ ] 可以考虑将active的train存入全局状态, 这样就可以减少事件的跨级发送
+- [] 将两个rail拖拽创建三个rail时整个rails时的y有bug
