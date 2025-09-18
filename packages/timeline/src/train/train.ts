@@ -369,7 +369,10 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
             this.updatePos(this.container.x, undefined, true)
           }
           else {
-            this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
+            const newStart = getMsByPx(this.x, this.state.pxPerMs)
+            if (newStart !== this.start) {
+              this.updateStart(getMsByPx(this.x, this.state.pxPerMs))
+            }
           }
         }
 

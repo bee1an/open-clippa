@@ -57,6 +57,11 @@ export type RailEvents = {
    * when train `activeChanged` event trigger
    */
   trainActiveChanged: [Train]
+
+  /**
+   * insert train
+   */
+  insertTrain: [Train]
 }
 
 export class Rail extends EventBus<RailEvents> {
@@ -296,6 +301,8 @@ export class Rail extends EventBus<RailEvents> {
       this.trains.splice(nextIndex, 0, train)
     else
       this.trains.push(train)
+
+    this.emit('insertTrain', train)
   }
 
   /**

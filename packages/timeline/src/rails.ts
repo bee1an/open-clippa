@@ -186,6 +186,8 @@ export class Rails extends EventBus<RailsEvents> {
       }
     })
 
+    rail.on('insertTrain', () => this.scrollBox.update())
+
     this._insertRailByZIndex(rail, zIndex)
 
     this.railsContainer.addChild(rail.container)
