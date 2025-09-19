@@ -260,7 +260,12 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     const move = (e: { x: number }): void => {
       const dx = e.x - x!
 
-      this._scrollX(dx)
+      // 基于trigger移动的距离转换为实际滚动距离
+      const scrollMore = this.scrollMore?.x ?? 0
+      const stepRatio = this.viewportWidth / (this.width + scrollMore)
+      const scrollDx = dx / stepRatio
+
+      this._scrollXByDistance(scrollDx)
 
       x += dx
     }
@@ -289,31 +294,6 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this._scrollbarXBar.visible = !this.hideXBar
 
     this.container.rawAddChild(this._scrollbarXBar)
-  }
-
-  private _scrollX(dx: number): void {
-    if (!this._scrollbarXTrigger || !this.isXBarVisible)
-      return
-
-    const trigger = this._scrollbarXTrigger
-
-    const scrollMore = this.scrollMore?.x ?? 0
-    const stepRatio = this.viewportWidth / (this.width + scrollMore)
-
-    // left limit
-    if (trigger.x + dx < 0) {
-      dx = -trigger.x
-    }
-
-    // right limit
-    if (trigger.x + dx + trigger.width > this.viewportWidth) {
-      dx = this.viewportWidth - trigger.x - trigger.width
-    }
-
-    trigger.x += dx
-    this._wrapper.x -= dx / stepRatio
-
-    this.emit('scroll', { x: dx, y: 0 })
   }
 
   private _scrollbarYBar?: Container
@@ -345,7 +325,12 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     const move = (e: { y: number }): void => {
       const dy = e.y - y!
 
-      this._scrollY(dy)
+      // 基于trigger移动的距离转换为实际滚动距离
+      const scrollMore = this.scrollMore?.y ?? 0
+      const stepRatio = this.viewportHeight / (this.height + scrollMore)
+      const scrollDy = dy / stepRatio
+
+      this._scrollYByDistance(scrollDy)
 
       y += dy
     }
@@ -374,32 +359,6 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this._scrollbarYBar.visible = !this.hideYBar
 
     this.container.rawAddChild(this._scrollbarYBar)
-  }
-
-  private _scrollY(dy: number): void {
-    if (!this._scrollbarYTrigger || !this.isYBarVisible)
-      return
-
-    const trigger = this._scrollbarYTrigger
-
-    const scrollMore = this.scrollMore?.y ?? 0
-
-    const stepRatio = this.viewportHeight / (this.height + scrollMore)
-
-    // top limit
-    if (trigger.y + dy < 0) {
-      dy = -trigger.y
-    }
-
-    // bottom limit
-    if (trigger.y + dy + trigger.height > this.viewportHeight) {
-      dy = this.viewportHeight - trigger.y - trigger.height
-    }
-
-    trigger.y += dy
-    this._wrapper.y -= dy / stepRatio
-
-    this.emit('scroll', { x: 0, y: dy })
   }
 
   private _bindEvents(): void {
@@ -434,12 +393,52 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
   scroll({ x, y }: { x?: number, y?: number }): void {
     if (x) {
-      this._scrollX(x)
+      this._scrollXByDistance(x)
     }
 
     if (y) {
-      this._scrollY(y)
+      this._scrollYByDistance(y)
     }
+  }
+
+  /**
+   * 基于像素距离的水平滚动方法
+   */
+  private _scrollXByDistance(dx: number): void {
+    if (!this.isXBarVisible)
+      return
+
+    const scrollMore = this.scrollMore?.x ?? 0
+    const stepRatio = this.viewportWidth / (this.width + scrollMore)
+
+    // 计算trigger需要移动的距离
+    const triggerDx = dx * stepRatio
+
+    // 获取trigger的当前位置
+    if (!this._scrollbarXTrigger)
+      return
+
+    const trigger = this._scrollbarXTrigger
+
+    // 限制trigger移动范围
+    const newTriggerX = Math.max(
+      0,
+      Math.min(this.viewportWidth - trigger.width, trigger.x + triggerDx),
+    )
+
+    // 计算trigger实际移动的距离
+    const actualTriggerDx = newTriggerX - trigger.x
+
+    // 更新trigger位置
+    trigger.x = newTriggerX
+
+    // 根据trigger实际移动距离计算wrapper的移动距离
+    const wrapperDx = actualTriggerDx / stepRatio
+
+    // 更新wrapper位置
+    this._wrapper.x = this._wrapper.x - wrapperDx
+
+    this.emit('scroll', { x: wrapperDx, y: 0 })
   }
 
   /**
@@ -498,6 +497,43 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   }
 
   /**
+   * 基于像素距离的垂直滚动方法
+   */
+  private _scrollYByDistance(dy: number): void {
+    if (!this._scrollbarYTrigger || !this.isYBarVisible)
+      return
+
+    const scrollMore = this.scrollMore?.y ?? 0
+    const stepRatio = this.viewportHeight / (this.height + scrollMore)
+
+    // 计算trigger需要移动的距离
+    const triggerDy = dy * stepRatio
+
+    // 获取trigger的当前位置
+    const trigger = this._scrollbarYTrigger
+
+    // 限制trigger移动范围
+    const newTriggerY = Math.max(
+      0,
+      Math.min(this.viewportHeight - trigger.height, trigger.y + triggerDy),
+    )
+
+    // 计算trigger实际移动的距离
+    const actualTriggerDy = newTriggerY - trigger.y
+
+    // 更新trigger位置
+    trigger.y = newTriggerY
+
+    // 根据trigger实际移动距离计算wrapper的移动距离
+    const wrapperDy = actualTriggerDy / stepRatio
+
+    // 更新wrapper位置
+    this._wrapper.y = this._wrapper.y - wrapperDy
+
+    this.emit('scroll', { x: 0, y: wrapperDy })
+  }
+
+  /**
    * Update the size of the viewport.
    */
   updateViewportSize(w?: number, h?: number): void {
@@ -537,5 +573,34 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this._queueRenderId && cancelAnimationFrame(this._queueRenderId)
 
     this._queueRenderId = requestAnimationFrame(() => this.render())
+  }
+
+  /**
+   * 翻到下一页
+   */
+  turnToNextPage(): void {
+    if (!this.isXBarVisible)
+      return
+
+    // 直接滚动一个视口宽度的距离
+    this._scrollXByDistance(this.viewportWidth)
+  }
+
+  /**
+   * 翻到上一页
+   */
+  turnToPrevPage(): void {
+    if (!this.isXBarVisible)
+      return
+
+    // 直接滚动一个视口宽度的距离
+    this._scrollXByDistance(-this.viewportWidth)
+  }
+
+  /**
+   * 获取当前滚动位置
+   */
+  getCurrentScrollX(): number {
+    return -this._wrapper.x
   }
 }

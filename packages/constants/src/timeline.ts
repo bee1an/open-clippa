@@ -62,3 +62,7 @@ export const TIMELINE_TICK_COLOR = '#838398'
  * dot color
  */
 export const TIMELINE_DOT_FILL = '#505067'
+/**
+ * auto page turn threshold - percentage of viewport width from right edge
+ */
+export const TIMELINE_AUTO_PAGE_TURN_THRESHOLD = 0.02

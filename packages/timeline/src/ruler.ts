@@ -6,7 +6,7 @@ import {
   TIMELINE_RULER_HEIGHT,
   TIMELINE_TICK_COLOR,
   TIMELINE_TICK_FONT_SIZE,
-} from '@clippa/constants/src/timeline'
+} from '@clippa/constants'
 import { drag, EventBus, getMsByPx, getPxByMs, ms2TimeStr } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'

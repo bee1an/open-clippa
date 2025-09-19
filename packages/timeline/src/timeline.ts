@@ -1,5 +1,6 @@
 import type { Train } from './train'
-import { EventBus } from '@clippa/utils'
+import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD } from '@clippa/constants'
+import { EventBus, getPxByMs } from '@clippa/utils'
 import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Rails } from './rails'
@@ -58,6 +59,9 @@ export class Timeline extends EventBus<TimlineEvents> {
    * 是否播放中
    */
   private _playing: boolean = false
+  /**
+   * 记录上一次翻页的时间戳，防止连续翻页
+   */
 
   ready: Promise<void>
   private _readyResolve
@@ -268,6 +272,9 @@ export class Timeline extends EventBus<TimlineEvents> {
       }
 
       this.cursor!.seek(this.currentTime)
+
+      // 检查是否需要翻页
+      this._checkPageTurn()
     })
   }
 
@@ -296,6 +303,33 @@ export class Timeline extends EventBus<TimlineEvents> {
     this._stop()
 
     this.emit('pause')
+  }
+
+  /**
+   * 检查是否需要翻页
+   */
+  private _checkPageTurn(): void {
+    if (!this.rails || !this.app || !this.cursor)
+      return
+
+    // 获取播放头在时间轴上的位置（像素）
+    const cursorPosition = getPxByMs(this.currentTime, this.state.pxPerMs)
+
+    // 获取视口宽度
+    const viewportWidth = this.app.screen.width
+
+    // 计算播放头相对于当前视口的位置
+    const cursorRelativePosition = cursorPosition + this.rails.offsetX
+
+    // 检查播放头是否非常接近视口右边界
+    const threshold = viewportWidth * TIMELINE_AUTO_PAGE_TURN_THRESHOLD
+    const distanceToRight = viewportWidth - cursorRelativePosition
+
+    const isNearRightEdge = distanceToRight < threshold
+
+    if (isNearRightEdge) {
+      this.rails.scrollBox.turnToNextPage()
+    }
   }
 
   seek(time: number, withEffect = true): void {
