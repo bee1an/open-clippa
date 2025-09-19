@@ -20,7 +20,7 @@ Clippa timeline component
 
 - [x] move train active status in global state
 
-- [ ] auto scroll when playing
+- [x] auto scroll when playing
 
 - [ ] auto scroll when drag
 

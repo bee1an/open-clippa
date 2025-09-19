@@ -74,3 +74,11 @@ export const TIMELINE_CURSOR_DRAG_SCROLL_THRESHOLD = 0.1
  * cursor drag auto scroll speed - pixels per frame
  */
 export const TIMELINE_CURSOR_DRAG_SCROLL_SPEED = 5
+/**
+ * train drag auto scroll threshold - percentage of viewport width from edge
+ */
+export const TIMELINE_TRAIN_DRAG_SCROLL_THRESHOLD = 0.15
+/**
+ * train drag auto scroll speed - pixels per frame
+ */
+export const TIMELINE_TRAIN_DRAG_SCROLL_SPEED = 8

@@ -243,6 +243,7 @@ export class Timeline extends EventBus<TimlineEvents> {
    *
    * call ruler `updateDuration` method
    * call rails `updateDuration` method
+   * call cursor `updateDuration` method
    */
   updateDuration(duration: number): void {
     this.duration = duration
@@ -364,16 +365,6 @@ export class Timeline extends EventBus<TimlineEvents> {
     }
   }
 
-  seek(time: number, withEffect = true): void {
-    this._stop()
-
-    this.currentTime = time
-
-    withEffect && this.cursor?.seek(time)
-
-    this.emit('seeked', time)
-  }
-
   /**
    * 处理cursor拖拽时的滚动
    */
@@ -402,6 +393,16 @@ export class Timeline extends EventBus<TimlineEvents> {
     requestAnimationFrame(() => {
       this.cursor?.seek(this.currentTime + getMsByPx(scrollDirection, this.state.pxPerMs))
     })
+  }
+
+  seek(time: number, withEffect = true): void {
+    this._stop()
+
+    this.currentTime = time
+
+    withEffect && this.cursor?.seek(time)
+
+    this.emit('seeked', time)
   }
 
   addTrainByZIndex(train: Train, zIndex: number): void {
