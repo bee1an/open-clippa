@@ -148,7 +148,10 @@ export class Cursor extends EventBus<CursorEvents> {
     this._processWidth()
   }
 
-  seek(time: number): void {
+  /**
+   * 更新光标位置但不触发事件
+   */
+  updatePosition(time: number): void {
     // 边界判断
     if (time < 0) {
       time = 0
@@ -160,7 +163,10 @@ export class Cursor extends EventBus<CursorEvents> {
     this.currentTime = time
 
     this.container.x = ((this.currentTime / this.duration) * this.width)
+  }
 
+  seek(time: number): void {
+    this.updatePosition(time)
     this.emit('seek', this.currentTime)
   }
 }

@@ -273,7 +273,8 @@ export class Timeline extends EventBus<TimlineEvents> {
         this._start()
       }
 
-      this.cursor!.seek(this.currentTime)
+      // 使用updatePosition方法更新光标位置，避免触发seek事件
+      this.cursor!.updatePosition(this.currentTime)
 
       // 检查是否需要翻页
       this._checkPageTurn()
