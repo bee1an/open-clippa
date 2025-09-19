@@ -22,6 +22,8 @@ export class Cursor extends EventBus<CursorEvents> {
 
   state: State
 
+  isDragging: boolean = false
+
   get pxPerMs(): number {
     return this.state.pxPerMs
   }
@@ -103,11 +105,13 @@ export class Cursor extends EventBus<CursorEvents> {
     }
 
     const up = (): void => {
+      this.isDragging = false
       document.removeEventListener('pointermove', move)
       document.removeEventListener('pointerup', up)
     }
 
     this.container.on('pointerdown', (e) => {
+      this.isDragging = true
       x = e.x
       document.addEventListener('pointermove', move)
       document.addEventListener('pointerup', up)
@@ -145,8 +149,18 @@ export class Cursor extends EventBus<CursorEvents> {
   }
 
   seek(time: number): void {
+    // 边界判断
+    if (time < 0) {
+      time = 0
+    }
+    else if (time > this.duration) {
+      time = this.duration
+    }
+
     this.currentTime = time
 
-    this.container.x = ((this.currentTime / this.duration) * this.width) - 10
+    this.container.x = ((this.currentTime / this.duration) * this.width)
+
+    this.emit('seek', this.currentTime)
   }
 }

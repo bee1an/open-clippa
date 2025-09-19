@@ -1,6 +1,6 @@
 import type { Train } from './train'
 import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD } from '@clippa/constants'
-import { EventBus, getPxByMs } from '@clippa/utils'
+import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Rails } from './rails'
@@ -232,6 +232,8 @@ export class Timeline extends EventBus<TimlineEvents> {
     this.adjuster.addChild(this.cursor.container)
 
     this.cursor.on('seek', (seekTime: number) => {
+      this.cursor!.isDragging && this._moveCursorWithScroll()
+
       this.seek(seekTime, false)
     })
   }
@@ -306,11 +308,11 @@ export class Timeline extends EventBus<TimlineEvents> {
   }
 
   /**
-   * 检查是否需要翻页
+   * 当前播放时间是否接近右边界
    */
-  private _checkPageTurn(): void {
-    if (!this.rails || !this.app || !this.cursor)
-      return
+  private _currentTimeWhetherNearRightEdge(): boolean {
+    if (!this.rails || !this.app)
+      return false
 
     // 获取播放头在时间轴上的位置（像素）
     const cursorPosition = getPxByMs(this.currentTime, this.state.pxPerMs)
@@ -327,8 +329,37 @@ export class Timeline extends EventBus<TimlineEvents> {
 
     const isNearRightEdge = distanceToRight < threshold
 
-    if (isNearRightEdge) {
-      this.rails.scrollBox.turnToNextPage()
+    return isNearRightEdge
+  }
+
+  /**
+   * 当前播放时间是否接近左边界
+   */
+  private _currentTimeWhetherNearLeftEdge(): boolean {
+    if (!this.rails || !this.app)
+      return false
+
+    // 获取播放头在时间轴上的位置（像素）
+    const cursorPosition = getPxByMs(this.currentTime, this.state.pxPerMs)
+
+    // 计算播放头相对于当前视口的位置
+    const cursorRelativePosition = cursorPosition + this.rails.offsetX
+
+    // 检查播放头是否非常接近视口左边界
+    const threshold = this.app.screen.width * TIMELINE_AUTO_PAGE_TURN_THRESHOLD
+    const distanceToLeft = cursorRelativePosition
+
+    const isNearLeftEdge = distanceToLeft < threshold
+
+    return isNearLeftEdge
+  }
+
+  /**
+   * 检查是否需要翻页
+   */
+  private _checkPageTurn(): void {
+    if (this._currentTimeWhetherNearRightEdge()) {
+      this.rails!.scrollBox.turnToNextPage()
     }
   }
 
@@ -340,6 +371,36 @@ export class Timeline extends EventBus<TimlineEvents> {
     withEffect && this.cursor?.seek(time)
 
     this.emit('seeked', time)
+  }
+
+  /**
+   * 处理cursor拖拽时的滚动
+   */
+  private _moveCursorWithScroll(): void {
+    let scrollDirection = 0
+
+    const scrollMore = this.rails!.scrollBox.scrollMore?.x ?? 0
+    if (
+      -this.rails!.offsetX + this.rails!.scrollBox.viewportWidth
+      < (this.rails!.scrollBox.width + scrollMore)
+      && this._currentTimeWhetherNearRightEdge()
+    ) {
+      scrollDirection = 1
+    }
+    else if (
+      this.rails!.offsetX < 0
+      && this._currentTimeWhetherNearLeftEdge()
+    ) {
+      scrollDirection = -1
+    }
+    else {
+      return
+    }
+
+    this.rails?.scrollBox.scroll({ x: scrollDirection })
+    requestAnimationFrame(() => {
+      this.cursor?.seek(this.currentTime + getMsByPx(scrollDirection, this.state.pxPerMs))
+    })
   }
 
   addTrainByZIndex(train: Train, zIndex: number): void {

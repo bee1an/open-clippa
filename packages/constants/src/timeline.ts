@@ -66,3 +66,11 @@ export const TIMELINE_DOT_FILL = '#505067'
  * auto page turn threshold - percentage of viewport width from right edge
  */
 export const TIMELINE_AUTO_PAGE_TURN_THRESHOLD = 0.02
+/**
+ * cursor drag auto scroll threshold - percentage of viewport width from edge
+ */
+export const TIMELINE_CURSOR_DRAG_SCROLL_THRESHOLD = 0.1
+/**
+ * cursor drag auto scroll speed - pixels per frame
+ */
+export const TIMELINE_CURSOR_DRAG_SCROLL_SPEED = 5

@@ -436,7 +436,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     const wrapperDx = actualTriggerDx / stepRatio
 
     // 更新wrapper位置
-    this._wrapper.x = this._wrapper.x - wrapperDx
+    this._wrapper.x = -newTriggerX / stepRatio
 
     this.emit('scroll', { x: wrapperDx, y: 0 })
   }
@@ -528,7 +528,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     const wrapperDy = actualTriggerDy / stepRatio
 
     // 更新wrapper位置
-    this._wrapper.y = this._wrapper.y - wrapperDy
+    this._wrapper.y = -newTriggerY / stepRatio
 
     this.emit('scroll', { x: 0, y: wrapperDy })
   }
