@@ -1,35 +1,15 @@
+import {
+  TIMELINE_DOT_FILL,
+  TIMELINE_DOT_NUM,
+  TIMELINE_DOT_RADIUS,
+  TIMELINE_RULER_FILL,
+  TIMELINE_RULER_HEIGHT,
+  TIMELINE_TICK_COLOR,
+  TIMELINE_TICK_FONT_SIZE,
+} from '@clippa/constants/src/timeline'
 import { drag, EventBus, getMsByPx, getPxByMs, ms2TimeStr } from '@clippa/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
-
-/**
- * rail height
- */
-export const RULER_HEIGHT = 28
-/**
- * dot radius
- */
-export const DOT_RADIUS = 1.5
-/**
- * between ticks dot number
- */
-export const DOT_NUM = 3
-/**
- * tick font size
- */
-export const TICK_FONT_SIZE = 10
-/**
- * ruler background color
- */
-export const RULER_FILL = '#1e1e29'
-/**
- * time text color
- */
-export const TICK_COLOR = '#838398'
-/**
- * dot color
- */
-export const DOT_FILL = '#505067'
 
 export interface RulerOption {
   screenWidth: number
@@ -99,8 +79,8 @@ export class Ruler extends EventBus<RulerEvents> {
   private _bg?: Graphics
   private _drawBg(): void {
     const bg = new Graphics({ label: 'bg' })
-    bg.rect(0, 0, Math.max(this.width, this.screenWidth - this.offsetX), RULER_HEIGHT)
-    bg.fill(RULER_FILL)
+    bg.rect(0, 0, Math.max(this.width, this.screenWidth - this.offsetX), TIMELINE_RULER_HEIGHT)
+    bg.fill(TIMELINE_RULER_FILL)
 
     if (this._bg) {
       this.container.replaceChild(this._bg, bg)
@@ -121,8 +101,8 @@ export class Ruler extends EventBus<RulerEvents> {
    */
   private _drawBgByDuration(): void {
     const bg = new Graphics()
-    bg.roundRect(0, 0, this.width, RULER_HEIGHT, 8)
-    bg.fill(RULER_FILL)
+    bg.roundRect(0, 0, this.width, TIMELINE_RULER_HEIGHT, 8)
+    bg.fill(TIMELINE_RULER_FILL)
 
     if (this._bgByDuration) {
       this.container.replaceChild(this._bgByDuration, bg)
@@ -137,9 +117,9 @@ export class Ruler extends EventBus<RulerEvents> {
   private _drawDot(x: number): Graphics {
     const graphics = new Graphics()
 
-    graphics.circle(0, 0, DOT_RADIUS)
-    graphics.position.set(x, RULER_HEIGHT / 2)
-    graphics.fill(DOT_FILL)
+    graphics.circle(0, 0, TIMELINE_DOT_RADIUS)
+    graphics.position.set(x, TIMELINE_RULER_HEIGHT / 2)
+    graphics.fill(TIMELINE_DOT_FILL)
 
     return graphics
   }
@@ -147,11 +127,11 @@ export class Ruler extends EventBus<RulerEvents> {
   private _drawTextTime(x: number, content: string): Text {
     const text = new Text({
       style: {
-        fontSize: TICK_FONT_SIZE,
-        fill: TICK_COLOR,
+        fontSize: TIMELINE_TICK_FONT_SIZE,
+        fill: TIMELINE_TICK_COLOR,
       },
       x,
-      y: RULER_HEIGHT / 2,
+      y: TIMELINE_RULER_HEIGHT / 2,
       text: content,
     })
 
@@ -177,12 +157,12 @@ export class Ruler extends EventBus<RulerEvents> {
     const tick = this._tick
     const gap = getPxByMs(tick, this.state.pxPerMs)
 
-    const dotGap = gap / (DOT_NUM + 1)
+    const dotGap = gap / (TIMELINE_DOT_NUM + 1)
 
     const rightLimitX = Math.max(this.screenWidth - this.offsetX, this.width)
 
     const drawDotGroup = (): void => {
-      for (let index = 0; index < DOT_NUM; index++) {
+      for (let index = 0; index < TIMELINE_DOT_NUM; index++) {
         const dot = this._drawDot(x + dotGap * (index + 1))
 
         const dotRightX = dot.x + dot.width

@@ -1,10 +1,10 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
+import { TIMELINE_RULER_HEIGHT } from '@clippa/constants'
 import { EventBus, getPxByMs } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
 import { GAP, RailGap } from './railGap'
-import { RULER_HEIGHT } from './ruler'
 import { ScrollBox } from './scrollBox'
 import { State } from './state'
 
@@ -103,7 +103,7 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.scrollBox.on('scroll', event => this.emit('scroll', event))
 
-    this.container.y = RULER_HEIGHT
+    this.container.y = TIMELINE_RULER_HEIGHT
 
     // TODO: maybe bug add on this local
     // this.container.addChild(this.railsContainer)
@@ -127,7 +127,7 @@ export class Rails extends EventBus<RailsEvents> {
     }
     else {
       // move to center y
-      this.railsContainer.y = ((this.screenHeight - RULER_HEIGHT - (this.scrollBox.isXBarVisible ? this.scrollBox.barHeight : 0)) / 2) - this.railsContainer.height / 2
+      this.railsContainer.y = ((this.screenHeight - TIMELINE_RULER_HEIGHT - (this.scrollBox.isXBarVisible ? this.scrollBox.barHeight : 0)) / 2) - this.railsContainer.height / 2
     }
 
     this.scrollBox.update()
@@ -232,7 +232,7 @@ export class Rails extends EventBus<RailsEvents> {
     const w = Math.max(this.width, this.screenWidth - this.offsetX)
     const h = Math.max(
       this.railsContainer.height,
-      this.screenHeight - RULER_HEIGHT,
+      this.screenHeight - TIMELINE_RULER_HEIGHT,
     )
 
     if (this._foundation) {
@@ -478,7 +478,7 @@ export class Rails extends EventBus<RailsEvents> {
   updateScreenHeight(screenHeight: number): void {
     this.screenHeight = screenHeight
 
-    this.scrollBox.updateViewportSize(undefined, screenHeight - RULER_HEIGHT)
+    this.scrollBox.updateViewportSize(undefined, screenHeight - TIMELINE_RULER_HEIGHT)
 
     this.scrollBox.update()
 
@@ -494,7 +494,7 @@ export class Rails extends EventBus<RailsEvents> {
       this.screenHeight = screenHeight
     }
 
-    this.scrollBox.updateViewportSize(this.screenWidth, this.screenHeight - RULER_HEIGHT)
+    this.scrollBox.updateViewportSize(this.screenWidth, this.screenHeight - TIMELINE_RULER_HEIGHT)
 
     this.scrollBox.update()
 
