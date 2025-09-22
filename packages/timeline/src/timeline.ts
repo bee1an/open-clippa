@@ -1,4 +1,5 @@
 import type { Train } from './train'
+import { TIMELINE_LEFT_PADDING } from '@clippa/constants'
 import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
@@ -36,11 +37,11 @@ export class Timeline extends EventBus<TimlineEvents> {
   /**
    * outmost container
    */
-  container = new Container()
+  container = new Container({ x: TIMELINE_LEFT_PADDING })
   /**
    * ruler and cursor container
    */
-  adjuster = new Container()
+  adjuster = new Container({ label: 'adjuster' })
   currentTime: number = 0
   /**
    * timeline global state
@@ -167,7 +168,7 @@ export class Timeline extends EventBus<TimlineEvents> {
     if (!this.app)
       return
 
-    const screenWidth = this.app.screen.width
+    const screenWidth = this.app.screen.width - TIMELINE_LEFT_PADDING
     const screenHeight = this.app.screen.height
 
     this.ruler?.updateScreenWidth(screenWidth)
@@ -190,7 +191,7 @@ export class Timeline extends EventBus<TimlineEvents> {
    */
   private _createRuler(): void {
     this.ruler = new Ruler({
-      screenWidth: this.app!.screen.width,
+      screenWidth: this.app!.screen.width - TIMELINE_LEFT_PADDING,
       duration: this.duration,
     })
     this.adjuster.addChild(this.ruler.container)
@@ -207,7 +208,7 @@ export class Timeline extends EventBus<TimlineEvents> {
    */
   private _createRails(): void {
     this.rails = new Rails({
-      screenWidth: this.app!.screen.width,
+      screenWidth: this.app!.screen.width - TIMELINE_LEFT_PADDING,
       screenHeight: this.app!.screen.height,
       duration: this.duration,
     })
@@ -230,7 +231,7 @@ export class Timeline extends EventBus<TimlineEvents> {
    */
   private _createCursor(): void {
     this.cursor = new Cursor({
-      screenWidth: this.app!.screen.width,
+      screenWidth: this.app!.screen.width - TIMELINE_LEFT_PADDING,
       height: this.app!.screen.height,
       duration: this.duration,
     })

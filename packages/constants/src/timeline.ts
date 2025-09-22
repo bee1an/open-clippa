@@ -82,3 +82,7 @@ export const TIMELINE_TRAIN_DRAG_SCROLL_THRESHOLD = 0.15
  * train drag auto scroll speed - pixels per frame
  */
 export const TIMELINE_TRAIN_DRAG_SCROLL_SPEED = 8
+/**
+ * left padding for timeline to prevent cursor from going off screen
+ */
+export const TIMELINE_LEFT_PADDING = 10

@@ -176,6 +176,13 @@ export class Ruler extends EventBus<RulerEvents> {
       }
     }
 
+    // 绘制0刻度
+    const zeroText = this._drawTextTime(0, '0')
+    const zeroTextRightX = zeroText.x + zeroText.width
+    if (zeroTextRightX < rightLimitX) {
+      ticksWrapper.addChild(zeroText)
+    }
+
     // 如果width < screenWidth, 会补足screenWidth, 防止出现空隙
     for (let i = 0; i < rightLimitX / gap - 1; i++) {
       drawDotGroup()
