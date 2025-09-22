@@ -54,7 +54,7 @@ onMounted(async () => {
 
   video1 = new Video({
     src: '/bunny.mp4',
-    start: 0,
+    start: 100000,
     duration: video1Duration,
     width: 995,
     height: 560,

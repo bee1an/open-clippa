@@ -1,6 +1,6 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
-import { TIMELINE_RULER_HEIGHT } from '@clippa/constants'
+import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD, TIMELINE_RULER_HEIGHT } from '@clippa/constants'
 import { EventBus, getPxByMs } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
@@ -61,7 +61,6 @@ export class Rails extends EventBus<RailsEvents> {
   duration: number
 
   maxZIndex: number = -1
-
   get offsetX(): number {
     return this.scrollBox.offsetX
   }
@@ -254,6 +253,53 @@ export class Rails extends EventBus<RailsEvents> {
     this.rails.splice(this.maxZIndex - zIndex, 0, rail)
   }
 
+  private _tryAutoScrollWhenTrainDragging(): void {
+    // 如果已经在滚动或没有train在拖拽，直接返回
+    if (!this.state.trainDragging)
+      return
+
+    const scrollStep = (): void => {
+      if (!this.state.trainDragging)
+        return
+      // 执行滚动并检查是否需要继续
+      const shouldContinue = this._checkAndPerformScroll()
+
+      if (shouldContinue) {
+        // 继续滚动
+        requestAnimationFrame(scrollStep)
+      }
+    }
+
+    scrollStep()
+  }
+
+  /**
+   * 当前的鼠标的x位置
+   */
+  private _currentX = 0
+
+  /**
+   * 执行滚动并检查是否需要继续
+   */
+  private _checkAndPerformScroll(): boolean {
+    // 计算当前鼠标在视口中的位置
+    const offsetX = -this.offsetX + this._currentX
+
+    // 检查边界并执行滚动
+    if (this.isWhetherNearLeftEdge(offsetX)) {
+      this.scrollBox.scroll({ x: -0.2 })
+      this.state.atDragTrain?.updatePos(this.state.atDragTrain.x - 0.2, undefined)
+      return true // 继续滚动
+    }
+    else if (this.isWhetherNearRightEdge(offsetX)) {
+      this.scrollBox.scroll({ x: 0.2 })
+      this.state.atDragTrain?.updatePos(this.state.atDragTrain.x + 0.2, undefined)
+      return true // 继续滚动
+    }
+
+    return false // 停止滚动
+  }
+
   private _bindEvents(): void {
     this.container.eventMode = 'static'
     let timeId: number
@@ -287,8 +333,8 @@ export class Rails extends EventBus<RailsEvents> {
         this._stayWhenDragging(e)
       }, 500)
 
+      // 拖拽到rail上
       const { x, y } = e.getLocalPosition(this.railsContainer)
-
       const rail = this.rails.find((rail) => {
         const bounds = rail.container.getLocalBounds()
         bounds.y = rail.y
@@ -306,6 +352,9 @@ export class Rails extends EventBus<RailsEvents> {
 
         this.railGaps.forEach(gap => gap.setActive(false))
       }
+
+      this._currentX = e.getLocalPosition(this.container).x
+      this._tryAutoScrollWhenTrainDragging()
     })
 
     this.container.on('pointerup', () => {
@@ -345,8 +394,6 @@ export class Rails extends EventBus<RailsEvents> {
 
   /**
    * 创建rail和railGap
-   *
-   *
    */
   private _createRailByZIndexRaw(zIndex: number): Rail {
     /* update other zIndex */
@@ -377,6 +424,37 @@ export class Rails extends EventBus<RailsEvents> {
 
     this._drawFoundation()
     return rail
+  }
+
+  /**
+   * 判断一个值是否接近右边界
+   */
+  isWhetherNearRightEdge(x: number): boolean {
+    // 获取视口宽度
+    const viewportWidth = this.screenWidth
+
+    const cursorRelativePosition = x + this.offsetX
+
+    const threshold = viewportWidth * TIMELINE_AUTO_PAGE_TURN_THRESHOLD
+    const distanceToRight = viewportWidth - cursorRelativePosition
+
+    const isNearRightEdge = distanceToRight < threshold
+
+    return isNearRightEdge
+  }
+
+  /**
+   * 判断一个值是否接近左边界
+   */
+  isWhetherNearLeftEdge(x: number): boolean {
+    const cursorRelativePosition = x + this.offsetX
+
+    const threshold = this.screenWidth * TIMELINE_AUTO_PAGE_TURN_THRESHOLD
+    const distanceToLeft = cursorRelativePosition
+
+    const isNearLeftEdge = distanceToLeft < threshold
+
+    return isNearLeftEdge
   }
 
   /**

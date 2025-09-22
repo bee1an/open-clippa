@@ -22,7 +22,7 @@ Clippa timeline component
 
 - [x] auto scroll when playing
 
-- [ ] auto scroll when drag
+- [x] auto scroll when drag
 
 - [ ] drag emit `updateCurrentTime` event, not emit `seek` event
 

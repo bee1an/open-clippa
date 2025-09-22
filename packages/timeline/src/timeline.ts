@@ -1,5 +1,4 @@
 import type { Train } from './train'
-import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD } from '@clippa/constants'
 import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
@@ -65,6 +64,12 @@ export class Timeline extends EventBus<TimlineEvents> {
 
   ready: Promise<void>
   private _readyResolve
+  /**
+   * 播放时间对应的像素
+   */
+  get currentPx(): number {
+    return getPxByMs(this.currentTime, this.state.pxPerMs)
+  }
 
   constructor() {
     super()
@@ -310,57 +315,10 @@ export class Timeline extends EventBus<TimlineEvents> {
   }
 
   /**
-   * 当前播放时间是否接近右边界
-   */
-  private _currentTimeWhetherNearRightEdge(): boolean {
-    if (!this.rails || !this.app)
-      return false
-
-    // 获取播放头在时间轴上的位置（像素）
-    const cursorPosition = getPxByMs(this.currentTime, this.state.pxPerMs)
-
-    // 获取视口宽度
-    const viewportWidth = this.app.screen.width
-
-    // 计算播放头相对于当前视口的位置
-    const cursorRelativePosition = cursorPosition + this.rails.offsetX
-
-    // 检查播放头是否非常接近视口右边界
-    const threshold = viewportWidth * TIMELINE_AUTO_PAGE_TURN_THRESHOLD
-    const distanceToRight = viewportWidth - cursorRelativePosition
-
-    const isNearRightEdge = distanceToRight < threshold
-
-    return isNearRightEdge
-  }
-
-  /**
-   * 当前播放时间是否接近左边界
-   */
-  private _currentTimeWhetherNearLeftEdge(): boolean {
-    if (!this.rails || !this.app)
-      return false
-
-    // 获取播放头在时间轴上的位置（像素）
-    const cursorPosition = getPxByMs(this.currentTime, this.state.pxPerMs)
-
-    // 计算播放头相对于当前视口的位置
-    const cursorRelativePosition = cursorPosition + this.rails.offsetX
-
-    // 检查播放头是否非常接近视口左边界
-    const threshold = this.app.screen.width * TIMELINE_AUTO_PAGE_TURN_THRESHOLD
-    const distanceToLeft = cursorRelativePosition
-
-    const isNearLeftEdge = distanceToLeft < threshold
-
-    return isNearLeftEdge
-  }
-
-  /**
    * 检查是否需要翻页
    */
   private _checkPageTurn(): void {
-    if (this._currentTimeWhetherNearRightEdge()) {
+    if (this.rails?.isWhetherNearRightEdge(this.currentPx)) {
       this.rails!.scrollBox.turnToNextPage()
     }
   }
@@ -375,13 +333,13 @@ export class Timeline extends EventBus<TimlineEvents> {
     if (
       -this.rails!.offsetX + this.rails!.scrollBox.viewportWidth
       < (this.rails!.scrollBox.width + scrollMore)
-      && this._currentTimeWhetherNearRightEdge()
+      && this.rails?.isWhetherNearRightEdge(this.currentPx)
     ) {
       scrollDirection = 1
     }
     else if (
       this.rails!.offsetX < 0
-      && this._currentTimeWhetherNearLeftEdge()
+      && this.rails?.isWhetherNearLeftEdge(this.currentPx)
     ) {
       scrollDirection = -1
     }
