@@ -55,10 +55,11 @@ export class Cursor extends EventBus<CursorEvents> {
 
   private _draw(): void {
     const graphics = new Graphics()
-    graphics.roundRect(0, 0, 20, 20, 6)
+    // 将图形向左移动10px，使中心对齐
+    graphics.roundRect(-10, 0, 20, 20, 6)
     graphics.fill('#fff')
 
-    graphics.poly([0, 17, 20, 17, 10, 26])
+    graphics.poly([-10, 17, 10, 17, 0, 26])
     graphics.fill('#fff')
 
     this.container.addChild(graphics)
@@ -74,7 +75,8 @@ export class Cursor extends EventBus<CursorEvents> {
     }
 
     this._body = new Graphics()
-    this._body.roundRect(8, 0, 4, height, 2)
+    // 将竖条向左移动10px，使中心对齐
+    this._body.roundRect(-2, 0, 4, height, 2)
     this._body.fill('#fff')
 
     this.container.addChild(this._body)
@@ -92,12 +94,15 @@ export class Cursor extends EventBus<CursorEvents> {
 
       this.container.x += dx
 
-      // 左边界判断
+      // 左边界判断 (考虑光标宽度的一半)
       if (this.container.x < 0) {
         this.container.x = 0
       }
 
-      // TODO: 右边界判断
+      // 右边界判断 (考虑光标宽度的一半)
+      if (this.container.x > this.width) {
+        this.container.x = this.width
+      }
 
       this.currentTime = getMsByPx(this.container.x, this.pxPerMs)
 
@@ -162,6 +167,7 @@ export class Cursor extends EventBus<CursorEvents> {
 
     this.currentTime = time
 
+    // 计算光标中心位置
     this.container.x = ((this.currentTime / this.duration) * this.width)
   }
 
