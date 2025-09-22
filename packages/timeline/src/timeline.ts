@@ -330,20 +330,27 @@ export class Timeline extends EventBus<TimlineEvents> {
     let scrollDirection = 0
 
     const scrollMore = this.rails!.scrollBox.scrollMore?.x ?? 0
-    if (
-      -this.rails!.offsetX + this.rails!.scrollBox.viewportWidth
-      < (this.rails!.scrollBox.width + scrollMore)
-      && this.rails?.isWhetherNearRightEdge(this.currentPx)
-    ) {
-      scrollDirection = 1
+    const tolerance = 0.1 // 容差值，避免浮点数精度问题
+
+    // 检查是否可以向右滚动（未到达最右边）
+    if (this.rails?.isWhetherNearRightEdge(this.currentPx)) {
+      // 确保还没有滚动到最右边，使用容差值避免精度问题
+      const rightBoundary = -this.rails!.offsetX + this.rails!.scrollBox.viewportWidth
+      const contentWidth = this.rails!.scrollBox.width + scrollMore
+      if (rightBoundary + tolerance < contentWidth) {
+        scrollDirection = 1
+      }
     }
-    else if (
-      this.rails!.offsetX < 0
-      && this.rails?.isWhetherNearLeftEdge(this.currentPx)
-    ) {
-      scrollDirection = -1
+    // 检查是否可以向左滚动（未到达最左边）
+    else if (this.rails?.isWhetherNearLeftEdge(this.currentPx)) {
+      // 确保还没有滚动到最左边，使用容差值避免精度问题
+      if (this.rails!.offsetX < -tolerance) {
+        scrollDirection = -1
+      }
     }
-    else {
+
+    // 如果不需要滚动则返回
+    if (scrollDirection === 0) {
       return
     }
 
