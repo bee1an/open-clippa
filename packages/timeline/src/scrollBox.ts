@@ -9,6 +9,30 @@ export const TRIGGER_COLOR = '#78787f'
 
 export type Anyfn = (...args: any[]) => any // TODO
 
+export interface ScrollBarConfig {
+  /**
+   * 滚动条轨道颜色
+   */
+  railColor?: string
+  /**
+   * 滚动条触发器颜色
+   */
+  triggerColor?: string
+  /**
+   * 滚动条高度
+   */
+  barHeight?: number
+  /**
+   * 滚动条宽度
+   */
+  barWidth?: number
+  /**
+   * 滚动条显示/隐藏的滞回像素阈值
+   * 用于避免在阈值附近频繁切换造成抖动
+   */
+  hysteresisPx?: number
+}
+
 export interface ScrollBoxOption {
   /**
    * 可视区域宽度
@@ -29,10 +53,10 @@ export interface ScrollBoxOption {
 
   scrollMore?: { x?: number, y?: number }
 
-  railColor?: string
-  triggerColor?: string
-  barHeight?: number
-  barWidth?: number
+  /**
+   * 滚动条配置
+   */
+  scrollbar?: ScrollBarConfig
 }
 
 interface DrawScrollBarHelperOption {
@@ -125,10 +149,45 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
   scrollMore?: { x?: number, y?: number }
 
-  railColor: string
-  triggerColor: string
-  barHeight: number
-  barWidth: number
+  /**
+   * 滚动条配置
+   */
+  scrollbarConfig: ScrollBarConfig
+
+  /**
+   * 获取滚动条轨道颜色
+   */
+  get railColor(): string {
+    return this.scrollbarConfig.railColor ?? RAIL_COLOR
+  }
+
+  /**
+   * 获取滚动条触发器颜色
+   */
+  get triggerColor(): string {
+    return this.scrollbarConfig.triggerColor ?? TRIGGER_COLOR
+  }
+
+  /**
+   * 获取滚动条高度
+   */
+  get barHeight(): number {
+    return this.scrollbarConfig.barHeight ?? SCROLLBAR_HEIGHT
+  }
+
+  /**
+   * 获取滚动条宽度
+   */
+  get barWidth(): number {
+    return this.scrollbarConfig.barWidth ?? SCROLLBAR_WIDTH
+  }
+
+  /**
+   * 获取滞回像素阈值
+   */
+  get hysteresisPx(): number {
+    return this.scrollbarConfig.hysteresisPx ?? 12
+  }
 
   constructor(option?: ScrollBoxOption) {
     option ??= {}
@@ -145,10 +204,14 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this.hideYBar = option.hideYBar ?? false
     this.scrollMore = option.scrollMore
 
-    this.railColor = option.railColor ?? RAIL_COLOR
-    this.triggerColor = option.triggerColor ?? TRIGGER_COLOR
-    this.barHeight = option.barHeight ?? SCROLLBAR_HEIGHT
-    this.barWidth = option.barWidth ?? SCROLLBAR_WIDTH
+    // 初始化滚动条配置
+    this.scrollbarConfig = {
+      railColor: option.scrollbar?.railColor ?? RAIL_COLOR,
+      triggerColor: option.scrollbar?.triggerColor ?? TRIGGER_COLOR,
+      barHeight: option.scrollbar?.barHeight ?? SCROLLBAR_HEIGHT,
+      barWidth: option.scrollbar?.barWidth ?? SCROLLBAR_WIDTH,
+      hysteresisPx: option.scrollbar?.hysteresisPx ?? 12,
+    }
 
     this.container.rawAddChild(this._wrapper)
 
@@ -241,14 +304,19 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.container.rawRemoveChild(this._scrollbarXBar)
     }
 
-    const isXBarVisible = this.isXBarVisible
-    this.isXBarVisible = !this.hideXBar && this.width > this.viewportWidth
+    const prevVisible = this.isXBarVisible
+    const nextVisible = !this.hideXBar && (
+      prevVisible
+        ? this.width > this.viewportWidth - this.hysteresisPx
+        : this.width > this.viewportWidth + this.hysteresisPx
+    )
+    this.isXBarVisible = nextVisible
 
-    if (isXBarVisible !== this.isXBarVisible) {
-      this.emit('toggleXBarVisible', this.isXBarVisible)
+    if (prevVisible !== nextVisible) {
+      this.emit('toggleXBarVisible', nextVisible)
     }
 
-    if (this.width <= this.viewportWidth) {
+    if (!this.isXBarVisible) {
       return
     }
 
@@ -306,20 +374,31 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.container.rawRemoveChild(this._scrollbarYBar)
     }
 
-    const isYBarVisible = this.isYBarVisible
-    this.isYBarVisible = !this.hideYBar && this.height > this.viewportHeight
+    const prevVisible = this.isYBarVisible
+    // 计算实际可用的视口高度，考虑X轴滚动条占用的空间
+    const availableViewportHeight = this.viewportHeight - (this.isXBarVisible ? this.barHeight : 0)
 
-    if (isYBarVisible !== this.isYBarVisible) {
-      this.emit('toggleYBarVisible', this.isYBarVisible)
+    // 使用内容高度进行滚动条判断
+    const nextVisible = !this.hideYBar && (
+      prevVisible
+        ? this.height > availableViewportHeight - this.hysteresisPx
+        : this.height > availableViewportHeight + this.hysteresisPx
+    )
+    this.isYBarVisible = nextVisible
+
+    if (prevVisible !== nextVisible) {
+      this.emit('toggleYBarVisible', nextVisible)
     }
 
-    if (this.height <= this.viewportHeight) {
+    if (!this.isYBarVisible) {
       return
     }
 
     const scrollMore = this.scrollMore?.y ?? 0
 
-    const stepRatio = this.viewportHeight / (this.height + scrollMore)
+    // 使用相同的可用视口高度计算
+    const availableViewportHeightForRatio = this.viewportHeight - (this.isXBarVisible ? this.barHeight : 0)
+    const stepRatio = availableViewportHeightForRatio / (this.height + scrollMore)
 
     let y: number
     const move = (e: { y: number }): void => {
@@ -392,11 +471,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
   }
 
   scroll({ x, y }: { x?: number, y?: number }): void {
-    if (x) {
+    if (typeof x === 'number') {
       this._scrollXByDistance(x)
     }
 
-    if (y) {
+    if (typeof y === 'number') {
       this._scrollYByDistance(y)
     }
   }
@@ -573,6 +652,14 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this._queueRenderId && cancelAnimationFrame(this._queueRenderId)
 
     this._queueRenderId = requestAnimationFrame(() => this.render())
+  }
+
+  /**
+   * 同步渲染方法，在需要确保渲染立即完成时使用
+   */
+  renderSync(): void {
+    this._queueRenderId && cancelAnimationFrame(this._queueRenderId)
+    this.render()
   }
 
   /**

@@ -143,5 +143,5 @@ vite.config.ts.timestamp-*
 
 # custom
 QWEN.md
-CLAUDE.md
 GEMINI.md
+WARP.md

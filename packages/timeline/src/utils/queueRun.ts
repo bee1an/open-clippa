@@ -1,5 +1,5 @@
 export class QueueRun {
-  constructor(public _callback: () => void) {}
+  constructor(public _callback: () => void | Promise<void>) {}
 
   private _requestAnimationFrameId?: number
   queueRun(): void {
@@ -11,7 +11,7 @@ export class QueueRun {
     })
   }
 
-  run(): void {
-    this._callback()
+  async run(): Promise<void> {
+    await this._callback()
   }
 }

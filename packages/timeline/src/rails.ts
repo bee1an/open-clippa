@@ -2,7 +2,7 @@ import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD, TIMELINE_RULER_HEIGHT } from '@clippa/constants'
 import { EventBus, getPxByMs } from '@clippa/utils'
-import { Container, Graphics } from 'pixi.js'
+import { Container } from 'pixi.js'
 import { Rail, RAIL_HEIGHT } from './rail'
 import { GAP, RailGap } from './railGap'
 import { ScrollBox } from './scrollBox'
@@ -32,6 +32,9 @@ export class Rails extends EventBus<RailsEvents> {
   get container(): Container {
     return this.scrollBox.container
   }
+
+  // 背景容器已移除，rails组件不应该负责背景渲染
+  // private _backgroundContainer: Container = new Container({ label: 'background' })
 
   /**
    * sort by zIndex
@@ -80,38 +83,61 @@ export class Rails extends EventBus<RailsEvents> {
     })
 
     this.duration = option.duration
+    this.maxZIndex = option.maxZIndex ?? 2 // 默认值为2，确保有轨道显示
     this._processWidth()
     this.screenWidth = option.screenWidth
     this.screenHeight = option.screenHeight
 
-    this.scrollBox = new ScrollBox()
+    this.scrollBox = new ScrollBox({
+      scrollbar: {
+        hysteresisPx: 8, // 可配置更小的滞回阈值，响应更灵敏
+      },
+    })
 
     this.scrollBox.on('toggleXBarVisible', (visible) => {
+      // 更新 scrollMore 但不触发重新渲染，避免循环
+      this.scrollBox.scrollMore ??= {}
+      this.scrollBox.scrollMore.y = visible ? this.scrollBox.barHeight : 0
+      // 背景绘制已移除，只更新rails容器位置
       this._updateRailContainerY()
-
-      this.scrollBox.updateScrollMore({ y: visible ? this.scrollBox.barHeight : 0 })
     })
 
     this.scrollBox.on('toggleYBarVisible', (visible) => {
-      this._updateRailContainerY()
+      // 更新 scrollMore 但不触发重新渲染，避免循环
+      this.scrollBox.scrollMore ??= {}
+      this.scrollBox.scrollMore.x = visible ? this.scrollBox.barWidth : 0
 
-      this.scrollBox.updateScrollMore({ x: visible ? this.scrollBox.barWidth : 0 })
+      // 当 Y 滚动条消失时，重置 Y 方向的滚动偏移，确保内容能正确居中
+      if (!visible && this.scrollBox.offsetY !== 0) {
+        // 重置 wrapper 的 Y 位置
+        // (this.scrollBox as any)._wrapper.y = 0
+        // // 重置 Y 滚动条的位置（如果存在）
+        // if ((this.scrollBox as any)._scrollbarYTrigger) {
+        //   (this.scrollBox as any)._scrollbarYTrigger.y = 0
+        // }
+        this.scrollBox.scroll({ y: 0 })
+      }
+
+      // 背景绘制已移除，只更新rails容器位置
+      this._updateRailContainerY()
     })
 
     this.railsContainer.eventMode = 'static'
 
-    this.scrollBox.on('scroll', event => this.emit('scroll', event))
+    this.scrollBox.on('scroll', (event) => {
+      // 背景现在不参与滚动，保持固定位置
+      this.emit('scroll', event)
+    })
 
     this.container.y = TIMELINE_RULER_HEIGHT
 
-    // TODO: maybe bug add on this local
-    // this.container.addChild(this.railsContainer)
+    // 简化方案：将rails容器直接添加到container中
+    // 背景应该由更上层的组件负责，rails组件专注于rails逻辑
+    this.container.addChild(this.railsContainer)
 
     this._drawBody()
 
-    this._drawFoundation()
-
-    this.container.addChild(this.railsContainer)
+    // 移除背景绘制，rails组件不应该负责背景
 
     this._bindEvents()
   }
@@ -125,11 +151,12 @@ export class Rails extends EventBus<RailsEvents> {
       this.railsContainer.y = 0
     }
     else {
-      // move to center y
-      this.railsContainer.y = ((this.screenHeight - TIMELINE_RULER_HEIGHT - (this.scrollBox.isXBarVisible ? this.scrollBox.barHeight : 0)) / 2) - this.railsContainer.height / 2
+      // 无 Y 滚动条时纵向居中（考虑 X 滚动条高度占位）
+      const effectiveViewportHeight = this.screenHeight - TIMELINE_RULER_HEIGHT - (this.scrollBox.isXBarVisible ? this.scrollBox.barHeight : 0)
+      const contentHeight = this.railsContainer.height
+      const centeredY = Math.max(0, (effectiveViewportHeight - contentHeight) / 2)
+      this.railsContainer.y = centeredY
     }
-
-    this.scrollBox.update()
   }
 
   private _createRail(zIndex: number, trainsOptions: TrainOption[] = []): Rail {
@@ -222,28 +249,26 @@ export class Rails extends EventBus<RailsEvents> {
 
       this._createRailGap(zIndex)
     }
+
+    // 设置railsContainer的高度为rails总高度，确保ScrollBox能正确计算内容高度
+    const railsTotalHeight = this.getRailsTotalHeight()
+    this.railsContainer.height = railsTotalHeight
   }
 
-  private _foundation?: Graphics
-  private _drawFoundation(): void {
-    const bgColor = 'transparent'
+  // 背景绘制已移除 - rails组件不应该负责背景渲染
+  // 背景应该由更上层的timeline组件负责
+  // private _foundation?: Graphics
+  // private _drawFoundation(): void {
+  //   // 注释掉的背景绘制代码
+  // }
 
-    const w = Math.max(this.width, this.screenWidth - this.offsetX)
-    const h = Math.max(
-      this.railsContainer.height,
-      this.screenHeight - TIMELINE_RULER_HEIGHT,
-    )
-
-    if (this._foundation) {
-      this._foundation.clear().rect(0, 0, w, h).fill(bgColor)
-      return
-    }
-
-    this._foundation = new Graphics({ label: 'foundation', eventMode: 'static' })
-
-    this._foundation.rect(0, 0, w, h).fill(bgColor)
-    this.container.addChild(this._foundation)
-  }
+  // 背景同步滚动条状态已移除，因为不再有背景绘制
+  // private _syncScrollbarState(): void {
+  //   // 使用 requestAnimationFrame 确保在下一帧渲染时评估滚动条状态
+  //   requestAnimationFrame(() => {
+  //     this.scrollBox.renderSync()
+  //   })
+  // }
 
   private _insertGapByZIndex(gap: RailGap, zIndex: number): void {
     this.railGaps.splice((this.maxZIndex - zIndex) + 1, 0, gap)
@@ -422,7 +447,7 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.scrollBox.update()
 
-    this._drawFoundation()
+    // 背景绘制已移除，rails组件不负责背景
     return rail
   }
 
@@ -473,6 +498,10 @@ export class Rails extends EventBus<RailsEvents> {
 
     const rail = this._createRailByZIndexRaw(zIndex)
 
+    // 更新railsContainer高度
+    const railsTotalHeight = this.getRailsTotalHeight()
+    this.railsContainer.height = railsTotalHeight
+
     this._updateRailContainerY()
 
     return rail
@@ -520,7 +549,11 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.scrollBox.update()
 
-    this._drawFoundation()
+    // 更新railsContainer高度
+    const railsTotalHeight = this.getRailsTotalHeight()
+    this.railsContainer.height = railsTotalHeight
+
+    // 背景绘制已移除，rails组件不负责背景
   }
 
   getRailByZIndex(zIndex: number): Rail | undefined {
@@ -541,6 +574,13 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   /**
+   * 获取rails的总高度（用于滚动条判断）
+   */
+  getRailsTotalHeight(): number {
+    return (this.maxZIndex + 1) * (RAIL_HEIGHT + GAP) + GAP
+  }
+
+  /**
    * 更新屏幕宽度
    */
   updateScreenWidth(screenWidth: number): void {
@@ -548,7 +588,8 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.scrollBox.updateViewportSize(screenWidth)
 
-    this.scrollBox.update()
+    // 在resize场景中使用同步渲染避免竞态条件
+    this.scrollBox.renderSync()
 
     this.update()
   }
@@ -556,11 +597,18 @@ export class Rails extends EventBus<RailsEvents> {
   updateScreenHeight(screenHeight: number): void {
     this.screenHeight = screenHeight
 
-    this.scrollBox.updateViewportSize(undefined, screenHeight - TIMELINE_RULER_HEIGHT)
+    // 计算实际可用的视口高度（减去标尺高度）
+    const availableHeight = screenHeight - TIMELINE_RULER_HEIGHT
+    // 设置视口高度为实际可用高度，让ScrollBox根据内容高度决定是否显示滚动条
+    this.scrollBox.updateViewportSize(undefined, availableHeight)
 
-    this.scrollBox.update()
+    // 在resize场景中使用同步渲染避免竞态条件
+    this.scrollBox.renderSync()
 
     this.update()
+
+    // 视口高度变化时重新计算垂直居中位置
+    this._updateRailContainerY()
   }
 
   updateScreenSize(screenWidth?: number, screenHeight?: number): void {
@@ -572,11 +620,19 @@ export class Rails extends EventBus<RailsEvents> {
       this.screenHeight = screenHeight
     }
 
-    this.scrollBox.updateViewportSize(this.screenWidth, this.screenHeight - TIMELINE_RULER_HEIGHT)
+    const availableHeight = this.screenHeight - TIMELINE_RULER_HEIGHT
 
-    this.scrollBox.update()
+    this.scrollBox.updateViewportSize(this.screenWidth, availableHeight)
+
+    // 在resize场景中使用同步渲染避免竞态条件
+    this.scrollBox.renderSync()
 
     this.update()
+
+    // 视口尺寸变化时重新计算垂直居中位置
+    if (screenHeight) {
+      this._updateRailContainerY()
+    }
   }
 
   /**
@@ -590,7 +646,7 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   update(): void {
-    this._drawFoundation()
+    // 背景绘制已移除，rails组件不负责背景
 
     const helper = (instance: Rail | RailGap): void => {
       instance.updateWidth(Math.max(this.width, this.screenWidth - this.offsetX))

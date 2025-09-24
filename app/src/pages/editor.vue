@@ -22,6 +22,7 @@ function handleExport() {
         w300px
         content-class="h-[calc(100vh-50px)] p-y-2"
         collapsed-width="65"
+        collapsed
       >
         <Sider />
       </yy-layout-sider>
