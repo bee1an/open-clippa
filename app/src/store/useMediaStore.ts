@@ -53,7 +53,8 @@ export function validateThumbnailSet(thumbnails: Partial<ThumbnailSet>): Thumbna
 
 // Helper function to calculate aspect ratio
 function calculateAspectRatio(width: number, height: number): string {
-  if (width === 0 || height === 0) return '16:9'
+  if (width === 0 || height === 0)
+    return '16:9'
 
   const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b)
   const divisor = gcd(width, height)
@@ -61,10 +62,14 @@ function calculateAspectRatio(width: number, height: number): string {
   const aspectHeight = height / divisor
 
   // Common aspect ratios
-  if (aspectWidth === 16 && aspectHeight === 9) return '16:9'
-  if (aspectWidth === 4 && aspectHeight === 3) return '4:3'
-  if (aspectWidth === 21 && aspectHeight === 9) return '21:9'
-  if (aspectWidth === 1 && aspectHeight === 1) return '1:1'
+  if (aspectWidth === 16 && aspectHeight === 9)
+    return '16:9'
+  if (aspectWidth === 4 && aspectHeight === 3)
+    return '4:3'
+  if (aspectWidth === 21 && aspectHeight === 9)
+    return '21:9'
+  if (aspectWidth === 1 && aspectHeight === 1)
+    return '1:1'
 
   return `${aspectWidth}:${aspectHeight}`
 }
@@ -80,7 +85,7 @@ export interface AudioTrackInfo {
 
 // Video metadata interface
 export interface VideoMetadata {
-  resolution: { width: number; height: number }
+  resolution: { width: number, height: number }
   frameRate: number
   codec: string
   bitrate: number
@@ -167,7 +172,7 @@ export const useMediaStore = defineStore('media', () => {
       if (videoFile.thumbnails.primary) {
         URL.revokeObjectURL(videoFile.thumbnails.primary)
       }
-      videoFile.thumbnails.frames.forEach(frame => {
+      videoFile.thumbnails.frames.forEach((frame) => {
         URL.revokeObjectURL(frame.url)
       })
       videoFiles.value.splice(index, 1)
@@ -185,7 +190,7 @@ export const useMediaStore = defineStore('media', () => {
       if (videoFile.thumbnails.primary) {
         URL.revokeObjectURL(videoFile.thumbnails.primary)
       }
-      videoFile.thumbnails.frames.forEach(frame => {
+      videoFile.thumbnails.frames.forEach((frame) => {
         URL.revokeObjectURL(frame.url)
       })
     })
@@ -226,7 +231,7 @@ export const useMediaStore = defineStore('media', () => {
             videoFile.metadata = {
               resolution: {
                 width: video.videoWidth,
-                height: video.videoHeight
+                height: video.videoHeight,
               },
               frameRate: 30, // Default, will be enhanced later
               codec: 'unknown', // Will be enhanced with MediaInfo API later

@@ -1,4 +1,5 @@
-import { Log, MP4Clip } from '@webav/av-cliper'
+import type { ICombinatorOpts } from '@webav/av-cliper'
+import { Combinator, Log, MP4Clip, OffscreenSprite } from '@webav/av-cliper'
 
 Log.setLogLevel(Log.warn)
 
@@ -6,6 +7,15 @@ export interface Tick {
   video?: VideoFrame
   audio: Float32Array[]
   state: 'success' | 'done'
+}
+
+export interface VideoMetadata {
+  width: number
+  height: number
+  duration: number
+  audioSampleRate: number
+  audioChanCount: number
+  hasAudio: boolean
 }
 
 export class FrameExtractor {
@@ -40,5 +50,137 @@ export class FrameExtractor {
     }
 
     return this._frameCache[time]
+  }
+
+  /**
+   * 获取视频元数据信息
+   */
+  getVideoMetadata(): VideoMetadata {
+    if (!this.clip) {
+      throw new Error('视频未加载，请先调用 load()')
+    }
+
+    const meta = this.clip.meta
+    return {
+      width: meta.width,
+      height: meta.height,
+      duration: meta.duration,
+      audioSampleRate: meta.audioSampleRate,
+      audioChanCount: meta.audioChanCount,
+      hasAudio: meta.audioChanCount > 0,
+    }
+  }
+
+  /**
+   * 创建 OffscreenSprite 用于视频导出
+   */
+  async createOffscreenSprite(timeOffset: number = 0, duration?: number): Promise<OffscreenSprite> {
+    await this.load()
+
+    // 创建 OffscreenSprite 包装 MP4Clip
+    const offscreenSprite = new OffscreenSprite(this.clip)
+
+    // 设置时间属性
+    offscreenSprite.time = {
+      offset: timeOffset,
+      duration: duration || this.clip.meta.duration,
+      playbackRate: 1,
+    }
+
+    return offscreenSprite
+  }
+
+  /**
+   * 导出当前视频为 MP4 文件
+   * @param options - 导出选项
+   * @returns Promise<Blob> - MP4 文件 Blob
+   */
+  async exportVideo(options?: ICombinatorOpts): Promise<Blob> {
+    await this.load()
+
+    // 创建 OffscreenSprite
+    const offscreenSprite = await this.createOffscreenSprite()
+
+    // 使用 Combinator 直接导出单个视频
+    const combinator = new Combinator(options)
+    await combinator.addSprite(offscreenSprite, { main: true })
+
+    // 获取视频流并转换为 Blob
+    const stream = combinator.output()
+    const chunks: Uint8Array[] = []
+    const reader = stream.getReader()
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done)
+        break
+      chunks.push(value)
+    }
+
+    combinator.destroy()
+    return new Blob(chunks as BlobPart[], { type: 'video/mp4' })
+  }
+
+  /**
+   * 获取缩略图
+   * @param width - 缩略图宽度，默认 100
+   * @param opts - 缩略图选项
+   * @returns Promise<Array<{ ts: number; img: Blob }>> - 缩略图列表
+   */
+  async getThumbnails(width?: number, opts?: any): Promise<Array<{ ts: number, img: Blob }>> {
+    await this.load()
+    return this.clip.thumbnails(width, opts)
+  }
+
+  /**
+   * 分割视频
+   * @param time - 分割时间点（微秒）
+   * @returns Promise<[FrameExtractor, FrameExtractor]> - 分割后的两个视频片段
+   */
+  async split(time: number): Promise<[FrameExtractor, FrameExtractor]> {
+    await this.load()
+    const [clip1, clip2] = await this.clip.split(time)
+
+    // 创建两个新的 FrameExtractor 实例
+    const extractor1 = new FrameExtractor('')
+    const extractor2 = new FrameExtractor('')
+
+    // 直接设置 clip 属性
+    extractor1.clip = clip1
+    extractor2.clip = clip2
+
+    return [extractor1, extractor2]
+  }
+
+  /**
+   * 克隆视频
+   * @returns Promise<FrameExtractor> - 克隆的视频实例
+   */
+  async clone(): Promise<FrameExtractor> {
+    await this.load()
+    const clonedClip = await this.clip.clone()
+
+    const extractor = new FrameExtractor('')
+    extractor.clip = clonedClip
+
+    return extractor
+  }
+
+  /**
+   * 检查视频是否已加载
+   */
+  isLoaded(): boolean {
+    return !!this.clip && this.clip.meta.duration > 0
+  }
+
+  /**
+   * 销毁实例，释放资源
+   */
+  destroy(): void {
+    if (this.clip) {
+      this.clip.destroy()
+      this.clip = undefined as any
+    }
+    this._frameCache = {}
   }
 }
