@@ -110,6 +110,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    */
   private _wrapper: Container
 
+  /**
+   * 透明背景层，用于捕获wheel事件
+   */
+  private _background: Graphics | null = null
+
   get offsetX(): number {
     return this._wrapper.x
   }
@@ -223,12 +228,34 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       // this._updateSize(this._wrapper.width, this._wrapper.height)
     })
 
+    // 确保容器能接收事件
+    this.container.eventMode = 'static'
+
+    this._createBackground()
+
     this._bindEvents()
 
     this.render()
   }
 
   private _viewportMask?: Graphics
+
+  private _createBackground(): void {
+    this._background = new Graphics()
+    this._updateBackground()
+    this.container.addChildAt(this._background, 0) // 添加到底层
+  }
+
+  private _updateBackground(): void {
+    if (!this._background)
+      return
+
+    this._background.clear()
+    this._background
+      .rect(0, 0, this.viewportWidth || 100, this.viewportHeight || 100)
+      .fill({ color: 0x000000, alpha: 0 })
+  }
+
   private _drawView(): void {
     if (!this.viewportWidth || !this.viewportHeight)
       return
@@ -623,6 +650,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       this.viewportHeight = h
     }
 
+    this._updateBackground()
     this.queueRender()
   }
 
@@ -634,6 +662,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    * @see {@link _drawScrollYBar}
    */
   render(): void {
+    this._updateBackground()
     this._drawView()
 
     this._drawScrollXBar()
