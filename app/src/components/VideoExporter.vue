@@ -15,6 +15,7 @@ const isExporting = ref(false)
 const browserSupported = ref(false)
 const exportProgress = ref(0)
 const filename = ref('')
+const progressInterval = ref<number | null>(null)
 
 // 导出详情
 const exportDetails = reactive({
@@ -127,6 +128,28 @@ function updateExportOptions() {
   }
 }
 
+function startProgressPolling() {
+  // 清理现有的轮询
+  cleanupProgressPolling()
+
+  // 每100ms检查一次进度
+  progressInterval.value = setInterval(() => {
+    const progress = props.clippa.getExportProgress()
+    if (progress) {
+      exportProgress.value = progress.progress
+      exportDetails.loaded = progress.loaded
+      exportDetails.total = progress.total
+    }
+  }, 100)
+}
+
+function cleanupProgressPolling() {
+  if (progressInterval.value) {
+    clearInterval(progressInterval.value)
+    progressInterval.value = null
+  }
+}
+
 async function startExport() {
   if (!browserSupported.value) {
     console.error('您的浏览器不支持视频导出功能')
@@ -143,8 +166,8 @@ async function startExport() {
     updateExportOptions()
 
     // 添加事件监听器
-    eventListeners.value.exportStart = (options) => {
-      console.error('导出开始:', options)
+    eventListeners.value.exportStart = (_options) => {
+      // 导出开始事件处理
     }
     props.clippa.on('exportStart', eventListeners.value.exportStart)
 
@@ -155,8 +178,8 @@ async function startExport() {
     }
     props.clippa.on('exportProgress', eventListeners.value.exportProgress)
 
-    eventListeners.value.exportComplete = (blob) => {
-      console.error('导出完成:', blob)
+    eventListeners.value.exportComplete = (_blob) => {
+      cleanupProgressPolling()
       exportProgress.value = 100
       isExporting.value = false
 
@@ -171,15 +194,20 @@ async function startExport() {
 
     eventListeners.value.exportError = (error) => {
       console.error('导出错误:', error)
+      cleanupProgressPolling()
       isExporting.value = false
     }
     props.clippa.on('exportError', eventListeners.value.exportError)
+
+    // 开始进度轮询
+    startProgressPolling()
 
     // 开始导出
     await props.clippa.exportVideo(exportOptions)
   }
   catch (error) {
     console.error('导出启动失败:', error)
+    cleanupProgressPolling()
     isExporting.value = false
   }
 }
@@ -207,6 +235,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 清理进度轮询
+  cleanupProgressPolling()
+
   // 清理事件监听器
   if (eventListeners.value.exportStart) {
     props.clippa.off('exportStart', eventListeners.value.exportStart)

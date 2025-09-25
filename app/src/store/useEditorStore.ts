@@ -1,6 +1,7 @@
 import type { VideoExportProgress } from 'open-clippa'
 import { Clippa } from 'open-clippa'
 import { defineStore } from 'pinia'
+import { computed, markRaw, ref } from 'vue'
 
 export interface ExportState {
   isExporting: boolean

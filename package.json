@@ -7,16 +7,16 @@
     "build": "pnpm cleanup && rolldown -c rolldown.config.ts",
     "build:app": "pnpm -C app build",
     "preview": "pnpm -C app preview --open",
-    "lint:fix": "eslint --fix .",
+    "lint:fix": "eslint --fix . && pnpm -C app lint:fix",
     "cleanup": "tsx scripts/cleanup.ts",
     "test": "vitest",
     "cz": "cz",
     "prepare": "husky",
-    "commitlint": "commitlint --edit"
+    "commitlint": "commitlint --edit",
+    "typecheck": "tsc --noEmit && pnpm -C app typecheck"
   },
   "dependencies": {
     "@webav/av-cliper": "catalog:",
-    "open-clippa": "workspace:^",
     "pixi.js": "catalog:"
   },
   "devDependencies": {

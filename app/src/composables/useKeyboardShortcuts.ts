@@ -116,6 +116,15 @@ export function useKeyboardShortcuts() {
     }
   })
 
+  // 设置和清理函数
+  function setupShortcuts() {
+    // 键盘快捷键已在全局监听器中处理
+  }
+
+  function cleanupShortcuts() {
+    // 清理工作在全局监听器中处理
+  }
+
   return {
     isPlaying,
     isFullscreen,
@@ -123,5 +132,7 @@ export function useKeyboardShortcuts() {
     handleRewind,
     handleFastForward,
     toggleFullscreen,
+    setupShortcuts,
+    cleanupShortcuts,
   }
 }

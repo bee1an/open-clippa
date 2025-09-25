@@ -2,12 +2,6 @@
 import { computed, onMounted, onUnmounted, ref, toRefs, watch } from 'vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useEditorStore } from '@/store'
-import AppLogo from './appLogo.vue'
-import Canvas from './canvas.vue'
-import KeyboardShortcutsHelp from './keyboardShortcutsHelp.vue'
-import TimelineWrapper from './timelineWrapper.vue'
-import VideoExporter from './videoExporter.vue'
-import VideoPreviewList from './videoPreviewList.vue'
 
 // Store
 const editorStore = useEditorStore()
@@ -129,7 +123,7 @@ onUnmounted(() => {
     <!-- 顶部工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <AppLogo :size="32" />
+        <AppLogo size="lg" />
         <h1 class="app-title">
           Open Clippa
         </h1>
