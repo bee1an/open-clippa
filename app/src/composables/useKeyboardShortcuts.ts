@@ -33,7 +33,8 @@ export function useKeyboardShortcuts() {
         clippa.play()
         isPlaying.value = true
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('播放控制错误:', error)
     }
   }
@@ -42,7 +43,8 @@ export function useKeyboardShortcuts() {
     try {
       const newTime = Math.max(0, currentTime.value - 10000) // 快退10秒
       clippa.seek(newTime)
-    } catch (error) {
+    }
+    catch (error) {
       console.error('快退错误:', error)
     }
   }
@@ -51,7 +53,8 @@ export function useKeyboardShortcuts() {
     try {
       const newTime = Math.min(duration.value, currentTime.value + 10000) // 快进10秒
       clippa.seek(newTime)
-    } catch (error) {
+    }
+    catch (error) {
       console.error('快进错误:', error)
     }
   }
@@ -113,6 +116,15 @@ export function useKeyboardShortcuts() {
     }
   })
 
+  // 设置和清理函数
+  function setupShortcuts() {
+    // 键盘快捷键已在全局监听器中处理
+  }
+
+  function cleanupShortcuts() {
+    // 清理工作在全局监听器中处理
+  }
+
   return {
     isPlaying,
     isFullscreen,
@@ -120,5 +132,7 @@ export function useKeyboardShortcuts() {
     handleRewind,
     handleFastForward,
     toggleFullscreen,
+    setupShortcuts,
+    cleanupShortcuts,
   }
 }

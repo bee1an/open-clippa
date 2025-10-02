@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint:fix": "eslint --fix .",
+    "typecheck": "vue-tsc -p ./tsconfig.app.json --noEmit",
+    "vue-tsc": "vue-tsc"
   },
   "dependencies": {
     "@iconify/json": "catalog:app",

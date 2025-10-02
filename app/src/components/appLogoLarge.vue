@@ -27,7 +27,11 @@
 }
 
 .logo-text-large {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   letter-spacing: -0.03em;
 }
 </style>
