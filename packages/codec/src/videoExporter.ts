@@ -123,10 +123,10 @@ export class VideoExporter {
       // 创建OffscreenSprite包装MP4Clip
       const offscreenSprite = new OffscreenSprite(mp4Clip)
 
-      // 设置视频时间属性
+      // 设置视频时间属性 (转换为微秒)
       offscreenSprite.time = {
-        offset: video.start,
-        duration: video.duration,
+        offset: (video.start || 0) * 1000, // 毫秒转微秒，相对于时间轴0点
+        duration: (video.duration || 5000) * 1000, // 毫秒转微秒，默认5秒
         playbackRate: 1,
       }
 
@@ -156,12 +156,25 @@ export class VideoExporter {
    */
   getMetadata(): VideoExportMetadata {
     const options = this.getDefaultOptions()
-    // const firstVideo = this._videos[0] // 保留以供将来使用
+
+    // 计算时间轴的总时长（从最早开始到最晚结束）
+    let timelineStart = Infinity
+    let timelineEnd = 0
+
+    for (const video of this._videos) {
+      const videoStart = video.start || 0
+      const videoEnd = videoStart + (video.duration || 0)
+
+      timelineStart = Math.min(timelineStart, videoStart)
+      timelineEnd = Math.max(timelineEnd, videoEnd)
+    }
+
+    const totalDuration = timelineEnd - timelineStart
 
     return {
       width: options.width || 1920,
       height: options.height || 1080,
-      duration: this._videos.reduce((total, video) => total + video.duration, 0),
+      duration: totalDuration * 1000, // 毫秒转微秒
       frameRate: options.frameRate || 30,
       hasAudio: options.audio !== false,
       bitrate: options.bitrate || 5000000,
@@ -178,6 +191,20 @@ export class VideoExporter {
     }
 
     const options = this.getDefaultOptions()
+
+    // 计算时间轴总时长
+    let timelineStart = Infinity
+    let timelineEnd = 0
+
+    for (const video of this._videos) {
+      const videoStart = video.start || 0
+      const videoEnd = videoStart + (video.duration || 0)
+      timelineStart = Math.min(timelineStart, videoStart)
+      timelineEnd = Math.max(timelineEnd, videoEnd)
+    }
+
+    const totalDuration = timelineEnd - timelineStart
+
     const combinatorOpts: ICombinatorOpts = {
       width: options.width,
       height: options.height,
@@ -186,6 +213,7 @@ export class VideoExporter {
       bgColor: options.bgColor,
       videoCodec: options.videoCodec,
       audio: false,
+      duration: totalDuration * 1000, // 毫秒转微秒，设置总输出时长
       metaDataTags: options.metaDataTags,
     }
 

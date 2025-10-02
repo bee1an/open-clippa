@@ -122,6 +122,9 @@ export class Clippa extends EventBus<ClippaEvents> {
       this._videoExporter.destroy()
       this._videoExporter = null
 
+      // 先重置导出状态，再发射完成事件
+      this._isExporting = false
+
       // 发射导出完成事件
       this.emit('exportComplete', blob)
 
@@ -133,6 +136,7 @@ export class Clippa extends EventBus<ClippaEvents> {
       throw error
     }
     finally {
+      // 确保无论如何都重置状态
       this._isExporting = false
     }
   }

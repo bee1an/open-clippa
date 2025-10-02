@@ -1,10 +1,22 @@
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useEditorStore } from '@/store/useEditorStore'
+
 definePage({ redirect: '/editor/media' })
 
-function handleExport() {
-  // 这里可以添加导出逻辑
-  console.warn('导出功能尚未实现')
-}
+const editorStore = useEditorStore()
+const clippa = computed(() => editorStore.clippa)
+const isClippaReady = ref(false)
+
+// 等待 clippa 准备就绪
+onMounted(async () => {
+  try {
+    await editorStore.clippa.ready
+    isClippaReady.value = true
+  } catch (error) {
+    console.error('Clippa ready failed:', error)
+  }
+})
 </script>
 
 <template>
@@ -12,9 +24,7 @@ function handleExport() {
     <yy-layout-header h50px bordered flex items-center px-4>
       <AppLogo size="md" />
       <div class="flex-1" />
-      <yy-button type="primary" @click="handleExport">
-        导出
-      </yy-button>
+      <VideoExporter :clippa="isClippaReady ? clippa : undefined" />
     </yy-layout-header>
 
     <yy-layout has-sider max-w-full>
@@ -22,6 +32,7 @@ function handleExport() {
         w300px
         content-class="h-[calc(100vh-50px)] p-y-2"
         collapsed-width="65"
+        collapsed
       >
         <Sider />
       </yy-layout-sider>
