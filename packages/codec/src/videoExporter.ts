@@ -203,7 +203,7 @@ export class VideoExporter {
       timelineEnd = Math.max(timelineEnd, videoEnd)
     }
 
-    const totalDuration = timelineEnd - timelineStart
+    const _totalDuration = timelineEnd - timelineStart
 
     const combinatorOpts: ICombinatorOpts = {
       width: options.width,
@@ -213,7 +213,6 @@ export class VideoExporter {
       bgColor: options.bgColor,
       videoCodec: options.videoCodec,
       audio: false,
-      duration: totalDuration * 1000, // 毫秒转微秒，设置总输出时长
       metaDataTags: options.metaDataTags,
     }
 

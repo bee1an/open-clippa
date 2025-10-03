@@ -13,7 +13,8 @@ onMounted(async () => {
   try {
     await editorStore.clippa.ready
     isClippaReady.value = true
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Clippa ready failed:', error)
   }
 })

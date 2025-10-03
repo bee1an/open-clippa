@@ -74,7 +74,8 @@ const videoCount = computed(() => {
 
 const videoDuration = computed(() => {
   // 计算时间轴的总时长（从最早开始到最晚结束）
-  if (!props.clippa?.theater?.performers) return 0
+  if (!props.clippa?.theater?.performers)
+    return 0
 
   let timelineStart = Infinity
   let timelineEnd = 0
@@ -276,7 +277,8 @@ async function checkBrowserSupport() {
       // 使用静态方法检查浏览器支持
       const ClippaClass = Object.getPrototypeOf(props.clippa).constructor
       browserSupported.value = await ClippaClass.isExportSupported?.()
-    } else {
+    }
+    else {
       browserSupported.value = false
     }
   }

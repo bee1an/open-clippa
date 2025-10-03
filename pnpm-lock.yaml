@@ -226,6 +226,12 @@ importers:
 
   packages/performer: {}
 
+  packages/selection:
+    dependencies:
+      vue:
+        specifier: catalog:app
+        version: 3.5.18(typescript@5.8.3)
+
   packages/timeline: {}
 
   packages/utils: {}
@@ -4626,7 +4632,7 @@ snapshots:
 
   '@vue/compiler-core@3.5.18':
     dependencies:
-      '@babel/parser': 7.28.0
+      '@babel/parser': 7.28.4
       '@vue/shared': 3.5.18
       entities: 4.5.0
       estree-walker: 2.0.2
@@ -4639,7 +4645,7 @@ snapshots:
 
   '@vue/compiler-sfc@3.5.18':
     dependencies:
-      '@babel/parser': 7.28.0
+      '@babel/parser': 7.28.4
       '@vue/compiler-core': 3.5.18
       '@vue/compiler-dom': 3.5.18
       '@vue/compiler-ssr': 3.5.18
