@@ -1,3 +1,4 @@
+export { default as Selection } from './components/Selection.vue'
 export { useDrag } from './composables/useDrag'
 export { useResize } from './composables/useResize'
 export { useSelection } from './composables/useSelection'

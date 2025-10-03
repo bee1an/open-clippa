@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { CSSProperties } from 'vue'
+import type { ResizeDirection, SelectionItem } from '@clippa/selection'
+import { Selection } from '@clippa/selection'
 import { storeToRefs } from 'pinia'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 // Props
@@ -14,140 +15,94 @@ const { scaleRatio = 1 } = defineProps<Props>()
 const performerStore = usePerformerStore()
 const { getSelectedPerformers } = storeToRefs(performerStore)
 
-// Selection DOM 引用
-const selectionRef = ref<HTMLElement>()
-
-// 拖拽状态
-const isDragging = ref(false)
-const dragStartPos = ref({ x: 0, y: 0 })
-const selectionStartPos = ref({ x: 0, y: 0 })
-
-function selectionToCanvasCoords(selectionX: number, selectionY: number) {
-  return {
-    x: selectionX,
-    y: selectionY,
-  }
-}
-
 // 计算当前选中的 performer (单选模式)
 const currentSelection = computed(() => {
   const selected = getSelectedPerformers.value
   return selected.length > 0 ? selected[0] : null
 })
 
-// 计算选择框的样式
-const selectionStyle = computed<CSSProperties>(() => {
+// 将 performer bounds 转换为 SelectionItem（已应用缩放率的DOM坐标）
+const selectionItem = computed<SelectionItem | null>(() => {
   if (!currentSelection.value)
-    return { display: 'none' }
+    return null
 
   const bounds = currentSelection.value.getBounds()
-  const { x, y, width, height, rotation = 0 } = bounds
 
   // 应用缩放率：将 Canvas 坐标转换为 DOM 坐标
-  const scaledX = x * scaleRatio
-  const scaledY = y * scaleRatio
-  const scaledWidth = width * scaleRatio
-  const scaledHeight = height * scaleRatio
+  const scaledX = bounds.x * scaleRatio
+  const scaledY = bounds.y * scaleRatio
+  const scaledWidth = bounds.width * scaleRatio
+  const scaledHeight = bounds.height * scaleRatio
 
   return {
-    display: 'block',
-    position: 'absolute',
-    left: `${scaledX}px`,
-    top: `${scaledY}px`,
-    width: `${scaledWidth}px`,
-    height: `${scaledHeight}px`,
-    transform: `rotate(${rotation}deg)`,
-    border: '2px solid #3b82f6',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    cursor: isDragging.value ? 'grabbing' : 'grab',
-    pointerEvents: 'auto',
-    boxSizing: 'border-box' as const,
-    zIndex: 1000,
+    id: currentSelection.value.id,
+    x: scaledX,
+    y: scaledY,
+    width: scaledWidth,
+    height: scaledHeight,
+    rotation: bounds.rotation || 0,
+    zIndex: currentSelection.value.zIndex || 1,
+    visible: true,
+    disabled: false,
   }
 })
 
-// 拖拽处理函数
-function handleMouseDown(event: MouseEvent) {
+// Selection组件事件处理函数
+function handleSelectionUpdate(item: SelectionItem) {
   if (!currentSelection.value)
     return
 
-  event.preventDefault()
-  isDragging.value = true
-  dragStartPos.value = { x: event.clientX, y: event.clientY }
+  // 将 DOM 坐标转换回 Canvas 坐标
+  const canvasX = item.x / scaleRatio
+  const canvasY = item.y / scaleRatio
 
-  const bounds = currentSelection.value.getBounds()
-  // 将 Canvas 坐标转换为 DOM 坐标作为拖拽起始位置
-  const domX = bounds.x * scaleRatio
-  const domY = bounds.y * scaleRatio
-  selectionStartPos.value = { x: domX, y: domY }
-
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
-}
-
-function handleMouseMove(event: MouseEvent) {
-  if (!isDragging.value || !currentSelection.value)
-    return
-
-  const deltaX = event.clientX - dragStartPos.value.x
-  const deltaY = event.clientY - dragStartPos.value.y
-
-  const newX = selectionStartPos.value.x + deltaX
-  const newY = selectionStartPos.value.y + deltaY
-
-  // 将 DOM 坐标转换为 Canvas 坐标
-  const canvasX = newX / scaleRatio
-  const canvasY = newY / scaleRatio
-  const canvasCoords = selectionToCanvasCoords(canvasX, canvasY)
-
+  // 更新 performer 位置
   const performer = performerStore.getAllPerformers.find(p => p.id === currentSelection.value?.id)
   if (performer) {
-    performer.setPosition(canvasCoords.x, canvasCoords.y)
+    performer.setPosition(canvasX, canvasY)
   }
 }
 
-function handleMouseUp() {
-  isDragging.value = false
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mouseup', handleMouseUp)
+function handleSelectionResize(id: string, direction: ResizeDirection, item: SelectionItem) {
+  if (!currentSelection.value)
+    return
+
+  // 将 DOM 坐标转换回 Canvas 坐标
+  const canvasX = item.x / scaleRatio
+  const canvasY = item.y / scaleRatio
+  const canvasWidth = item.width / scaleRatio
+  const canvasHeight = item.height / scaleRatio
+
+  // 更新 performer 位置和尺寸
+  const performer = performerStore.getAllPerformers.find(p => p.id === currentSelection.value?.id)
+  if (performer) {
+    performer.setPosition(canvasX, canvasY)
+    performer.setScale(canvasWidth / performer.getBounds().width, canvasHeight / performer.getBounds().height)
+  }
 }
 
-// 监听 selectedPerformers 变化
-watch(() => currentSelection.value?.id, (newId, oldId) => {
-  if (newId !== oldId) {
-    // 选中状态改变时的处理
-    nextTick(() => {
-      if (currentSelection.value && selectionRef.value) {
-        // 可以在这里添加选中的视觉反馈
-      }
-    })
-  }
-}, { immediate: true })
+function handleSelectionSelect(id: string) {
+  performerStore.selectPerformer(id)
+}
 
-// 组件挂载时的初始化
-onMounted(() => {
-  // 可以在这里添加全局事件监听
-})
+function handleSelectionDelete(id: string) {
+  performerStore.removePerformer(id)
+}
 </script>
 
 <template>
   <div class="selection-group-container">
-    <div
-      v-if="currentSelection"
-      ref="selectionRef"
-      :style="selectionStyle"
-      class="selection-box"
-      @mousedown="handleMouseDown"
-    >
-      <!-- 调整大小的手柄 (预留扩展) -->
-      <div class="resize-handle top-left" />
-      <div class="resize-handle top-right" />
-      <div class="resize-handle bottom-left" />
-      <div class="resize-handle bottom-right" />
-
-      <!-- 移动手柄 (中心) -->
-      <div class="move-handle" />
-    </div>
+    <Selection
+      v-if="selectionItem"
+      :item="selectionItem"
+      :active="true"
+      :min-width="20"
+      :min-height="20"
+      @update="handleSelectionUpdate"
+      @resize="handleSelectionResize"
+      @select="handleSelectionSelect"
+      @delete="handleSelectionDelete"
+    />
   </div>
 </template>
 
@@ -158,76 +113,5 @@ onMounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
-}
-
-.selection-box {
-  user-select: none;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease;
-}
-
-.selection-box:hover {
-  border-color: #2563eb;
-  background-color: rgba(37, 99, 235, 0.15);
-}
-
-.resize-handle {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  background: #3b82f6;
-  border: 1px solid white;
-  border-radius: 50%;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.selection-box:hover .resize-handle {
-  opacity: 1;
-}
-
-.resize-handle.top-left {
-  top: -4px;
-  left: -4px;
-  cursor: nw-resize;
-}
-
-.resize-handle.top-right {
-  top: -4px;
-  right: -4px;
-  cursor: ne-resize;
-}
-
-.resize-handle.bottom-left {
-  bottom: -4px;
-  left: -4px;
-  cursor: sw-resize;
-}
-
-.resize-handle.bottom-right {
-  bottom: -4px;
-  right: -4px;
-  cursor: se-resize;
-}
-
-.move-handle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
-  background: #3b82f6;
-  border: 2px solid white;
-  border-radius: 50%;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  cursor: move;
-}
-
-.selection-box:hover .move-handle {
-  opacity: 1;
 }
 </style>
