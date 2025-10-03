@@ -21,6 +21,7 @@ const { clippa } = editorStore
 // 添加到时间轴
 function addToTimeline() {
   const video = new Video({
+    id: props.videoFile.id,
     src: props.videoFile.file,
     start: 0,
     duration: props.videoFile.duration,

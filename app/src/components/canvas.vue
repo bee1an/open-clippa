@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { Video } from 'open-clippa'
+import type { PerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { useEditorStore } from '@/store'
+import { usePerformerStore } from '@/store/usePerformerStore'
+import SelectionGroup from './SelectionGroup.vue'
 
 const editorStore = useEditorStore()
+const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
 const { clippa } = editorStore
 clippa.stage.init({ width: 995, height: 995 / 16 * 9 })
@@ -28,47 +31,60 @@ async function loadVideoWithDuration(src: string): Promise<number> {
   })
 }
 
-let video: Video
-let video1: Video
-
 const sliderValue = ref(0)
 
 watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
 
+// 创建 performer 的辅助函数
+async function createVideoPerformer(config: Omit<PerformerConfig, 'duration'>): Promise<void> {
+  const videoDuration = await loadVideoWithDuration(config.src as string)
+
+  const performerConfig: PerformerConfig = {
+    ...config,
+    duration: videoDuration,
+  }
+
+  const performer = performerStore.addPerformer(performerConfig)
+
+  // 将 performer 添加到 clippa
+  clippa.hire(performer)
+}
+
 onMounted(async () => {
   await clippa.ready
   clippa.stage.mount('canvas')
 
-  // 获取真实时长并创建视频对象
-  const videoDuration = await loadVideoWithDuration('https://pixijs.com/assets/video.mp4')
-  const video1Duration = await loadVideoWithDuration('/bunny.mp4')
-
-  video = new Video({
+  // 使用 performer store 创建视频对象
+  await createVideoPerformer({
+    id: 'video1',
     src: 'https://pixijs.com/assets/video.mp4',
     start: 4000,
-    duration: videoDuration,
+    x: 100,
+    y: 50,
     zIndex: 1,
   })
 
-  video1 = new Video({
+  await createVideoPerformer({
+    id: 'video2',
     src: '/bunny.mp4',
     start: 0,
-    duration: video1Duration,
+    x: 0,
+    y: 0,
     width: 995,
     height: 560,
     zIndex: 0,
   })
-
-  clippa.hire(video)
-  clippa.hire(video1)
 })
 </script>
 
 <template>
   <div hfull flex="~ col" items-center justify-center>
-    <div id="canvas" class="aspect-ratio-16/9 h-60%" relative mb-5 />
+    <div id="canvas" class="aspect-ratio-16/9 h-60%" relative mb-5>
+      <!-- Selection Group 组件 -->
+      <SelectionGroup :container-bounds="{ x: 0, y: 0, width: 995, height: 560 }" />
+    </div>
     <!-- <div w-130 mb-2>
       <yy-slider v-model="sliderValue" :max="1" @change="seekBySlider" />
     </div> -->

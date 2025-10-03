@@ -1,6 +1,7 @@
 import type { Sprite } from 'pixi.js'
 
 export interface Performer {
+  id: string
   start: number
   duration: number
   zIndex: number
@@ -22,6 +23,7 @@ export interface Performer {
 }
 
 export interface PerformerOption {
+  id: string
   start: number
   duration: number
 }

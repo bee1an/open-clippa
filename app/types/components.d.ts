@@ -19,6 +19,7 @@ declare module 'vue' {
     ResizableTimeline: typeof import('./../src/components/resizableTimeline.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SelectionGroup: typeof import('./../src/components/SelectionGroup.vue')['default']
     Sider: typeof import('./../src/components/sider/sider.vue')['default']
     TimelineWrapper: typeof import('./../src/components/timelineWrapper.vue')['default']
     VideoExporter: typeof import('./../src/components/videoExporter.vue')['default']
