@@ -213,6 +213,12 @@ export function useDrag(
 
   // 优化的更新位置函数
   const scheduleUpdate = (newX: number, newY: number): void => {
+    if (throttleInterval <= 0 && !useRAF) {
+      // 无节流，直接更新
+      onUpdate?.(newX, newY)
+      return
+    }
+
     if (rafId !== null) {
       return // 已有更新在队列中
     }

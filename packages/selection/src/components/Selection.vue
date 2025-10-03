@@ -181,8 +181,8 @@ const { isDragging, startDrag, endDrag, updatePosition, cleanup: cleanupDrag } =
     const updatedItem = { ...props.item, x, y }
     emit('update', updatedItem)
   },
-  useRAF: true, // 启用性能优化
-  throttleInterval: 16, // 60fps
+  useRAF: false, // 禁用 RAF 节流，允许实时更新
+  throttleInterval: 0, // 禁用节流间隔
 })
 
 // 调整大小功能
@@ -207,9 +207,8 @@ const { isResizing, startResize, endResize, updateSize, cleanup: cleanupResize }
     const updatedItem = { ...props.item, x, y, width, height }
     emit('update', updatedItem)
   },
-  useRAF: true, // 启用性能优化
-  throttleInterval: 16, // 60fps
-  _debug: false, // 调试模式，生产环境应设为false
+  useRAF: false, // 禁用 RAF 节流，允许实时更新
+  throttleInterval: 0, // 禁用节流间隔
 })
 
 // 鼠标事件处理

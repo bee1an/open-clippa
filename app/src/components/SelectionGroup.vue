@@ -63,7 +63,7 @@ function handleSelectionUpdate(item: SelectionItem) {
   }
 }
 
-function handleSelectionResize(id: string, direction: ResizeDirection, item: SelectionItem) {
+function handleSelectionResize(_id: string, _direction: ResizeDirection, item: SelectionItem) {
   if (!currentSelection.value)
     return
 
