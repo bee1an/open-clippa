@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import SelectionGroup from './SelectionGroup.vue'
@@ -33,6 +34,34 @@ async function loadVideoWithDuration(src: string): Promise<number> {
 
 const sliderValue = ref(0)
 
+// Canvas 缩放率
+const canvasScaleRatio = ref(1)
+
+// 获取 Canvas 元素并计算缩放率
+function calculateCanvasScaleRatio() {
+  // TODO: 后面采用内部的值
+  const canvasElement = document.querySelector('#canvas canvas') as HTMLCanvasElement
+  if (!canvasElement)
+    return
+
+  // Canvas 内在尺寸 (初始化时设置的尺寸)
+  const internalWidth = 995
+  const internalHeight = 560
+
+  // Canvas 实际显示尺寸 (CSS尺寸)
+  const displayWidth = canvasElement.clientWidth
+
+  // 计算缩放率 (由于宽高比固定，只需计算一个值)
+  const ratio = displayWidth / internalWidth
+  canvasScaleRatio.value = ratio
+
+  console.warn('Canvas scale ratio calculated:', {
+    internal: { width: internalWidth, height: internalHeight },
+    display: { width: displayWidth, height: displayWidth * 9 / 16 },
+    ratio,
+  })
+}
+
 watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
@@ -56,6 +85,14 @@ onMounted(async () => {
   await clippa.ready
   clippa.stage.mount('canvas')
 
+  // 计算初始缩放率
+  nextTick(() => {
+    calculateCanvasScaleRatio()
+  })
+
+  // 监听 window 大小变化
+  window.addEventListener('resize', calculateCanvasScaleRatio)
+
   // 使用 performer store 创建视频对象
   await createVideoPerformer({
     id: 'video1',
@@ -77,13 +114,17 @@ onMounted(async () => {
     zIndex: 0,
   })
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', calculateCanvasScaleRatio)
+})
 </script>
 
 <template>
   <div hfull flex="~ col" items-center justify-center>
     <div id="canvas" class="aspect-ratio-16/9 h-60%" relative mb-5>
       <!-- Selection Group 组件 -->
-      <SelectionGroup :container-bounds="{ x: 0, y: 0, width: 995, height: 560 }" />
+      <SelectionGroup :scale-ratio="canvasScaleRatio" />
     </div>
     <!-- <div w-130 mb-2>
       <yy-slider v-model="sliderValue" :max="1" @change="seekBySlider" />

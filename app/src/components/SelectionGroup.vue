@@ -6,17 +6,10 @@ import { usePerformerStore } from '@/store/usePerformerStore'
 
 // Props
 interface Props {
-  containerBounds?: {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
+  scaleRatio?: number
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  containerBounds: () => ({ x: 0, y: 0, width: 995, height: 560 }),
-})
+const { scaleRatio = 1 } = defineProps<Props>()
 
 const performerStore = usePerformerStore()
 const { getSelectedPerformers } = storeToRefs(performerStore)
@@ -31,8 +24,8 @@ const selectionStartPos = ref({ x: 0, y: 0 })
 
 function selectionToCanvasCoords(selectionX: number, selectionY: number) {
   return {
-    x: selectionX + props.containerBounds.x,
-    y: selectionY + props.containerBounds.y,
+    x: selectionX,
+    y: selectionY,
   }
 }
 
@@ -50,13 +43,19 @@ const selectionStyle = computed<CSSProperties>(() => {
   const bounds = currentSelection.value.getBounds()
   const { x, y, width, height, rotation = 0 } = bounds
 
+  // 应用缩放率：将 Canvas 坐标转换为 DOM 坐标
+  const scaledX = x * scaleRatio
+  const scaledY = y * scaleRatio
+  const scaledWidth = width * scaleRatio
+  const scaledHeight = height * scaleRatio
+
   return {
     display: 'block',
     position: 'absolute',
-    left: `${x}px`,
-    top: `${y}px`,
-    width: `${width}px`,
-    height: `${height}px`,
+    left: `${scaledX}px`,
+    top: `${scaledY}px`,
+    width: `${scaledWidth}px`,
+    height: `${scaledHeight}px`,
     transform: `rotate(${rotation}deg)`,
     border: '2px solid #3b82f6',
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -77,7 +76,10 @@ function handleMouseDown(event: MouseEvent) {
   dragStartPos.value = { x: event.clientX, y: event.clientY }
 
   const bounds = currentSelection.value.getBounds()
-  selectionStartPos.value = { x: bounds.x, y: bounds.y }
+  // 将 Canvas 坐标转换为 DOM 坐标作为拖拽起始位置
+  const domX = bounds.x * scaleRatio
+  const domY = bounds.y * scaleRatio
+  selectionStartPos.value = { x: domX, y: domY }
 
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', handleMouseUp)
@@ -93,15 +95,10 @@ function handleMouseMove(event: MouseEvent) {
   const newX = selectionStartPos.value.x + deltaX
   const newY = selectionStartPos.value.y + deltaY
 
-  // 边界检测
-  const maxX = props.containerBounds.width - currentSelection.value.getBounds().width
-  const maxY = props.containerBounds.height - currentSelection.value.getBounds().height
-
-  const constrainedX = Math.max(0, Math.min(newX, maxX))
-  const constrainedY = Math.max(0, Math.min(newY, maxY))
-
-  // 转换为 Canvas 坐标并更新 performer
-  const canvasCoords = selectionToCanvasCoords(constrainedX, constrainedY)
+  // 将 DOM 坐标转换为 Canvas 坐标
+  const canvasX = newX / scaleRatio
+  const canvasY = newY / scaleRatio
+  const canvasCoords = selectionToCanvasCoords(canvasX, canvasY)
 
   const performer = performerStore.getAllPerformers.find(p => p.id === currentSelection.value?.id)
   if (performer) {
