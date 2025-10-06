@@ -1,7 +1,7 @@
 import type { PerformerBounds, PerformerClickEvent } from '@clippa/performer'
 import { Video } from '@clippa/performer'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
 /**
  * Performer 配置选项
@@ -33,23 +33,25 @@ export interface SelectedPerformer {
  * Performer Store
  */
 export const usePerformerStore = defineStore('performer', () => {
-  // 所有 performers
-  const performers = ref<Video[]>([])
+  // 所有 performers - 使用普通 Map 存储，避免响应式追踪大型对象
+  const performerMap = new Map<string, Video>()
 
   // 选中的 performers
   const selectedPerformers = ref<SelectedPerformer[]>([])
 
   // 获取所有 performers
-  const getAllPerformers = computed(() => performers.value)
+  const getAllPerformers = () => Array.from(performerMap.values())
 
   // 获取选中的 performers (包含 bounds 信息)
-  const getSelectedPerformers = computed(() => {
-    return selectedPerformers.value.map(selected => performers.value.find(p => p.id === selected.id)).filter(Boolean)
-  })
+  const getSelectedPerformers = () => {
+    return selectedPerformers.value
+      .map(selected => performerMap.get(selected.id))
+      .filter(Boolean)
+  }
 
   // 选中 performer
   const selectPerformer = (performerId: string) => {
-    const performer = performers.value.find(p => p.id === performerId)
+    const performer = performerMap.get(performerId)
     if (performer) {
       const existingIndex = selectedPerformers.value.findIndex(s => s.id === performerId)
 
@@ -75,20 +77,26 @@ export const usePerformerStore = defineStore('performer', () => {
   }
 
   const handlePerformerPositionUpdate = (performer: Video, bounds: PerformerBounds) => {
-    // 可以在这里添加位置更新的额外逻辑
-    console.warn('Performer position updated:', performer.id, bounds)
+    // 更新选中的 performer 中的 bounds 信息
+    const selectedIndex = selectedPerformers.value.findIndex(s => s.id === performer.id)
+    if (selectedIndex > -1) {
+      selectedPerformers.value[selectedIndex] = {
+        ...selectedPerformers.value[selectedIndex],
+        bounds,
+        timestamp: Date.now(),
+      }
+    }
   }
 
   // 创建新的 performer
   const createPerformer = (config: PerformerConfig): Video => {
     const performer = new Video({
       ...config,
-      zIndex: config.zIndex || performers.value.length + 1,
+      zIndex: config.zIndex || performerMap.size + 1,
     })
 
     // 监听 performer 事件
-    performer.on('pointerdown', (event: PerformerClickEvent) => {
-      console.warn('Performer clicked:', event)
+    performer.on('pointerdown', (_event: PerformerClickEvent) => {
       handlePerformerPointerDown(performer)
     })
 
@@ -102,7 +110,7 @@ export const usePerformerStore = defineStore('performer', () => {
   // 添加 performer
   const addPerformer = (config: PerformerConfig): Video => {
     const performer = createPerformer(config)
-    performers.value.push(performer)
+    performerMap.set(performer.id, performer)
 
     // 自动选中新添加的 performer (等待 sprite 加载完成)
     performer.on('positionUpdate', () => {
@@ -114,15 +122,13 @@ export const usePerformerStore = defineStore('performer', () => {
 
   // 移除 performer
   const removePerformer = (performerId: string) => {
-    const index = performers.value.findIndex(p => p.id === performerId)
-    if (index > -1) {
-      const performer = performers.value[index]
-
+    const performer = performerMap.get(performerId)
+    if (performer) {
       // 清理 performer 资源
       performer.destroy()
 
-      // 从列表中移除
-      performers.value.splice(index, 1)
+      // 从 Map 中移除
+      performerMap.delete(performerId)
 
       // 从选中列表中移除
       const selectedIndex = selectedPerformers.value.findIndex(s => s.id === performerId)
@@ -134,7 +140,7 @@ export const usePerformerStore = defineStore('performer', () => {
 
   // 更新 performer
   const updatePerformer = (performerId: string, updates: Partial<PerformerConfig>) => {
-    const performer = performers.value.find(p => p.id === performerId)
+    const performer = performerMap.get(performerId)
     if (performer) {
       if (updates.x !== undefined || updates.y !== undefined) {
         const currentBounds = performer.getBounds()
@@ -196,21 +202,18 @@ export const usePerformerStore = defineStore('performer', () => {
 
   // 清理所有 performers
   const clearAllPerformers = () => {
-    performers.value.forEach(performer => performer.destroy())
-    performers.value = []
+    performerMap.forEach(performer => performer.destroy())
+    performerMap.clear()
     selectedPerformers.value = []
   }
 
   return {
     // 状态
-    performers,
     selectedPerformers,
 
-    // 计算属性
+    // 方法
     getAllPerformers,
     getSelectedPerformers,
-
-    // 方法
     createPerformer,
     addPerformer,
     removePerformer,

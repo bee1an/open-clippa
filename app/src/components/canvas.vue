@@ -46,7 +46,7 @@ function calculateCanvasScaleRatio() {
 
   // Canvas 内在尺寸 (初始化时设置的尺寸)
   const internalWidth = 995
-  const internalHeight = 560
+  const _internalHeight = 560
 
   // Canvas 实际显示尺寸 (CSS尺寸)
   const displayWidth = canvasElement.clientWidth
@@ -54,12 +54,6 @@ function calculateCanvasScaleRatio() {
   // 计算缩放率 (由于宽高比固定，只需计算一个值)
   const ratio = displayWidth / internalWidth
   canvasScaleRatio.value = ratio
-
-  console.warn('Canvas scale ratio calculated:', {
-    internal: { width: internalWidth, height: internalHeight },
-    display: { width: displayWidth, height: displayWidth * 9 / 16 },
-    ratio,
-  })
 }
 
 watch(currentTime, () => {

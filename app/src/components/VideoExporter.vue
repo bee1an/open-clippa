@@ -283,7 +283,7 @@ async function checkBrowserSupport() {
     }
   }
   catch (error) {
-    console.warn('浏览器支持检测失败:', error)
+    // 浏览器支持检测失败
     browserSupported.value = false
   }
 }

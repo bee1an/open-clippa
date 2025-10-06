@@ -258,7 +258,7 @@ export const useMediaStore = defineStore('media', () => {
         // 等待跳转完成并生成缩略图
         await new Promise<void>((resolve) => {
           const timeout = setTimeout(() => {
-            console.warn('缩略图生成超时')
+            // 缩略图生成超时
             resolve()
           }, 8000)
 
@@ -296,7 +296,7 @@ export const useMediaStore = defineStore('media', () => {
                   }, 'image/jpeg', 0.9)
                 }
                 else {
-                  console.warn('视频尺寸无效:', video.videoWidth, video.videoHeight)
+                  // 视频尺寸无效
                   resolve()
                 }
               }

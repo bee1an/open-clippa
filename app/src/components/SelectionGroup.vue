@@ -13,20 +13,26 @@ interface Props {
 const { scaleRatio = 1 } = defineProps<Props>()
 
 const performerStore = usePerformerStore()
-const { getSelectedPerformers } = storeToRefs(performerStore)
+const { selectedPerformers } = storeToRefs(performerStore)
 
-// 计算当前选中的 performer (单选模式)
+// 计算当前选中的 performer 信息（包含响应式 bounds）
+const currentSelectionInfo = computed(() => {
+  return selectedPerformers.value.length > 0 ? selectedPerformers.value[0] : null
+})
+
+// 计算当前选中的 performer 实例
 const currentSelection = computed(() => {
-  const selected = getSelectedPerformers.value
+  const selected = performerStore.getSelectedPerformers()
   return selected.length > 0 ? selected[0] : null
 })
 
 // 将 performer bounds 转换为 SelectionItem（已应用缩放率的DOM坐标）
 const selectionItem = computed<SelectionItem | null>(() => {
-  if (!currentSelection.value)
+  if (!currentSelectionInfo.value || !currentSelection.value)
     return null
 
-  const bounds = currentSelection.value.getBounds()
+  // 使用响应式 bounds 信息，而不是直接调用 getBounds()
+  const bounds = currentSelectionInfo.value.bounds
 
   // 应用缩放率：将 Canvas 坐标转换为 DOM 坐标
   const scaledX = bounds.x * scaleRatio
@@ -57,7 +63,7 @@ function handleSelectionUpdate(item: SelectionItem) {
   const canvasY = item.y / scaleRatio
 
   // 更新 performer 位置
-  const performer = performerStore.getAllPerformers.find(p => p.id === currentSelection.value?.id)
+  const performer = performerStore.getAllPerformers().find(p => p.id === currentSelection.value?.id)
   if (performer) {
     performer.setPosition(canvasX, canvasY)
   }
@@ -74,7 +80,7 @@ function handleSelectionResize(_id: string, _direction: ResizeDirection, item: S
   const canvasHeight = item.height / scaleRatio
 
   // 更新 performer 位置和尺寸
-  const performer = performerStore.getAllPerformers.find(p => p.id === currentSelection.value?.id)
+  const performer = performerStore.getAllPerformers().find(p => p.id === currentSelection.value?.id)
   if (performer) {
     performer.setPosition(canvasX, canvasY)
     performer.setScale(canvasWidth / performer.getBounds().width, canvasHeight / performer.getBounds().height)
