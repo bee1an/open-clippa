@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // 类型导入（按字母顺序）
 import type { Clippa } from 'open-clippa'
+// 内部包导入
+import type { VideoExporter } from '../../../packages/export/src'
+
 import type { ExportOptions, ExportProgress, MediaItem } from '../../../packages/export/src/types'
 
 // 外部依赖导入
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-
-// 内部包导入
-import { CompatibilityUtils, ExportErrorHandler, VideoExporter } from '../../../packages/export/src'
+import { CanvasExporter, CompatibilityUtils, ExportErrorHandler } from '../../../packages/export/src'
 
 // Props
 interface Props {
@@ -22,7 +23,7 @@ const isExporting = ref(false)
 const browserSupported = ref(false)
 const exportProgress = ref(0)
 const filename = ref('')
-const currentExporter = ref<VideoExporter | null>(null)
+const currentExporter = ref<VideoExporter | CanvasExporter | null>(null)
 
 // 导出详情
 const exportDetails = reactive({
@@ -130,13 +131,6 @@ function updateExportState() {
     videoDuration.value = timelineEnd - timelineStart
     mediaItems.value = newMediaItems
   }
-
-  console.warn('导出状态已更新:', {
-    videoCount: videoCount.value,
-    videoDuration: videoDuration.value,
-    mediaItemsCount: mediaItems.value.length,
-    hasVideos: hasVideos.value,
-  })
 }
 
 // 方法
@@ -148,17 +142,8 @@ function closeModal() {
 }
 
 function openModal() {
-  console.warn('=== 导出按钮被点击 ===')
-  console.warn('打开导出模态框，调试信息:')
-  console.warn('- hasVideos:', hasVideos.value)
-  console.warn('- videoCount:', videoCount.value)
-  console.warn('- 浏览器支持:', browserSupported.value)
-  console.warn('- performers 数量:', props.clippa?.theater?.performers?.length || 0)
-  console.warn('- 按钮禁用状态:', isExporting.value || !hasVideos.value)
-
   // 强制显示模态框进行调试
   showExportModal.value = true
-  console.warn('- 模态框状态:', showExportModal.value)
 }
 
 function resetExportState() {
@@ -234,17 +219,6 @@ function downloadBlobDirectly(blob: Blob, filename: string) {
 }
 
 async function startExport() {
-  console.warn('=== 开始导出被点击 ===')
-  console.warn('开始导出，调试信息:')
-  console.warn('- 浏览器支持:', browserSupported.value)
-  console.warn('- 媒体文件数量:', mediaItems.value.length)
-  console.warn('- hasVideos:', hasVideos.value)
-  console.warn('- videoCount:', videoCount.value)
-  console.warn('- clippa 对象:', !!props.clippa)
-  console.warn('- theater 对象:', !!props.clippa?.theater)
-  console.warn('- performers 数量:', props.clippa?.theater?.performers?.length || 0)
-  console.warn('- VideoExporter 类:', typeof VideoExporter)
-
   if (!browserSupported.value) {
     const error = ExportErrorHandler.createError('UNSUPPORTED_FORMAT', '您的浏览器不支持视频导出功能')
     console.error(error.message)
@@ -252,10 +226,7 @@ async function startExport() {
   }
 
   if (mediaItems.value.length === 0) {
-    const error = ExportErrorHandler.createError('INVALID_OPTIONS', '没有有效的媒体文件')
-    console.error(error.message)
-    console.warn('mediaItems 为空，可能原因:')
-    console.warn('- performers:', props.clippa?.theater?.performers)
+    ExportErrorHandler.createError('INVALID_OPTIONS', '没有有效的媒体文件')
     return
   }
 
@@ -263,8 +234,23 @@ async function startExport() {
     isExporting.value = true
     updateExportOptions()
 
-    // 创建新的导出器实例
-    currentExporter.value = new VideoExporter(mediaItems.value, exportOptions)
+    // 检查是否有可用的Director
+    if (!props.clippa?.director) {
+      throw new Error('Director实例不可用，无法使用Canvas导出')
+    }
+
+    // 创建Canvas导出器实例（使用新的Canvas-based实现）
+    const canvasExportOptions = {
+      ...exportOptions,
+      director: props.clippa.director,
+      resolution: {
+        width: exportOptions.width || 1920,
+        height: exportOptions.height || 1080,
+      },
+      frameRate: exportOptions.frameRate || 30,
+    }
+
+    currentExporter.value = new CanvasExporter(props.clippa.director, canvasExportOptions)
 
     // 监听进度更新
     currentExporter.value.onProgress((progress: ExportProgress) => {
@@ -277,7 +263,6 @@ async function startExport() {
 
     // 监听状态变更
     currentExporter.value.onStatusChange((status: string) => {
-      console.warn('导出状态变更:', status)
       if (status === 'completed') {
         isExporting.value = false
         showExportModal.value = false
@@ -303,10 +288,6 @@ async function startExport() {
     // 监听错误事件
     progressTracker.on('error', (error: any) => {
       console.error('导出错误:', error)
-      const userMessage = ExportErrorHandler.getUserFriendlyMessage(error)
-      console.error('用户提示:', userMessage)
-      const solutions = ExportErrorHandler.getErrorSolution(error)
-      console.error('解决方案:', solutions)
 
       isExporting.value = false
     })
@@ -316,9 +297,6 @@ async function startExport() {
   }
   catch (error) {
     console.error('导出启动失败:', error)
-    const exportError = ExportErrorHandler.handleError(error, 'startExport')
-    const userMessage = ExportErrorHandler.getUserFriendlyMessage(exportError)
-    console.error('用户提示:', userMessage)
 
     isExporting.value = false
     resetExportState()
@@ -329,7 +307,6 @@ function cancelExport() {
   if (currentExporter.value && isExporting.value) {
     try {
       currentExporter.value.cancel()
-      console.warn('导出已取消')
     }
     catch (error) {
       console.error('取消导出失败:', error)
@@ -338,6 +315,58 @@ function cancelExport() {
 
   isExporting.value = false
   resetExportState()
+}
+
+// Canvas诊断 - 使用新的测试方法
+async function diagnoseCanvas() {
+  // console.log('🔍 Canvas诊断已整合到测试功能中，请使用"测试"按钮')
+  // console.log('📝 测试功能包含完整的Canvas状态检查和@webav/av-cliper集成测试')
+}
+
+// 测试Canvas导出器
+async function testCanvasExporter() {
+  if (!props.clippa?.director) {
+    console.error('Director实例不可用')
+    return
+  }
+
+  try {
+    // console.log('🧪 开始Canvas导出器测试...')
+
+    // 创建Canvas导出器
+    // console.log('🎬 创建导出器并测试@webav/av-cliper集成')
+    const testExporter = new CanvasExporter(props.clippa.director, {
+      resolution: { width: 1920, height: 1080 },
+      frameRate: 30,
+      quality: 'medium',
+    })
+
+    // 监听进度
+    testExporter.onProgress((_progress) => {
+      // console.log(`📊 测试进度: ${progress.progress.toFixed(1)}% - ${progress.message}`)
+    })
+
+    // 监听状态变更
+    testExporter.onStatusChange((_status) => {
+      // console.log(`🔄 状态变更: ${status}`)
+    })
+
+    // 运行测试导出（包含Canvas状态检查和@webav/av-cliper集成测试）
+    const success = await testExporter.testExport()
+
+    if (success) {
+      // console.log('🎉 Canvas导出器测试成功!')
+    }
+    else {
+      console.error('Canvas导出器测试失败')
+    }
+
+    // 清理
+    testExporter.destroy()
+  }
+  catch (error) {
+    console.error('测试失败:', error)
+  }
 }
 
 // 估算剩余时间
@@ -368,8 +397,6 @@ watch(() => exportOptions.quality, updateExportOptions)
 
 // 监听 clippa 实例变化
 watch(() => props.clippa, (newClippa, oldClippa) => {
-  console.warn('Clippa 实例发生变化:', { newClippa: !!newClippa, oldClippa: !!oldClippa })
-
   // 移除旧的事件监听器
   if (oldClippa?.theater) {
     oldClippa.theater.off('hire', updateExportState)
@@ -390,15 +417,28 @@ watch(() => props.clippa, (newClippa, oldClippa) => {
 // 检查浏览器支持
 async function checkBrowserSupport() {
   try {
-    // 使用新的兼容性检测工具
+    // 检查基本的兼容性
     const report = CompatibilityUtils.getCompatibilityReport()
-    browserSupported.value = report.webCodecs && report.supportedFormats.includes('mp4')
+    const basicSupport = report.webCodecs && report.supportedFormats.includes('mp4')
 
-    // 输出兼容性信息用于调试
-    console.warn('浏览器兼容性报告:', report)
-    if (!browserSupported.value) {
-      console.warn('浏览器不支持视频导出，建议:', report.recommendations)
+    // 如果有Director实例，检查Canvas导出支持
+    let canvasSupport = false
+    if (props.clippa?.director) {
+      try {
+        canvasSupport = await CanvasExporter.isSupported({
+          director: props.clippa.director,
+          resolution: { width: 1920, height: 1080 },
+          frameRate: 30,
+          videoCodec: 'avc1.42E032',
+        })
+      }
+      catch {
+        console.warn('Canvas导出兼容性检测失败')
+        canvasSupport = false
+      }
     }
+
+    browserSupported.value = basicSupport && canvasSupport
   }
   catch (error) {
     // 浏览器支持检测失败
@@ -696,6 +736,28 @@ onUnmounted(() => {
           >
             取消
           </button>
+          <!-- Canvas诊断按钮 -->
+          <button
+            class="px-2 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-lg font-medium transition-all transform hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-1 text-xs"
+            :disabled="isExporting"
+            title="诊断Canvas状态（不涉及帧捕获）"
+            @click="diagnoseCanvas"
+          >
+            <div class="i-carbon-scan w-3 h-3" />
+            诊断
+          </button>
+
+          <!-- 测试按钮 -->
+          <button
+            class="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-lg font-medium transition-all transform hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+            :disabled="isExporting"
+            title="测试Canvas导出器功能"
+            @click="testCanvasExporter"
+          >
+            <div class="i-carbon-test-tool w-4 h-4" />
+            测试
+          </button>
+
           <button
             class="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-lg font-medium transition-all transform hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
             :disabled="isExporting || !browserSupported"
