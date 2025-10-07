@@ -140,4 +140,79 @@ export interface ExportConfig {
   overwrite?: boolean
 }
 
+/**
+ * Canvas导出选项
+ */
+export interface CanvasExportOptions extends ExportOptions {
+  /** Director实例 */
+  director: any // TODO: 添加正确的Director类型导入
+  /** 导出分辨率 */
+  resolution?: {
+    width: number
+    height: number
+  }
+  /** 帧率 */
+  frameRate?: number
+  /** 视频编解码器 */
+  videoCodec?: string
+  /** 音频编解码器 */
+  audioCodec?: string
+}
+
+/**
+ * 编码器配置
+ */
+export interface EncoderConfig {
+  /** 视频宽度 */
+  width: number
+  /** 视频高度 */
+  height: number
+  /** 视频编解码器 */
+  videoCodec?: string
+  /** 音频编解码器 */
+  audioCodec?: string
+  /** 比特率 */
+  bitrate?: number
+  /** 帧率 */
+  frameRate?: number
+  /** 关键帧间隔 */
+  keyframeInterval?: number
+  /** 是否包含音频 */
+  audio?: boolean
+}
+
+/**
+ * 帧数据接口
+ */
+export interface FrameData {
+  /** ImageData对象 */
+  imageData: ImageData
+  /** 时间戳（微秒） */
+  timestamp: number
+  /** 帧索引 */
+  index: number
+  /** 帧宽度 */
+  width: number
+  /** 帧高度 */
+  height: number
+}
+
+/**
+ * 编码进度信息
+ */
+export interface EncodingProgress {
+  /** 已编码帧数 */
+  encodedFrames: number
+  /** 总帧数 */
+  totalFrames: number
+  /** 当前进度百分比 */
+  progress: number
+  /** 当前阶段 */
+  stage: 'initializing' | 'encoding' | 'finalizing' | 'completed'
+  /** 编码速度（fps） */
+  encodingSpeed?: number
+  /** 预计剩余时间（秒） */
+  estimatedTimeRemaining?: number
+}
+
 export * from './events'

@@ -1,4 +1,7 @@
+import type { Director } from '@clippa/canvas'
 import type { ExportFormat, ExportOptions, ExportResult, MediaItem } from '../types'
+import type { CanvasExportOptions } from './CanvasExporter'
+import { CanvasExporter } from './CanvasExporter'
 import { VideoExporter } from './VideoExporter'
 
 /**
@@ -13,6 +16,13 @@ export class ExportManager {
   }
 
   /**
+   * 创建Canvas导出器
+   */
+  static createCanvasExporter(director: Director, options?: CanvasExportOptions): CanvasExporter {
+    return new CanvasExporter(director, { director, ...options })
+  }
+
+  /**
    * 快速导出视频 - 简化接口
    */
   static async exportVideo(
@@ -20,6 +30,17 @@ export class ExportManager {
     options?: ExportOptions,
   ): Promise<ExportResult> {
     const exporter = new VideoExporter(mediaItems, options)
+    return await exporter.export()
+  }
+
+  /**
+   * 快速导出Canvas视频 - 基于Director
+   */
+  static async exportCanvas(
+    director: Director,
+    options?: CanvasExportOptions,
+  ): Promise<ExportResult> {
+    const exporter = new CanvasExporter(director, { director, ...options })
     return await exporter.export()
   }
 
@@ -36,6 +57,18 @@ export class ExportManager {
   }
 
   /**
+   * 快速导出并下载Canvas视频
+   */
+  static async downloadCanvas(
+    director: Director,
+    filename?: string,
+    options?: CanvasExportOptions,
+  ): Promise<void> {
+    const exporter = new CanvasExporter(director, { director, ...options })
+    await exporter.download(filename)
+  }
+
+  /**
    * 检查格式支持情况
    */
   static async checkSupport(format: ExportFormat, options?: ExportOptions): Promise<boolean> {
@@ -46,6 +79,13 @@ export class ExportManager {
       default:
         return false
     }
+  }
+
+  /**
+   * 检查Canvas导出支持情况
+   */
+  static async checkCanvasSupport(options?: CanvasExportOptions): Promise<boolean> {
+    return await CanvasExporter.isSupported(options)
   }
 
   /**

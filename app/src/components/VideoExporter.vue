@@ -325,6 +325,43 @@ async function startExport() {
   }
 }
 
+function cancelExport() {
+  if (currentExporter.value && isExporting.value) {
+    try {
+      currentExporter.value.cancel()
+      console.warn('导出已取消')
+    }
+    catch (error) {
+      console.error('取消导出失败:', error)
+    }
+  }
+
+  isExporting.value = false
+  resetExportState()
+}
+
+// 估算剩余时间
+function estimateRemainingTime(): string {
+  if (exportProgress.value <= 0 || !exportDetails.loaded || !exportDetails.total) {
+    return '计算中...'
+  }
+
+  // 简单的线性估算
+  const elapsed = Date.now() - (exportDetails.loaded ? Date.now() : 0)
+  const rate = exportDetails.loaded / Math.max(elapsed, 1)
+  const remaining = (exportDetails.total - exportDetails.loaded) / Math.max(rate, 1)
+
+  if (remaining < 1000) {
+    return '< 1秒'
+  }
+  else if (remaining < 60000) {
+    return `${Math.round(remaining / 1000)}秒`
+  }
+  else {
+    return `${Math.round(remaining / 60000)}分钟`
+  }
+}
+
 // 监听分辨率和质量变化
 watch(resolutionPreset, updateExportOptions)
 watch(() => exportOptions.quality, updateExportOptions)
@@ -370,9 +407,17 @@ async function checkBrowserSupport() {
   }
 }
 
+// 键盘事件处理
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && showExportModal.value && !isExporting.value) {
+    closeModal()
+  }
+}
+
 // 生命周期
 onMounted(() => {
   checkBrowserSupport()
+  document.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
@@ -383,6 +428,8 @@ onUnmounted(() => {
   if (props.clippa?.theater) {
     props.clippa.theater.off('hire', updateExportState)
   }
+
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -392,186 +439,270 @@ onUnmounted(() => {
     <button
       v-if="props.clippa"
       :disabled="isExporting || !hasVideos"
-      class="export-button"
-      :class="[
-        {
-          disabled: isExporting,
-          exporting: isExporting,
-        },
-      ]" @click="openModal"
+      class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-md transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:transform-none disabled:cursor-not-allowed"
+      @click="openModal"
     >
-      <span v-if="!isExporting" class="icon">📥</span>
-      <span v-else class="spinner">⏳</span>
-      {{ isExporting ? '导出中...' : '导出视频' }}
+      <div v-if="!isExporting" class="i-carbon-download w-4 h-4" />
+      <div v-else class="i-carbon-circle-dash animate-spin w-4 h-4" />
+      <span class="font-medium">{{ isExporting ? '导出中...' : '导出视频' }}</span>
     </button>
 
     <!-- 加载状态 -->
-    <div v-else class="loading-indicator">
-      <span class="spinner">⏳</span>
-      <span>初始化中...</span>
+    <div v-else class="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-gray-300 rounded-md opacity-80">
+      <div class="i-carbon-circle-dash animate-spin w-4 h-4" />
+      <span class="text-sm">初始化中...</span>
     </div>
 
     <!-- 导出模态框 -->
-    <div v-if="showExportModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>导出视频设置</h3>
-          <button class="close-button" @click="closeModal">
-            &times;
+    <div
+      v-if="showExportModal"
+      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      @click.self="closeModal"
+    >
+      <div class="bg-gray-900 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-800">
+        <!-- 模态框头部 -->
+        <div class="flex items-center justify-between p-6 border-b border-gray-800">
+          <h3 class="text-xl font-semibold text-white flex items-center gap-2">
+            <div class="i-carbon-video w-5 h-5 text-blue-400" />
+            导出视频设置
+          </h3>
+          <button
+            class="text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-lg transition-colors"
+            @click="closeModal"
+          >
+            <div class="i-carbon-close w-5 h-5" />
           </button>
         </div>
 
-        <div class="modal-body">
+        <div class="p-6 space-y-6">
           <!-- 基础设置 -->
-          <div class="settings-section">
-            <h4>基础设置</h4>
+          <section>
+            <h4 class="text-lg font-medium text-white mb-4 flex items-center gap-2">
+              <div class="i-carbon-settings w-4 h-4 text-blue-400" />
+              基础设置
+            </h4>
 
-            <div class="setting-item">
-              <label for="quality">视频质量</label>
-              <select id="quality" v-model="exportOptions.quality" class="quality-select">
-                <option value="low">
-                  低质量 (小文件)
-                </option>
-                <option value="medium">
-                  中等质量
-                </option>
-                <option value="high">
-                  高质量 (大文件)
-                </option>
-              </select>
-            </div>
+            <div class="space-y-4">
+              <div>
+                <label for="quality" class="block text-sm font-medium text-gray-300 mb-2">视频质量</label>
+                <select
+                  id="quality"
+                  v-model="exportOptions.quality"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option value="low">
+                    低质量 (小文件)
+                  </option>
+                  <option value="medium">
+                    中等质量
+                  </option>
+                  <option value="high">
+                    高质量 (大文件)
+                  </option>
+                </select>
+              </div>
 
-            <div class="setting-item">
-              <label for="resolution">分辨率</label>
-              <select id="resolution" v-model="resolutionPreset" class="resolution-select">
-                <option value="480p">
-                  480p (854×480)
-                </option>
-                <option value="720p">
-                  720p (1280×720)
-                </option>
-                <option value="1080p" selected>
-                  1080p (1920×1080)
-                </option>
-                <option value="4k">
-                  4K (3840×2160)
-                </option>
-              </select>
-            </div>
+              <div>
+                <label for="resolution" class="block text-sm font-medium text-gray-300 mb-2">分辨率</label>
+                <select
+                  id="resolution"
+                  v-model="resolutionPreset"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option value="480p">
+                    480p (854×480)
+                  </option>
+                  <option value="720p">
+                    720p (1280×720)
+                  </option>
+                  <option value="1080p" selected>
+                    1080p (1920×1080)
+                  </option>
+                  <option value="4k">
+                    4K (3840×2160)
+                  </option>
+                </select>
+              </div>
 
-            <div class="setting-item">
-              <label for="filename">文件名</label>
-              <input
-                id="filename"
-                v-model="filename"
-                type="text"
-                placeholder="输入文件名（不含扩展名）"
-                class="filename-input"
-              >
+              <div>
+                <label for="filename" class="block text-sm font-medium text-gray-300 mb-2">文件名</label>
+                <input
+                  id="filename"
+                  v-model="filename"
+                  type="text"
+                  placeholder="输入文件名（不含扩展名）"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+              </div>
             </div>
-          </div>
+          </section>
 
           <!-- 高级设置 -->
-          <div class="settings-section">
-            <h4>高级设置</h4>
+          <section>
+            <h4 class="text-lg font-medium text-white mb-4 flex items-center gap-2">
+              <div class="i-carbon-settings-adjust w-4 h-4 text-blue-400" />
+              高级设置
+            </h4>
 
-            <div class="setting-item">
-              <label for="bitrate">比特率 (Mbps)</label>
-              <input
-                id="bitrate"
-                v-model.number="exportOptions.bitrate"
-                type="number"
-                min="1"
-                max="50"
-                step="0.5"
-                class="bitrate-input"
-              >
-            </div>
-
-            <div class="setting-item">
-              <label for="framerate">帧率 (fps)</label>
-              <input
-                id="framerate"
-                v-model.number="exportOptions.frameRate"
-                type="number"
-                min="1"
-                max="120"
-                step="1"
-                class="framerate-input"
-              >
-            </div>
-
-            <div class="setting-item checkbox-item">
-              <input
-                id="include-audio"
-                v-model="exportOptions.audio"
-                type="checkbox"
-                class="audio-checkbox"
-              >
-              <label for="include-audio">包含音频</label>
-            </div>
-
-            <div class="setting-item">
-              <label for="bg-color">背景颜色</label>
-              <input
-                id="bg-color"
-                v-model="exportOptions.bgColor"
-                type="color"
-                class="color-picker"
-              >
-            </div>
-          </div>
-
-          <!-- 预览信息 -->
-          <div class="preview-section">
-            <h4>导出信息</h4>
-            <div class="preview-info">
-              <div class="info-item">
-                <span class="label">时长:</span>
-                <span class="value">{{ formatDuration(videoDuration) }}</span>
+            <div class="space-y-4">
+              <div>
+                <label for="bitrate" class="block text-sm font-medium text-gray-300 mb-2">
+                  比特率 (Mbps)
+                  <span class="text-xs text-gray-500 ml-1" title="建议：5-10 Mbps 为高质量，1-5 Mbps 为中等质量">ℹ️</span>
+                </label>
+                <input
+                  id="bitrate"
+                  v-model.number="exportOptions.bitrate"
+                  type="number"
+                  min="1"
+                  max="50"
+                  step="0.5"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  title="更高的比特率意味着更好的视频质量，但文件会更大"
+                >
               </div>
-              <div class="info-item">
-                <span class="label">预估大小:</span>
-                <span class="value">{{ estimatedFileSize }}</span>
+
+              <div>
+                <label for="framerate" class="block text-sm font-medium text-gray-300 mb-2">
+                  帧率 (fps)
+                  <span class="text-xs text-gray-500 ml-1" title="建议：24-30 fps 为标准，60 fps 为流畅">ℹ️</span>
+                </label>
+                <input
+                  id="framerate"
+                  v-model.number="exportOptions.frameRate"
+                  type="number"
+                  min="1"
+                  max="120"
+                  step="1"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  title="更高的帧率使视频更流畅，但文件会更大"
+                >
               </div>
-              <div class="info-item">
-                <span class="label">浏览器支持:</span>
-                <span class="value" :class="{ unsupported: !browserSupported }">
+
+              <div class="flex items-center gap-3">
+                <input
+                  id="include-audio"
+                  v-model="exportOptions.audio"
+                  type="checkbox"
+                  class="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                >
+                <label for="include-audio" class="text-sm font-medium text-gray-300 cursor-pointer">包含音频</label>
+              </div>
+
+              <div>
+                <label for="bg-color" class="block text-sm font-medium text-gray-300 mb-2">背景颜色</label>
+                <div class="flex items-center gap-3">
+                  <input
+                    id="bg-color"
+                    v-model="exportOptions.bgColor"
+                    type="color"
+                    class="w-12 h-10 bg-gray-800 border border-gray-700 rounded cursor-pointer"
+                  >
+                  <span class="text-sm text-gray-400 font-mono">{{ exportOptions.bgColor }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 导出信息 -->
+          <section>
+            <h4 class="text-lg font-medium text-white mb-4 flex items-center gap-2">
+              <div class="i-carbon-information w-4 h-4 text-blue-400" />
+              导出信息
+            </h4>
+
+            <div class="bg-gray-800 rounded-lg p-4 space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-400">时长:</span>
+                <span class="text-sm font-medium text-white">{{ formatDuration(videoDuration) }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-400">预估大小:</span>
+                <span class="text-sm font-medium text-white">{{ estimatedFileSize }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-400">浏览器支持:</span>
+                <span class="text-sm font-medium" :class="browserSupported ? 'text-green-400' : 'text-red-400'">
                   {{ browserSupported ? '✅ 支持' : '❌ 不支持' }}
                 </span>
               </div>
             </div>
-          </div>
+          </section>
         </div>
 
         <!-- 导出进度 -->
-        <div v-if="isExporting" class="export-progress">
-          <div class="progress-label">
-            <span>导出进度</span>
-            <span>{{ Math.round(exportProgress) }}%</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: `${exportProgress}%` }" />
-          </div>
-          <div class="progress-details">
-            <span v-if="exportDetails.stage" class="progress-stage">
-              阶段: {{ exportDetails.stage }}
-            </span>
-            <span v-if="exportDetails.message" class="progress-message">
-              {{ exportDetails.message }}
-            </span>
-            <span v-if="exportDetails.loaded > 0">
-              {{ formatFileSize(exportDetails.loaded) }} / {{ formatFileSize(exportDetails.total) }}
-            </span>
+        <div v-if="isExporting" class="px-6 pb-6">
+          <div class="bg-gray-800 rounded-lg p-4 space-y-4">
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-medium text-white flex items-center gap-2">
+                <div class="i-carbon-circle-dash animate-spin w-4 h-4 text-blue-400" />
+                导出进度
+              </span>
+              <div class="flex items-center gap-3">
+                <span class="text-sm font-medium text-blue-400">{{ Math.round(exportProgress) }}%</span>
+                <button
+                  class="text-red-400 hover:text-red-300 hover:bg-red-500/20 p-1.5 rounded-md transition-all"
+                  title="取消导出"
+                  @click="cancelExport"
+                >
+                  <div class="i-carbon-close w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden shadow-inner">
+              <div
+                class="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500 ease-out relative"
+                :style="{ width: `${exportProgress}%` }"
+              >
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2 text-xs">
+              <div v-if="exportDetails.stage" class="flex justify-between items-center py-1 px-2 bg-blue-500/10 rounded">
+                <span class="text-blue-400 font-medium">当前阶段:</span>
+                <span class="text-blue-300">{{ exportDetails.stage }}</span>
+              </div>
+              <div v-if="exportDetails.message" class="flex justify-between items-center py-1 px-2 bg-gray-700/50 rounded">
+                <span class="text-gray-400">状态:</span>
+                <span class="text-gray-300 italic">{{ exportDetails.message }}</span>
+              </div>
+              <div v-if="exportDetails.loaded > 0" class="flex justify-between items-center py-1 px-2 bg-gray-700/50 rounded">
+                <span class="text-gray-400">处理数据:</span>
+                <span class="text-gray-300 font-mono">{{ formatFileSize(exportDetails.loaded) }} / {{ formatFileSize(exportDetails.total) }}</span>
+              </div>
+            </div>
+
+            <!-- 速度指示器 -->
+            <div class="flex justify-center items-center gap-4 pt-2 border-t border-gray-700">
+              <div class="flex items-center gap-2 text-xs text-gray-400">
+                <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <span>正在处理</span>
+              </div>
+              <div class="text-xs text-gray-500">
+                预计剩余时间: {{ estimateRemainingTime() }}
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- 操作按钮 -->
-        <div class="modal-footer">
-          <button class="cancel-button" :disabled="isExporting" @click="closeModal">
+        <div class="flex justify-end gap-3 p-6 border-t border-gray-800">
+          <button
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+            :disabled="isExporting"
+            @click="closeModal"
+          >
             取消
           </button>
-          <button class="export-button" :disabled="isExporting || !browserSupported" @click="startExport">
+          <button
+            class="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-lg font-medium transition-all transform hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
+            :disabled="isExporting || !browserSupported"
+            @click="startExport"
+          >
+            <div v-if="isExporting" class="i-carbon-circle-dash animate-spin w-4 h-4" />
+            <div v-else class="i-carbon-download w-4 h-4" />
             {{ isExporting ? '导出中...' : '开始导出' }}
           </button>
         </div>
@@ -581,342 +712,5 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.video-exporter {
-  display: inline-block;
-}
-
-.export-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.export-button:hover:not(.disabled) {
-  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.export-button.disabled {
-  background: #cbd5e0;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.export-button.exporting {
-  background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
-}
-
-.spinner {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: #1a1a2e;
-  border-radius: 12px;
-  min-width: 500px;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #2d3748;
-}
-
-.modal-header h3 {
-  margin: 0;
-  color: #e2e8f0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  color: #a0aec0;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.close-button:hover {
-  background: #2d3748;
-  color: #e2e8f0;
-}
-
-.modal-body {
-  padding: 24px;
-}
-
-.settings-section {
-  margin-bottom: 24px;
-}
-
-.settings-section h4 {
-  margin: 0 0 16px 0;
-  color: #e2e8f0;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.setting-item {
-  margin-bottom: 16px;
-}
-
-.setting-item label {
-  display: block;
-  margin-bottom: 6px;
-  color: #a0aec0;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.quality-select,
-.resolution-select,
-.filename-input,
-.bitrate-input,
-.framerate-input {
-  width: 100%;
-  padding: 8px 12px;
-  background: #2d3748;
-  border: 1px solid #4a5568;
-  border-radius: 6px;
-  color: #e2e8f0;
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-
-.quality-select:focus,
-.resolution-select:focus,
-.filename-input:focus,
-.bitrate-input:focus,
-.framerate-input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.checkbox-item label {
-  margin: 0;
-  cursor: pointer;
-}
-
-.audio-checkbox,
-.color-picker {
-  cursor: pointer;
-}
-
-.color-picker {
-  width: 60px;
-  height: 36px;
-  border: 1px solid #4a5568;
-  border-radius: 6px;
-  background: #2d3748;
-}
-
-.preview-section h4 {
-  margin: 0 0 12px 0;
-  color: #e2e8f0;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.preview-info {
-  background: #2d3748;
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.info-item:last-child {
-  margin-bottom: 0;
-}
-
-.info-item .label {
-  color: #a0aec0;
-  font-size: 14px;
-  margin: 0;
-}
-
-.info-item .value {
-  color: #e2e8f0;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.info-item .value.unsupported {
-  color: #f56565;
-}
-
-.export-progress {
-  margin: 24px 0;
-}
-
-.progress-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.progress-label span {
-  color: #e2e8f0;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 8px;
-  background: #2d3748;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  transition: width 0.3s ease;
-}
-
-.progress-details {
-  margin-top: 8px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.progress-stage {
-  color: #667eea;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.progress-message {
-  color: #a0aec0;
-  font-size: 12px;
-  font-style: italic;
-}
-
-.progress-details span:not(.progress-stage):not(.progress-message) {
-  color: #a0aec0;
-  font-size: 12px;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding: 20px 24px;
-  border-top: 1px solid #2d3748;
-}
-
-.cancel-button {
-  padding: 8px 16px;
-  background: #2d3748;
-  color: #e2e8f0;
-  border: 1px solid #4a5568;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.cancel-button:hover:not(:disabled) {
-  background: #4a5568;
-  transform: translateY(-1px);
-}
-
-.cancel-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.modal-footer .export-button {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-}
-
-.modal-footer .export-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
-}
-
-.loading-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #4a5568;
-  color: #a0aec0;
-  border-radius: 6px;
-  font-size: 14px;
-  opacity: 0.8;
-}
-
-/* 响应式设计 */
-@media (max-width: 640px) {
-  .modal-content {
-    min-width: 90vw;
-    margin: 20px;
-  }
-
-  .modal-header,
-  .modal-body,
-  .modal-footer {
-    padding: 16px;
-  }
-}
+/* 所有样式已使用 UnoCSS 重构，无需额外 CSS */
 </style>
