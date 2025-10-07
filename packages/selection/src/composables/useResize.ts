@@ -30,6 +30,8 @@ interface UseResizeOptions {
   throttleInterval?: number
   /** 是否启用requestAnimationFrame优化 */
   useRAF?: boolean
+  /** 调试模式 */
+  _debug?: boolean
 }
 
 export function useResize(

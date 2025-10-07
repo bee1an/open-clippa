@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import type { Clippa, VideoExportOptions, VideoExportProgress } from 'open-clippa'
+// 类型导入（按字母顺序）
+import type { Clippa } from 'open-clippa'
+import type { ExportOptions, ExportProgress, MediaItem } from '../../../packages/export/src/types'
+
+// 外部依赖导入
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+
+// 内部包导入
+import { CompatibilityUtils, ExportErrorHandler, VideoExporter } from '../../../packages/export/src'
 
 // Props
 interface Props {
@@ -15,24 +22,18 @@ const isExporting = ref(false)
 const browserSupported = ref(false)
 const exportProgress = ref(0)
 const filename = ref('')
-const progressInterval = ref<number | null>(null)
+const currentExporter = ref<VideoExporter | null>(null)
 
 // 导出详情
 const exportDetails = reactive({
   loaded: 0,
   total: 0,
+  stage: '' as ExportProgress['stage'],
+  message: '' as string,
 })
 
-// 事件监听器引用
-const eventListeners = ref<{
-  exportStart?: (options: VideoExportOptions) => void
-  exportProgress?: (progress: VideoExportProgress) => void
-  exportComplete?: (blob: Blob) => void
-  exportError?: (error: Error) => void
-}>({})
-
 // 导出选项
-const exportOptions = reactive<VideoExportOptions>({
+const exportOptions = reactive<ExportOptions>({
   quality: 'medium',
   width: 1920,
   height: 1080,
@@ -61,34 +62,14 @@ const qualityPresets = {
   high: { bitrate: 1.5 },
 }
 
+// 导出相关状态（使用 ref 而非 computed）
+const videoCount = ref(0)
+const videoDuration = ref(0)
+const mediaItems = ref<MediaItem[]>([])
+
 // 计算属性
 const hasVideos = computed(() => {
-  // 临时返回 true 以测试按钮功能
-  // 后续可以根据需要恢复更复杂的检查
-  return true
-})
-
-const videoCount = computed(() => {
-  return props.clippa?.theater?.performers?.length || 0
-})
-
-const videoDuration = computed(() => {
-  // 计算时间轴的总时长（从最早开始到最晚结束）
-  if (!props.clippa?.theater?.performers)
-    return 0
-
-  let timelineStart = Infinity
-  let timelineEnd = 0
-
-  for (const performer of props.clippa.theater.performers) {
-    const videoStart = performer.start || 0
-    const videoEnd = videoStart + (performer.duration || 0)
-
-    timelineStart = Math.min(timelineStart, videoStart)
-    timelineEnd = Math.max(timelineEnd, videoEnd)
-  }
-
-  return timelineEnd - timelineStart
+  return videoCount.value > 0
 })
 
 const estimatedFileSize = computed(() => {
@@ -98,6 +79,66 @@ const estimatedFileSize = computed(() => {
   return formatFileSize(estimatedSize * 1024 * 1024)
 })
 
+// 更新导出相关状态的方法
+function updateExportState() {
+  if (!props.clippa?.theater?.performers) {
+    videoCount.value = 0
+    videoDuration.value = 0
+    mediaItems.value = []
+    return
+  }
+
+  const performers = props.clippa.theater.performers
+
+  // 更新视频数量
+  videoCount.value = performers.length
+
+  // 计算时间轴总时长
+  if (performers.length === 0) {
+    videoDuration.value = 0
+    mediaItems.value = []
+  }
+  else {
+    let timelineStart = Infinity
+    let timelineEnd = 0
+
+    const newMediaItems: MediaItem[] = performers.map((performer) => {
+      const videoStart = performer.start || 0
+      const videoEnd = videoStart + (performer.duration || 5000)
+
+      timelineStart = Math.min(timelineStart, videoStart)
+      timelineEnd = Math.max(timelineEnd, videoEnd)
+
+      // 类型断言：performer 可能有额外的媒体属性
+      const performerWithMedia = performer as any
+      return {
+        src: performerWithMedia.src || performerWithMedia.url || '',
+        start: performer.start || 0,
+        duration: performer.duration || 5000,
+        position: {
+          x: performerWithMedia.x || 0,
+          y: performerWithMedia.y || 0,
+          width: performerWithMedia.width || 1920,
+          height: performerWithMedia.height || 1080,
+        },
+        playbackRate: performerWithMedia.playbackRate || 1,
+        volume: performerWithMedia.volume || 1,
+        muted: performerWithMedia.muted || false,
+      }
+    })
+
+    videoDuration.value = timelineEnd - timelineStart
+    mediaItems.value = newMediaItems
+  }
+
+  console.warn('导出状态已更新:', {
+    videoCount: videoCount.value,
+    videoDuration: videoDuration.value,
+    mediaItemsCount: mediaItems.value.length,
+    hasVideos: hasVideos.value,
+  })
+}
+
 // 方法
 function closeModal() {
   if (!isExporting.value) {
@@ -106,10 +147,32 @@ function closeModal() {
   }
 }
 
+function openModal() {
+  console.warn('=== 导出按钮被点击 ===')
+  console.warn('打开导出模态框，调试信息:')
+  console.warn('- hasVideos:', hasVideos.value)
+  console.warn('- videoCount:', videoCount.value)
+  console.warn('- 浏览器支持:', browserSupported.value)
+  console.warn('- performers 数量:', props.clippa?.theater?.performers?.length || 0)
+  console.warn('- 按钮禁用状态:', isExporting.value || !hasVideos.value)
+
+  // 强制显示模态框进行调试
+  showExportModal.value = true
+  console.warn('- 模态框状态:', showExportModal.value)
+}
+
 function resetExportState() {
   exportProgress.value = 0
   exportDetails.loaded = 0
   exportDetails.total = 0
+  exportDetails.stage = undefined
+  exportDetails.message = ''
+
+  // 清理导出器
+  if (currentExporter.value) {
+    currentExporter.value.destroy()
+    currentExporter.value = null
+  }
 }
 
 function formatDuration(milliseconds: number): string {
@@ -146,29 +209,8 @@ function updateExportOptions() {
   }
 }
 
-function startProgressPolling() {
-  // 清理现有的轮询
-  cleanupProgressPolling()
-
-  // 每100ms检查一次进度
-  progressInterval.value = setInterval(() => {
-    if (props.clippa) {
-      const progress = props.clippa.getExportProgress()
-      if (progress) {
-        exportProgress.value = progress.progress
-        exportDetails.loaded = progress.loaded
-        exportDetails.total = progress.total
-      }
-    }
-  }, 100)
-}
-
-function cleanupProgressPolling() {
-  if (progressInterval.value) {
-    clearInterval(progressInterval.value)
-    progressInterval.value = null
-  }
-}
+// 使用新的导出API，不需要轮询机制
+// 进度通过事件监听器自动更新
 
 function downloadBlobDirectly(blob: Blob, filename: string) {
   try {
@@ -192,18 +234,28 @@ function downloadBlobDirectly(blob: Blob, filename: string) {
 }
 
 async function startExport() {
+  console.warn('=== 开始导出被点击 ===')
+  console.warn('开始导出，调试信息:')
+  console.warn('- 浏览器支持:', browserSupported.value)
+  console.warn('- 媒体文件数量:', mediaItems.value.length)
+  console.warn('- hasVideos:', hasVideos.value)
+  console.warn('- videoCount:', videoCount.value)
+  console.warn('- clippa 对象:', !!props.clippa)
+  console.warn('- theater 对象:', !!props.clippa?.theater)
+  console.warn('- performers 数量:', props.clippa?.theater?.performers?.length || 0)
+  console.warn('- VideoExporter 类:', typeof VideoExporter)
+
   if (!browserSupported.value) {
-    console.error('您的浏览器不支持视频导出功能')
+    const error = ExportErrorHandler.createError('UNSUPPORTED_FORMAT', '您的浏览器不支持视频导出功能')
+    console.error(error.message)
     return
   }
 
-  if (!hasVideos.value) {
-    console.error('没有可导出的视频内容')
-    return
-  }
-
-  if (!props.clippa) {
-    console.error('Clippa 实例未初始化')
+  if (mediaItems.value.length === 0) {
+    const error = ExportErrorHandler.createError('INVALID_OPTIONS', '没有有效的媒体文件')
+    console.error(error.message)
+    console.warn('mediaItems 为空，可能原因:')
+    console.warn('- performers:', props.clippa?.theater?.performers)
     return
   }
 
@@ -211,51 +263,65 @@ async function startExport() {
     isExporting.value = true
     updateExportOptions()
 
-    // 添加事件监听器
-    eventListeners.value.exportStart = (_options) => {
-      // 导出开始事件处理
-      isExporting.value = true
-    }
-    props.clippa.on('exportStart', eventListeners.value.exportStart)
+    // 创建新的导出器实例
+    currentExporter.value = new VideoExporter(mediaItems.value, exportOptions)
 
-    eventListeners.value.exportProgress = (progress: VideoExportProgress) => {
+    // 监听进度更新
+    currentExporter.value.onProgress((progress: ExportProgress) => {
       exportProgress.value = progress.progress
       exportDetails.loaded = progress.loaded
       exportDetails.total = progress.total
-    }
-    props.clippa.on('exportProgress', eventListeners.value.exportProgress)
+      exportDetails.stage = progress.stage || undefined
+      exportDetails.message = progress.message || ''
+    })
 
-    eventListeners.value.exportComplete = (blob: Blob) => {
-      cleanupProgressPolling()
-      exportProgress.value = 100
-      isExporting.value = false
+    // 监听状态变更
+    currentExporter.value.onStatusChange((status: string) => {
+      console.warn('导出状态变更:', status)
+      if (status === 'completed') {
+        isExporting.value = false
+        showExportModal.value = false
+        resetExportState()
+      }
+      else if (status === 'error') {
+        isExporting.value = false
+      }
+    })
 
-      // 直接处理下载，使用已获取的 blob
+    // 监听完成事件
+    const progressTracker = currentExporter.value.getProgressTracker()
+
+    progressTracker.on('completed', (result: any) => {
       const finalFilename = filename.value.trim() || `clippa-export-${Date.now()}`
-      downloadBlobDirectly(blob, finalFilename)
+      downloadBlobDirectly(result.blob, finalFilename)
 
+      isExporting.value = false
       showExportModal.value = false
       resetExportState()
-    }
-    props.clippa.on('exportComplete', eventListeners.value.exportComplete)
+    })
 
-    eventListeners.value.exportError = (error) => {
+    // 监听错误事件
+    progressTracker.on('error', (error: any) => {
       console.error('导出错误:', error)
-      cleanupProgressPolling()
-      isExporting.value = false
-    }
-    props.clippa.on('exportError', eventListeners.value.exportError)
+      const userMessage = ExportErrorHandler.getUserFriendlyMessage(error)
+      console.error('用户提示:', userMessage)
+      const solutions = ExportErrorHandler.getErrorSolution(error)
+      console.error('解决方案:', solutions)
 
-    // 开始进度轮询
-    startProgressPolling()
+      isExporting.value = false
+    })
 
     // 开始导出
-    await props.clippa.exportVideo(exportOptions)
+    await currentExporter.value.export()
   }
   catch (error) {
     console.error('导出启动失败:', error)
-    cleanupProgressPolling()
+    const exportError = ExportErrorHandler.handleError(error, 'startExport')
+    const userMessage = ExportErrorHandler.getUserFriendlyMessage(exportError)
+    console.error('用户提示:', userMessage)
+
     isExporting.value = false
+    resetExportState()
   }
 }
 
@@ -264,26 +330,42 @@ watch(resolutionPreset, updateExportOptions)
 watch(() => exportOptions.quality, updateExportOptions)
 
 // 监听 clippa 实例变化
-watch(() => props.clippa, (newClippa) => {
+watch(() => props.clippa, (newClippa, oldClippa) => {
+  console.warn('Clippa 实例发生变化:', { newClippa: !!newClippa, oldClippa: !!oldClippa })
+
+  // 移除旧的事件监听器
+  if (oldClippa?.theater) {
+    oldClippa.theater.off('hire', updateExportState)
+  }
+
+  // 添加新的事件监听器并初始化状态
   if (newClippa) {
     checkBrowserSupport()
+
+    // 监听 theater 的 hire 事件
+    newClippa.theater.on('hire', updateExportState)
+
+    // 初始化导出状态
+    updateExportState()
   }
 }, { immediate: true })
 
 // 检查浏览器支持
 async function checkBrowserSupport() {
   try {
-    if (props.clippa) {
-      // 使用静态方法检查浏览器支持
-      const ClippaClass = Object.getPrototypeOf(props.clippa).constructor
-      browserSupported.value = await ClippaClass.isExportSupported?.()
-    }
-    else {
-      browserSupported.value = false
+    // 使用新的兼容性检测工具
+    const report = CompatibilityUtils.getCompatibilityReport()
+    browserSupported.value = report.webCodecs && report.supportedFormats.includes('mp4')
+
+    // 输出兼容性信息用于调试
+    console.warn('浏览器兼容性报告:', report)
+    if (!browserSupported.value) {
+      console.warn('浏览器不支持视频导出，建议:', report.recommendations)
     }
   }
   catch (error) {
     // 浏览器支持检测失败
+    console.error('兼容性检测失败:', error)
     browserSupported.value = false
   }
 }
@@ -294,23 +376,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  // 清理进度轮询
-  cleanupProgressPolling()
+  // 清理导出器
+  resetExportState()
 
   // 清理事件监听器
-  if (props.clippa) {
-    if (eventListeners.value.exportStart) {
-      props.clippa.off('exportStart', eventListeners.value.exportStart)
-    }
-    if (eventListeners.value.exportProgress) {
-      props.clippa.off('exportProgress', eventListeners.value.exportProgress)
-    }
-    if (eventListeners.value.exportComplete) {
-      props.clippa.off('exportComplete', eventListeners.value.exportComplete)
-    }
-    if (eventListeners.value.exportError) {
-      props.clippa.off('exportError', eventListeners.value.exportError)
-    }
+  if (props.clippa?.theater) {
+    props.clippa.theater.off('hire', updateExportState)
   }
 })
 </script>
@@ -324,10 +395,10 @@ onUnmounted(() => {
       class="export-button"
       :class="[
         {
-          disabled: isExporting || !hasVideos,
+          disabled: isExporting,
           exporting: isExporting,
         },
-      ]" @click="showExportModal = true"
+      ]" @click="openModal"
     >
       <span v-if="!isExporting" class="icon">📥</span>
       <span v-else class="spinner">⏳</span>
@@ -460,10 +531,6 @@ onUnmounted(() => {
                 <span class="value">{{ formatDuration(videoDuration) }}</span>
               </div>
               <div class="info-item">
-                <span class="label">视频数:</span>
-                <span class="value">{{ videoCount }} 个</span>
-              </div>
-              <div class="info-item">
                 <span class="label">预估大小:</span>
                 <span class="value">{{ estimatedFileSize }}</span>
               </div>
@@ -487,6 +554,12 @@ onUnmounted(() => {
             <div class="progress-fill" :style="{ width: `${exportProgress}%` }" />
           </div>
           <div class="progress-details">
+            <span v-if="exportDetails.stage" class="progress-stage">
+              阶段: {{ exportDetails.stage }}
+            </span>
+            <span v-if="exportDetails.message" class="progress-message">
+              {{ exportDetails.message }}
+            </span>
             <span v-if="exportDetails.loaded > 0">
               {{ formatFileSize(exportDetails.loaded) }} / {{ formatFileSize(exportDetails.total) }}
             </span>
@@ -761,9 +834,24 @@ onUnmounted(() => {
 .progress-details {
   margin-top: 8px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.progress-details span {
+.progress-stage {
+  color: #667eea;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.progress-message {
+  color: #a0aec0;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.progress-details span:not(.progress-stage):not(.progress-message) {
   color: #a0aec0;
   font-size: 12px;
 }

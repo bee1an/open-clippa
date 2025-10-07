@@ -1,4 +1,4 @@
-import type { VideoExportProgress } from 'open-clippa'
+import type { ExportProgress } from 'open-clippa'
 import { Clippa } from 'open-clippa'
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref } from 'vue'
@@ -54,7 +54,7 @@ export const useEditorStore = defineStore('editor', () => {
     exportState.value.exportOptions = options
   })
 
-  clippa.on('exportProgress', (progress: VideoExportProgress) => {
+  clippa.on('exportProgress', (progress: ExportProgress) => {
     exportState.value.exportProgress = progress.progress
   })
 

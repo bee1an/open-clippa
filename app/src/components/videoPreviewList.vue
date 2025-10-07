@@ -27,6 +27,7 @@ function closePreview() {
 // 从模态框添加到时间轴
 function handleAddToTimeline(videoFile: VideoFile) {
   const video = new Video({
+    id: `video-${Date.now()}`,
     src: videoFile.file,
     start: 0,
     duration: videoFile.duration,

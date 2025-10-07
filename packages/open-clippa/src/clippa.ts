@@ -1,15 +1,15 @@
 import type { MaybeArray } from 'type-aide'
-import type { VideoExportOptions, VideoExportProgress } from './codec'
+import type { ExportOptions, ExportProgress, MediaItem } from './export'
 import type { Performer } from './performer'
 import { VideoTrain } from '@clippa/timeline'
 import { Director, Stage, Theater } from './canvas'
-import { VideoExporter } from './codec'
+import { VideoExporter } from './export'
 import { Timeline } from './timeline'
 import { EventBus } from './utils'
 
 export interface ClippaEvents {
-  exportStart: [options: VideoExportOptions]
-  exportProgress: [progress: VideoExportProgress]
+  exportStart: [options: ExportOptions]
+  exportProgress: [progress: ExportProgress]
   exportComplete: [blob: Blob]
   exportError: [error: Error]
   [key: string]: unknown[]
@@ -94,7 +94,7 @@ export class Clippa extends EventBus<ClippaEvents> {
    * @param options - 导出选项
    * @returns Promise<Blob> - MP4 文件 Blob
    */
-  async exportVideo(options?: VideoExportOptions): Promise<Blob> {
+  async exportVideo(options?: ExportOptions): Promise<Blob> {
     if (this._isExporting) {
       throw new Error('正在导出中，请等待完成')
     }
@@ -102,10 +102,28 @@ export class Clippa extends EventBus<ClippaEvents> {
     this._isExporting = true
 
     try {
-      // 获取 theater中的所有表演者
+      // 获取 theater中的所有表演者并转换为 MediaItems
       const performers = this.theater.performers
+      const mediaItems = performers.map((performer): MediaItem => {
+        // 类型断言：performer 可能有额外的媒体属性
+        const performerWithMedia = performer as any
+        return {
+          src: performerWithMedia.src || performerWithMedia.url || '',
+          start: performer.start || 0,
+          duration: performer.duration || 5000,
+          position: {
+            x: performerWithMedia.x || 0,
+            y: performerWithMedia.y || 0,
+            width: performerWithMedia.width || 1920,
+            height: performerWithMedia.height || 1080,
+          },
+          playbackRate: performerWithMedia.playbackRate || 1,
+          volume: performerWithMedia.volume || 1,
+          muted: performerWithMedia.muted || false,
+        }
+      })
 
-      if (performers.length === 0) {
+      if (mediaItems.length === 0) {
         throw new Error('没有可导出的视频内容')
       }
 
@@ -113,10 +131,10 @@ export class Clippa extends EventBus<ClippaEvents> {
       this.emit('exportStart', options || {})
 
       // 创建视频导出器
-      this._videoExporter = new VideoExporter(performers, options)
+      this._videoExporter = new VideoExporter(mediaItems, options)
 
       // 执行导出
-      const blob = await this._videoExporter.export()
+      const result = await this._videoExporter.export()
 
       // 清理资源
       this._videoExporter.destroy()
@@ -125,10 +143,9 @@ export class Clippa extends EventBus<ClippaEvents> {
       // 先重置导出状态，再发射完成事件
       this._isExporting = false
 
-      // 发射导出完成事件
-      this.emit('exportComplete', blob)
-
-      return blob
+      // 发射导出完成事件（使用 result.blob）
+      this.emit('exportComplete', result.blob)
+      return result.blob
     }
     catch (error) {
       console.error('视频导出失败:', error)
@@ -146,7 +163,7 @@ export class Clippa extends EventBus<ClippaEvents> {
    * @param filename - 文件名，可选
    * @param options - 导出选项
    */
-  async downloadVideo(filename?: string, options?: VideoExportOptions): Promise<void> {
+  async downloadVideo(filename?: string, options?: ExportOptions): Promise<void> {
     try {
       const blob = await this.exportVideo(options)
 
@@ -176,7 +193,7 @@ export class Clippa extends EventBus<ClippaEvents> {
   /**
    * 获取导出进度
    */
-  getExportProgress(): VideoExportProgress | null {
+  getExportProgress(): ExportProgress | null {
     if (!this._videoExporter) {
       return null
     }
@@ -211,7 +228,7 @@ export class Clippa extends EventBus<ClippaEvents> {
   /**
    * 检查浏览器是否支持视频导出
    */
-  static async isExportSupported(options?: VideoExportOptions): Promise<boolean> {
+  static async isExportSupported(options?: ExportOptions): Promise<boolean> {
     try {
       return await VideoExporter.isSupported(options)
     }
