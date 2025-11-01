@@ -19,6 +19,7 @@ catalog:
   tsx: ^4.20.3
   type-aide: ^0.0.2
   typescript: ^5.8.3
+  unplugin-agent-sync: ^0.1.1
   unplugin-vue-components: ^29.0.0
   vitest: ^3.2.4
   yaml: ^2.8.0

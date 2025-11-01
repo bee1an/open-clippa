@@ -142,6 +142,7 @@ vite.config.ts.timestamp-*
 
 
 # custom
+CLAUDE.md
 QWEN.md
 GEMINI.md
 WARP.md

@@ -48,5 +48,10 @@
     "pcss",
     "postcss"
   ],
-  "kiroAgent.configureMCP": "Disabled"
+  "kiroAgent.configureMCP": "Disabled",
+
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "AGENTS.md": "CLAUDE.md, QWEN.md, GEMINI.md, WARP.md"
+  }
 }

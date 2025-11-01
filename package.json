@@ -3,10 +3,10 @@
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "scripts": {
-    "dev": "pnpm -C app dev",
+    "dev": "vite",
     "build": "pnpm cleanup && rolldown -c rolldown.config.ts",
-    "build:app": "pnpm -C app build",
-    "preview": "pnpm -C app preview --open",
+    "build:app": "vite build",
+    "preview": "vite preview --open",
     "lint:fix": "eslint --fix . && pnpm -C app lint:fix",
     "cleanup": "tsx scripts/cleanup.ts",
     "test": "vitest",
@@ -34,6 +34,7 @@
     "tsx": "catalog:",
     "type-aide": "catalog:",
     "typescript": "catalog:",
+    "unplugin-agent-sync": "catalog:",
     "unplugin-vue-components": "catalog:",
     "vitest": "catalog:",
     "yaml": "catalog:"
