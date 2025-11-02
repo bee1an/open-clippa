@@ -66,7 +66,7 @@ export interface UseSelectionOptions {
     /** 选择更新回调 */
     onUpdate?: (
       data: { x: number, y: number } | { x: number, y: number, width: number, height: number },
-      type: 'drag' | 'resize'
+      type: 'drag' | 'resize',
     ) => void
   }
 }
