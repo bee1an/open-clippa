@@ -1,5 +1,4 @@
-import type { ICombinatorOpts } from '@webav/av-cliper'
-import { Combinator, Log, MP4Clip, OffscreenSprite } from '@webav/av-cliper'
+import { Log, MP4Clip, OffscreenSprite } from '@webav/av-cliper'
 
 Log.setLogLevel(Log.warn)
 
@@ -88,37 +87,6 @@ export class FrameExtractor {
     }
 
     return offscreenSprite
-  }
-
-  /**
-   * 导出当前视频为 MP4 文件
-   * @param options - 导出选项
-   * @returns Promise<Blob> - MP4 文件 Blob
-   */
-  async exportVideo(options?: ICombinatorOpts): Promise<Blob> {
-    await this.load()
-
-    // 创建 OffscreenSprite
-    const offscreenSprite = await this.createOffscreenSprite()
-
-    // 使用 Combinator 直接导出单个视频
-    const combinator = new Combinator(options)
-    await combinator.addSprite(offscreenSprite, { main: true })
-
-    // 获取视频流并转换为 Blob
-    const stream = combinator.output()
-    const chunks: Uint8Array[] = []
-    const reader = stream.getReader()
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done)
-        break
-      chunks.push(value)
-    }
-
-    combinator.destroy()
-    return new Blob(chunks as BlobPart[], { type: 'video/mp4' })
   }
 
   /**

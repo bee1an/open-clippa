@@ -60,6 +60,7 @@ open-clippa/
 
 - ESLint + @antfu/eslint-config
 - 单引号、尾随逗号、无分号
+- class类中private方法使用下划线开头
 
 **目录规范**
 
@@ -99,3 +100,11 @@ open-clippa/
 
 - 运行 `pnpm typecheck` 进行类型检查
 - 使用 `pnpm lint:fix` 确保代码质量
+
+## 重要注意事项
+
+总是使用简体中文回复
+
+完成后非必要不写测试和用例
+完成后运行 `pnpm typecheck` 进行类型检查
+完成后使用 `pnpm lint:fix` 确保代码质量

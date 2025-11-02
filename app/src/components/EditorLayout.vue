@@ -146,9 +146,6 @@ onUnmounted(() => {
       </div>
 
       <div class="toolbar-right">
-        <!-- 导出按钮 -->
-        <VideoExporter :clippa="clippa" />
-
         <!-- 设置按钮 -->
         <button class="icon-btn" @click="showSettings = true">
           ⚙️

@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useEditorStore } from '@/store/useEditorStore'
 
 definePage({ redirect: '/editor/media' })
 
 const editorStore = useEditorStore()
-const clippa = computed(() => editorStore.clippa)
 const isClippaReady = ref(false)
 
 // 等待 clippa 准备就绪
@@ -25,7 +24,6 @@ onMounted(async () => {
     <yy-layout-header h50px bordered flex items-center px-4>
       <AppLogo size="md" />
       <div class="flex-1" />
-      <VideoExporter :clippa="isClippaReady ? clippa : undefined" />
     </yy-layout-header>
 
     <yy-layout has-sider max-w-full>

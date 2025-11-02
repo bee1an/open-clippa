@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@webav/av-cliper": "catalog:",
+    "mediabunny": "catalog:",
     "pixi.js": "catalog:"
   },
   "devDependencies": {
