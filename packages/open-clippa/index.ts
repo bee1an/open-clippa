@@ -1,6 +1,7 @@
 export * from './src/canvas'
 export * from './src/clippa'
 export * from './src/codec'
+export * from './src/export'
 export * from './src/performer'
 export * from './src/selection'
 export * from './src/timeline'

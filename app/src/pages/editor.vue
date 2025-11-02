@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { CanvasExport } from 'open-clippa'
 import { useEditorStore } from '@/store/useEditorStore'
 
 definePage({ redirect: '/editor/media' })
@@ -17,6 +17,40 @@ onMounted(async () => {
     console.error('Clippa ready failed:', error)
   }
 })
+
+function exportHandler() {
+  const exportInstance = new CanvasExport({
+    canvas: editorStore.clippa.stage.app.canvas,
+    duration: editorStore.duration,
+    frameRate: 30,
+    nextFrame: () => {
+      editorStore.clippa.seek(editorStore.currentTime + 1000 / 30)
+      return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          resolve()
+        })
+      })
+    },
+  })
+
+  exportInstance.export().then((blob) => {
+    console.warn('导出成功', blob)
+
+    // 创建下载链接
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `video-${Date.now()}.mp4`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+
+    // 清理 URL
+    setTimeout(() => URL.revokeObjectURL(url), 100)
+  }).catch((error) => {
+    console.error('导出失败:', error)
+  })
+}
 </script>
 
 <template>
@@ -24,6 +58,9 @@ onMounted(async () => {
     <yy-layout-header h50px bordered flex items-center px-4>
       <AppLogo size="md" />
       <div class="flex-1" />
+      <yy-button @click="exportHandler">
+        导出
+      </yy-button>
     </yy-layout-header>
 
     <yy-layout has-sider max-w-full>

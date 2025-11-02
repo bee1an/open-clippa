@@ -1,3 +1,4 @@
+// TODO IRenderLayer is internal
 import type { ContainerChild, FederatedPointerEvent, IRenderLayer } from 'pixi.js'
 import { EventBus } from 'open-clippa'
 import { Container, Graphics } from 'pixi.js'

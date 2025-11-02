@@ -10,7 +10,7 @@ const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
 const { clippa } = editorStore
-clippa.stage.init({ width: 995, height: 995 / 16 * 9 })
+clippa.stage.init({ width: 996, height: 996 / 16 * 9 })
 
 // 异步加载视频并获取真实时长
 async function loadVideoWithDuration(src: string): Promise<number> {
@@ -45,8 +45,8 @@ function calculateCanvasScaleRatio() {
     return
 
   // Canvas 内在尺寸 (初始化时设置的尺寸)
-  const internalWidth = 995
-  const _internalHeight = 560
+  const internalWidth = 996
+  const _internalHeight = 561
 
   // Canvas 实际显示尺寸 (CSS尺寸)
   const displayWidth = canvasElement.clientWidth
@@ -103,8 +103,8 @@ onMounted(async () => {
     start: 0,
     x: 0,
     y: 0,
-    width: 995,
-    height: 560,
+    width: 996,
+    height: 561,
     zIndex: 0,
   })
 })

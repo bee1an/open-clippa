@@ -10,7 +10,7 @@ export interface CanvasExportOptions {
   /** 要导出的 HTML Canvas 元素，作为视频帧的来源 */
   canvas: HTMLCanvasElement
   /** 更新下一帧内容的异步函数，在导出过程中每一帧都会调用此函数 */
-  nextFrame: () => Promise<void>
+  nextFrame: () => (Promise<void> | void)
   /** 视频总时长，单位为毫秒 */
   duration: number
   /** 视频帧率，即每秒的帧数 */
@@ -43,7 +43,7 @@ export class QualityPresets {
 
 export class CanvasExport {
   private _canvas: HTMLCanvasElement
-  private _nextFrame: () => Promise<void>
+  private _nextFrame: () => (Promise<void> | void)
   private _totalFrames: number
   private _frameRate: number
   private _duration: number
