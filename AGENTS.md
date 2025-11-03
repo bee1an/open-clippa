@@ -1,11 +1,8 @@
 # open-clippa
 
+总是使用简体中文回复
+
 开源视频剪辑库构建工具，基于 TypeScript、Vue 3 和 Pixi.js 构建的高性能时间线编辑器。
-
-## Core Commands
-
-- Type check: `pnpm typecheck`
-- Lint & fix: `pnpm lint:fix`
 
 ## Architecture Overview
 
@@ -25,6 +22,12 @@ Monorepo 结构包含以下核心包：
 ### 应用
 
 - **app** - Vue 3 演示应用，使用 Pinia 状态管理、Vue Router 路由、UnoCSS 样式
+
+#### Unocss 样式
+
+- 优先使用 UnoCSS 样式，提供更好的性能和可维护性
+- UnoCSS 使用方式参考配置文件, 注意使用 attribute 模式
+- UnoCSS 配置文件：app/uno.config.ts
 
 ### 关键架构模式
 
@@ -94,16 +97,7 @@ open-clippa/
 
 - 事件驱动架构：组件通过 EventBus 通信
 
-## Development Workflow
-
-**功能开发**
-
-- 运行 `pnpm typecheck` 进行类型检查
-- 使用 `pnpm lint:fix` 确保代码质量
-
 ## 重要注意事项
-
-总是使用简体中文回复
 
 完成后非必要不写测试和用例
 完成后运行 `pnpm typecheck` 进行类型检查
