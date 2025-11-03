@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import type { VideoFile } from '@/store/useMediaStore'
-import { Video } from 'open-clippa'
-import { useEditorStore } from '@/store'
-import { useMediaStore } from '@/store/useMediaStore'
+import type { VideoFile } from '@/store'
+import { ms2TimeStr, Video } from 'open-clippa'
+import { useEditorStore, useMediaStore } from '@/store'
 
 interface Props {
   videoFile: VideoFile
@@ -10,13 +9,12 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// 预览视频
-const emit = defineEmits<{
-  preview: [videoFile: VideoFile]
-}>()
 const mediaStore = useMediaStore()
 const editorStore = useEditorStore()
 const { clippa } = editorStore
+
+// 勾选状态
+const isSelected = ref(false)
 
 // 添加到时间轴
 function addToTimeline() {
@@ -31,150 +29,146 @@ function addToTimeline() {
 }
 
 // 删除视频文件
-function removeVideo() {
+function _removeVideo() {
   mediaStore.removeVideoFile(props.videoFile.id)
 }
 
-function previewVideo() {
-  emit('preview', props.videoFile)
+// 显示菜单
+function _showMenu() {
+  console.warn('Show menu for', props.videoFile.name)
+}
+
+// 切换勾选状态
+function _toggleSelect() {
+  isSelected.value = !isSelected.value
 }
 </script>
 
 <template>
-  <div
-    cursor-pointer
-    min-w="180px"
-    max-w="220px"
-    bg="#13131b"
-    rounded-lg
-    p-3
-    border="#2a2a3a"
-    hover="border-blue-500 bg-[#1a1a2e]"
-    transition="all duration-200"
-    @click="previewVideo"
-  >
-    <!-- 缩略图区域 -->
-    <div
-      relative
-      mb-3
-      rounded
-      overflow-hidden
-      bg="#0a0a0f"
-      :style="{
-        background: `linear-gradient(45deg, #0a0a0f 25%, transparent 25%), linear-gradient(-45deg, #0a0a0f 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #0a0a0f 75%), linear-gradient(-45deg, transparent 75%, #0a0a0f 75%)`,
-        backgroundSize: '20px 20px',
-        backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-      }"
-    >
-      <div aspect-video w-full>
-        <img
-          v-if="videoFile.thumbnail"
-          :src="videoFile.thumbnail"
-          :alt="videoFile.name"
-          w-full
-          h-full
-          object-cover
-        >
-        <div
-          v-else
-          flex
-          items-center
-          justify-center
-          text-gray-500
-          w-full
-          h-full
-          :style="{
-            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-          }"
-        >
-          <div i-carbon-video text-2xl />
-        </div>
+  <div class="group" bg="#2a2a2a" rounded-sm p-1.5 wfull>
+    <!-- 视频预览区 -->
+    <div bg-black rounded-sm relative flex items-center justify-center overflow-hidden>
+      <!-- 缩略图或默认图标 -->
+      <img
+        v-if="videoFile.thumbnail"
+        :src="videoFile.thumbnail"
+        :alt="videoFile.name"
+        w-full
+        h-full
+        object-cover
+      >
+      <div
+        v-else
+        flex
+        items-center
+        justify-center
+        w-full
+        h-full
+        bg-black
+      >
+        <div i-carbon-video text-4xl text-gray-600 />
       </div>
 
-      <!-- 时长显示 -->
+      <!-- 时间码 -->
       <div
         v-if="videoFile.duration > 0"
-        absolute
-        bottom-2
-        right-2
-        px-2
-        py-1
-        rounded
-        text-xs
-        font-mono
+        group-hover:opacity-0
         text-white
-        bg="black/70"
-        :style="{
-          backdropFilter: 'blur(4px)',
-          fontVariantNumeric: 'tabular-nums',
-        }"
-      >
-        {{ mediaStore.formatDuration(videoFile.duration) }}
-      </div>
-
-      <!-- 操作按钮 -->
-      <div
+        text-xs
+        font-sans
         absolute
-        top-2
-        right-2
-        opacity-0
-        group-hover:opacity-100
-        flex
-        gap-1
+        bottom-1
+        left-1
+        bg="#2d3427"
+        p-x-1
+        rounded-1
         transition-opacity
-        duration-200
       >
-        <button
-          class="bg-black/60 hover:bg-blue-600/80"
-          flex items-center justify-center text-white text-xs rounded transition-all duration-200
-          w-6
-          h-6
-          :style="{
-            backdropFilter: 'blur(4px)',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-          }"
-          title="添加到时间轴"
-          @click.stop="addToTimeline"
-        >
-          <div i-carbon-add />
-        </button>
-
-        <button
-          class="bg-black/60 hover:bg-red-600/80"
-          flex items-center justify-center text-white text-xs rounded transition-all duration-200
-          w-6
-          h-6
-          :style="{
-            backdropFilter: 'blur(4px)',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-          }"
-          title="删除视频"
-          @click.stop="removeVideo"
-        >
-          <div i-carbon-trash-can />
-        </button>
+        {{ ms2TimeStr(videoFile.duration) }}
       </div>
+
+      <!-- 右上角菜单按钮 -->
+      <button
+        group-hover:opacity-100
+        opacity-0
+        absolute
+        top-1
+        right-1
+        bg="#333333"
+        w-8
+        h-8
+        rounded-md
+        flex
+        items-center
+        justify-center
+        text-white
+        hover:bg="#444444"
+        transition-colors
+        transition-opacity
+        @click.stop="_showMenu"
+      >
+        <div i-carbon-overflow-menu-horizontal text-lg />
+      </button>
+
+      <!-- 右下角加号按钮 -->
+      <button
+        group-hover:opacity-100
+        opacity-0
+        absolute
+        bottom-1
+        right-1
+        bg="#10b981"
+        w-8
+        h-8
+        rounded-md
+        flex
+        items-center
+        justify-center
+        text="white 2xl"
+        font-bold
+        hover:bg="#059669"
+        transition-colors
+        transition-opacity
+        @click.stop="addToTimeline"
+      >
+        +
+      </button>
     </div>
 
-    <!-- 视频信息 -->
-    <div>
-      <h3
-        text-sm
-        font-medium
-        text-gray-200
-        mb-1
+    <!-- 文件信息栏 -->
+    <div flex items-center justify-between mt-1>
+      <span
+        text="xs white"
+        font-sans
         truncate
-        leading-tight
+        flex-1
         :title="videoFile.name"
       >
         {{ videoFile.name }}
-      </h3>
+      </span>
 
-      <div flex items-center justify-between text-xs text-gray-400>
-        <span>{{ mediaStore.formatFileSize(videoFile.size) }}</span>
-        <span v-if="videoFile.duration > 0">
-          {{ mediaStore.formatDuration(videoFile.duration) }}
-        </span>
+      <!-- 勾选框 -->
+      <div
+        w-3
+        h-3
+        border="~ white"
+        rounded-full
+        flex
+        items-center
+        justify-center
+        cursor-pointer
+        transition-all
+        hover:scale-110
+        :class="{ 'bg-white': isSelected }"
+        @click.stop="_toggleSelect"
+      >
+        <div
+          v-if="isSelected"
+          text="black xs"
+          font-bold
+        >
+          ✓
+        </div>
       </div>
     </div>
   </div>

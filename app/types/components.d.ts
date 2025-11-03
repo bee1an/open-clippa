@@ -25,6 +25,5 @@ declare module 'vue' {
     TimelineWrapper: typeof import('./../src/components/timelineWrapper.vue')['default']
     VideoPreviewCard: typeof import('./../src/components/VideoPreviewCard.vue')['default']
     VideoPreviewList: typeof import('./../src/components/VideoPreviewList.vue')['default']
-    VideoPreviewModal: typeof import('./../src/components/VideoPreviewModal.vue')['default']
   }
 }

@@ -51,29 +51,6 @@ export function validateThumbnailSet(thumbnails: Partial<ThumbnailSet>): Thumbna
   }
 }
 
-// Helper function to calculate aspect ratio
-function calculateAspectRatio(width: number, height: number): string {
-  if (width === 0 || height === 0)
-    return '16:9'
-
-  const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b)
-  const divisor = gcd(width, height)
-  const aspectWidth = width / divisor
-  const aspectHeight = height / divisor
-
-  // Common aspect ratios
-  if (aspectWidth === 16 && aspectHeight === 9)
-    return '16:9'
-  if (aspectWidth === 4 && aspectHeight === 3)
-    return '4:3'
-  if (aspectWidth === 21 && aspectHeight === 9)
-    return '21:9'
-  if (aspectWidth === 1 && aspectHeight === 1)
-    return '1:1'
-
-  return `${aspectWidth}:${aspectHeight}`
-}
-
 // Audio track information
 export interface AudioTrackInfo {
   index: number
@@ -136,7 +113,7 @@ export const useMediaStore = defineStore('media', () => {
 
   // 添加视频文件
   function addVideoFile(file: File): VideoFile {
-    const videoFile: VideoFile = {
+    const videoFile: VideoFile = reactive({
       id: crypto.randomUUID(),
       name: file.name,
       file,
@@ -148,7 +125,7 @@ export const useMediaStore = defineStore('media', () => {
       metadata: createDefaultVideoMetadata(),
       thumbnails: createDefaultThumbnailSet(),
       processingStatus: createDefaultProcessingStatus(),
-    }
+    })
 
     videoFiles.value.push(videoFile)
 
@@ -203,119 +180,36 @@ export const useMediaStore = defineStore('media', () => {
       isGeneratingThumbnail.value = true
       videoFile.thumbnails.generating = true
 
-      // 创建视频元素
-      const video = document.createElement('video')
-      video.src = videoFile.url
-      video.muted = true
-      video.preload = 'metadata'
-      video.crossOrigin = 'anonymous'
-
-      // 添加到 DOM 中（某些浏览器需要）
-      video.style.position = 'absolute'
-      video.style.top = '-9999px'
-      video.style.left = '-9999px'
-      document.body.appendChild(video)
+      // 使用 codec 子包生成缩略图
+      const { generateThumbnailWithCodec } = await import('@/utils/thumbnailGenerator')
 
       try {
-        // 等待视频元数据加载
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('视频加载超时'))
-          }, 10000)
+        const thumbnailUrl = await generateThumbnailWithCodec(videoFile)
 
-          video.addEventListener('loadedmetadata', () => {
-            clearTimeout(timeout)
-            videoFile.duration = video.duration * 1000
-
-            // Extract metadata
-            videoFile.metadata = {
-              resolution: {
-                width: video.videoWidth,
-                height: video.videoHeight,
-              },
-              frameRate: 30, // Default, will be enhanced later
-              codec: 'unknown', // Will be enhanced with MediaInfo API later
-              bitrate: 0, // Will be enhanced later
-              aspectRatio: calculateAspectRatio(video.videoWidth, video.videoHeight),
-              colorSpace: undefined,
-              audioTracks: [], // Will be enhanced later
-            }
-
-            videoFile.processingStatus.metadataExtracted = true
-            resolve()
-          })
-
-          video.addEventListener('error', () => {
-            clearTimeout(timeout)
-            reject(new Error('视频加载失败'))
-          })
+        // 保存缩略图
+        videoFile.thumbnail = thumbnailUrl // Keep for backward compatibility
+        videoFile.thumbnails.primary = thumbnailUrl
+        videoFile.thumbnails.frames.push({
+          url: thumbnailUrl,
+          timestamp: 1, // 1秒位置
         })
 
-        // 跳转到指定时间点
-        const seekTime = Math.min(2, video.duration * 0.1) // 取10%位置或2秒
-        video.currentTime = seekTime
-
-        // 等待跳转完成并生成缩略图
-        await new Promise<void>((resolve) => {
-          const timeout = setTimeout(() => {
-            // 缩略图生成超时
-            resolve()
-          }, 8000)
-
-          video.addEventListener('seeked', () => {
-            clearTimeout(timeout)
-
-            // 等待视频帧渲染
-            setTimeout(() => {
-              try {
-                const canvas = document.createElement('canvas')
-                const ctx = canvas.getContext('2d')
-
-                if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
-                  // 设置缩略图尺寸，保持16:9比例
-                  canvas.width = 160
-                  canvas.height = 90
-
-                  // 绘制视频帧
-                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-                  // 转换为 blob
-                  canvas.toBlob((blob) => {
-                    if (blob) {
-                      const thumbnailUrl = URL.createObjectURL(blob)
-                      videoFile.thumbnail = thumbnailUrl // Keep for backward compatibility
-                      videoFile.thumbnails.primary = thumbnailUrl
-                      videoFile.thumbnails.frames.push({
-                        url: thumbnailUrl,
-                        timestamp: seekTime,
-                      })
-                      videoFile.processingStatus.thumbnailsGenerated = true
-                      // 缩略图生成成功
-                    }
-                    resolve()
-                  }, 'image/jpeg', 0.9)
-                }
-                else {
-                  // 视频尺寸无效
-                  resolve()
-                }
-              }
-              catch (error) {
-                console.error('缩略图生成失败:', error)
-                resolve()
-              }
-            }, 100) // 等待100ms确保帧渲染完成
-          })
-        })
+        // 标记处理完成
+        videoFile.processingStatus.thumbnailsGenerated = true
+        videoFile.processingStatus.metadataExtracted = true
       }
-      finally {
-        // 清理 DOM
-        document.body.removeChild(video)
+      catch (error) {
+        console.error('使用 codec 生成缩略图失败:', error)
+        // 生成失败时不设置缩略图，使用默认图片
+        videoFile.processingStatus.thumbnailsGenerated = false
+        videoFile.processingStatus.metadataExtracted = false
       }
     }
     catch (error) {
       console.error('生成视频信息失败:', error)
       videoFile.processingStatus.error = error instanceof Error ? error.message : '未知错误'
+      videoFile.processingStatus.thumbnailsGenerated = false
+      videoFile.processingStatus.metadataExtracted = false
     }
     finally {
       isGeneratingThumbnail.value = false
@@ -342,8 +236,8 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   return {
-    videoFiles: readonly(videoFiles),
-    isGeneratingThumbnail: readonly(isGeneratingThumbnail),
+    videoFiles,
+    isGeneratingThumbnail,
     addVideoFile,
     removeVideoFile,
     clearVideoFiles,
