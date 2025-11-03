@@ -4,6 +4,8 @@ import { useEditorStore } from '@/store/useEditorStore'
 
 definePage({ redirect: '/editor/media' })
 
+const siderCollapsed = useStorage('siderCollapsed', false)
+
 const editorStore = useEditorStore()
 const isClippaReady = ref(false)
 
@@ -68,7 +70,9 @@ function exportHandler() {
         w300px
         content-class="h-[calc(100vh-50px)] p-y-2"
         collapsed-width="65"
-        collapsed
+        :collapsed="siderCollapsed"
+        @collapsed="siderCollapsed = true"
+        @expanded="siderCollapsed = false"
       >
         <Sider />
       </yy-layout-sider>

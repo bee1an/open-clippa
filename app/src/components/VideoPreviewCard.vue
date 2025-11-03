@@ -45,7 +45,7 @@ function _toggleSelect() {
 </script>
 
 <template>
-  <div class="group" bg="#2a2a2a" rounded-sm p-1.5 wfull>
+  <div class="group" hover:bg="#2a2a2a" rounded-sm p-1.5 wfull>
     <!-- 视频预览区 -->
     <div bg-black rounded-sm relative flex items-center justify-center overflow-hidden>
       <!-- 缩略图或默认图标 -->

@@ -101,6 +101,7 @@ open-clippa/
 
 图片识别调用 zai-mcp-server
 网络搜索调用 web-search-prime
+文档查询调用 context7
 
 ## 重要注意事项
 
