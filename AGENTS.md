@@ -97,6 +97,11 @@ open-clippa/
 
 - 事件驱动架构：组件通过 EventBus 通信
 
+## 关于mcp
+
+图片识别调用 zai-mcp-server
+网络搜索调用 web-search-prime
+
 ## 重要注意事项
 
 完成后非必要不写测试和用例
