@@ -47,7 +47,7 @@ const selectionItem = computed<SelectionItem | null>(() => {
     width: scaledWidth,
     height: scaledHeight,
     rotation: bounds.rotation || 0,
-    zIndex: currentSelection.value.zIndex || 1,
+    zIndex: currentSelection.value.zIndex ?? 1,
     visible: true,
     disabled: false,
   }
@@ -97,11 +97,13 @@ function handleSelectionDelete(id: string) {
 </script>
 
 <template>
-  <div 
-    absolute 
-    inset-0 
-    w-full 
+  <div
+    absolute
+    inset-0
+    w-full
     h-full
+    pointer-events-none
+    z-1
   >
     <Selection
       v-if="selectionItem"

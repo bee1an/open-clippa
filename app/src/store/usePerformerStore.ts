@@ -91,7 +91,7 @@ export const usePerformerStore = defineStore('performer', () => {
   const createPerformer = (config: PerformerConfig): Video => {
     const performer = new Video({
       ...config,
-      zIndex: config.zIndex || performerMap.size + 1,
+      zIndex: config.zIndex ?? performerMap.size + 1,
     })
 
     // 监听 performer 事件

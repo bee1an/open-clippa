@@ -83,7 +83,9 @@ export class Rails extends EventBus<RailsEvents> {
     })
 
     this.duration = option.duration
-    this.maxZIndex = option.maxZIndex ?? 2 // 默认值为2，确保有轨道显示
+    if (typeof option.maxZIndex === 'number') {
+      this.maxZIndex = option.maxZIndex
+    }
     this._processWidth()
     this.screenWidth = option.screenWidth
     this.screenHeight = option.screenHeight
@@ -125,19 +127,14 @@ export class Rails extends EventBus<RailsEvents> {
     this.railsContainer.eventMode = 'static'
 
     this.scrollBox.on('scroll', (event) => {
-      // 背景现在不参与滚动，保持固定位置
       this.emit('scroll', event)
     })
 
     this.container.y = TIMELINE_RULER_HEIGHT
 
-    // 简化方案：将rails容器直接添加到container中
-    // 背景应该由更上层的组件负责，rails组件专注于rails逻辑
     this.container.addChild(this.railsContainer)
 
     this._drawBody()
-
-    // 移除背景绘制，rails组件不应该负责背景
 
     this._bindEvents()
   }
@@ -254,21 +251,6 @@ export class Rails extends EventBus<RailsEvents> {
     const railsTotalHeight = this.getRailsTotalHeight()
     this.railsContainer.height = railsTotalHeight
   }
-
-  // 背景绘制已移除 - rails组件不应该负责背景渲染
-  // 背景应该由更上层的timeline组件负责
-  // private _foundation?: Graphics
-  // private _drawFoundation(): void {
-  //   // 注释掉的背景绘制代码
-  // }
-
-  // 背景同步滚动条状态已移除，因为不再有背景绘制
-  // private _syncScrollbarState(): void {
-  //   // 使用 requestAnimationFrame 确保在下一帧渲染时评估滚动条状态
-  //   requestAnimationFrame(() => {
-  //     this.scrollBox.renderSync()
-  //   })
-  // }
 
   private _insertGapByZIndex(gap: RailGap, zIndex: number): void {
     this.railGaps.splice((this.maxZIndex - zIndex) + 1, 0, gap)

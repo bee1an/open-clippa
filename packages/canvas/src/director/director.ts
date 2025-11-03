@@ -185,17 +185,29 @@ export class Director extends EventBus<DirectorEvents> {
     in?: (p: Performer) => void
     out?: (p: Performer) => void
   }): void {
-    this.theater.performers.forEach((p) => {
-      if (this.checkPerformerInShowTime(p)) {
-        p.showState !== 'playing' && this.stage.add(p)
-        cb?.in?.(p)
-      }
-      else {
-        // 暂停属于移除出舞台的默认行为
-        p.showState === 'playing' && this.stage.remove(p)
-        p.pause(this.currentTime - p.start)
-        cb?.out?.(p)
-      }
-    })
+    // 使用reduce将表演者按zindex分组, 确保添加顺序从0开始
+    this.theater.performers
+      .reduce((pre, p) => {
+        /**
+         * pre是一个二维数组
+         * pre[n]表示zindex为n
+         */
+        if (this.checkPerformerInShowTime(p)) {
+          typeof pre[p.zIndex] === 'undefined' && (pre[p.zIndex] = [])
+          pre[p.zIndex].push(() => {
+            p.showState !== 'playing' && this.stage.add(p)
+            cb?.in?.(p)
+          })
+        }
+        else {
+          p.showState === 'playing' && this.stage.remove(p)
+          // 暂停属于移除出舞台的默认行为
+          p.pause(this.currentTime - p.start)
+          cb?.out?.(p)
+        }
+        return pre
+      }, [] as (() => void)[][])
+      .flat()
+      .forEach(cb => cb())
   }
 }
