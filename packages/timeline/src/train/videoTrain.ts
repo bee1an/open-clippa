@@ -32,7 +32,7 @@ export class VideoTrain extends Train<VideoTrainEvents> {
 
     await this.frameExctractor.load()
 
-    const { width, height, duration } = this.frameExctractor.clip.meta
+    const { width, height, duration } = await this.frameExctractor.getVideoMetadata()
 
     const singleWidth = (width / height) * this.height
 

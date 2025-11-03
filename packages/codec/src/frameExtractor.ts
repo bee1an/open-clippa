@@ -1,6 +1,12 @@
-import { Log, MP4Clip, OffscreenSprite } from '@webav/av-cliper'
-
-Log.setLogLevel(Log.warn)
+import type {
+  InputVideoTrack,
+} from 'mediabunny'
+import {
+  ALL_FORMATS,
+  Input,
+  UrlSource,
+  VideoSampleSink,
+} from 'mediabunny'
 
 export interface Tick {
   video?: VideoFrame
@@ -18,21 +24,36 @@ export interface VideoMetadata {
 }
 
 export class FrameExtractor {
-  clip!: MP4Clip
+  input!: Input
+  videoTrack: InputVideoTrack | null = null
+
+  private _loadingPromise: Promise<void> | null = null
 
   constructor(private _url: string) {
     this.load()
   }
 
   async load(): Promise<void> {
-    if (!this.clip) {
-      this.clip = new MP4Clip((await fetch(this._url)).body!)
+    if (!this._loadingPromise) {
+      this._loadingPromise = this._doLoad()
     }
 
-    await this.clip.ready
+    await this._loadingPromise
+  }
+
+  private async _doLoad(): Promise<void> {
+    this.input = new Input({
+      formats: ALL_FORMATS,
+      source: new UrlSource(this._url),
+    })
+
+    // 获取视频轨道
+    this.videoTrack = await this.input.getPrimaryVideoTrack()
   }
 
   private _frameCache: { [time: number]: Promise<Tick> } = {}
+  private _videoSink: VideoSampleSink | null = null
+
   /**
    * Given a time in microsecond, return the frame at that time.
    *
@@ -45,110 +66,76 @@ export class FrameExtractor {
     await this.load()
 
     if (!this._frameCache[time]) {
-      this._frameCache[time] = this.clip!.tick(time)
+      this._frameCache[time] = this._extractFrame(time)
     }
 
     return this._frameCache[time]
   }
 
+  private async _extractFrame(time: number): Promise<Tick> {
+    if (!this.videoTrack) {
+      throw new Error('视频轨道未找到')
+    }
+
+    // 转换时间为秒
+    const timeInSeconds = time / 1_000_000
+
+    // 创建视频采样器（如果不存在）
+    if (!this._videoSink) {
+      this._videoSink = new VideoSampleSink(this.videoTrack)
+    }
+
+    try {
+      // 获取指定时间的视频采样
+      const videoSample = await this._videoSink.getSample(timeInSeconds)
+
+      if (!videoSample) {
+        return { audio: [], state: 'done' }
+      }
+
+      // 转换为 VideoFrame
+      const videoFrame = await videoSample.toVideoFrame()
+
+      // 关闭采样以释放资源
+      videoSample.close()
+
+      return {
+        video: videoFrame,
+        audio: [],
+        state: 'success',
+      }
+    }
+    catch (error) {
+      console.error('提取帧时出错:', error)
+      return { audio: [], state: 'done' }
+    }
+  }
+
   /**
    * 获取视频元数据信息
    */
-  getVideoMetadata(): VideoMetadata {
-    if (!this.clip) {
-      throw new Error('视频未加载，请先调用 load()')
+  async getVideoMetadata(): Promise<VideoMetadata> {
+    await this.load()
+
+    if (!this.videoTrack) {
+      throw new Error('视频轨道未找到')
     }
 
-    const meta = this.clip.meta
+    // 获取音频轨道
+    const audioTrack = await this.input.getPrimaryAudioTrack()
+
+    // 获取视频信息
+    const duration = await this.videoTrack.computeDuration()
+    const displayWidth = this.videoTrack.displayWidth
+    const displayHeight = this.videoTrack.displayHeight
+
     return {
-      width: meta.width,
-      height: meta.height,
-      duration: meta.duration,
-      audioSampleRate: meta.audioSampleRate,
-      audioChanCount: meta.audioChanCount,
-      hasAudio: meta.audioChanCount > 0,
+      width: displayWidth,
+      height: displayHeight,
+      duration: duration * 1_000_000, // 转换为微秒
+      audioSampleRate: audioTrack?.sampleRate || 44100,
+      audioChanCount: audioTrack?.numberOfChannels || 0,
+      hasAudio: !!audioTrack,
     }
-  }
-
-  /**
-   * 创建 OffscreenSprite 用于视频导出
-   */
-  async createOffscreenSprite(timeOffset: number = 0, duration?: number): Promise<OffscreenSprite> {
-    await this.load()
-
-    // 创建 OffscreenSprite 包装 MP4Clip
-    const offscreenSprite = new OffscreenSprite(this.clip)
-
-    // 设置时间属性
-    offscreenSprite.time = {
-      offset: timeOffset,
-      duration: duration || this.clip.meta.duration,
-      playbackRate: 1,
-    }
-
-    return offscreenSprite
-  }
-
-  /**
-   * 获取缩略图
-   * @param width - 缩略图宽度，默认 100
-   * @param opts - 缩略图选项
-   * @returns Promise<Array<{ ts: number; img: Blob }>> - 缩略图列表
-   */
-  async getThumbnails(width?: number, opts?: any): Promise<Array<{ ts: number, img: Blob }>> {
-    await this.load()
-    return this.clip.thumbnails(width, opts)
-  }
-
-  /**
-   * 分割视频
-   * @param time - 分割时间点（微秒）
-   * @returns Promise<[FrameExtractor, FrameExtractor]> - 分割后的两个视频片段
-   */
-  async split(time: number): Promise<[FrameExtractor, FrameExtractor]> {
-    await this.load()
-    const [clip1, clip2] = await this.clip.split(time)
-
-    // 创建两个新的 FrameExtractor 实例
-    const extractor1 = new FrameExtractor('')
-    const extractor2 = new FrameExtractor('')
-
-    // 直接设置 clip 属性
-    extractor1.clip = clip1
-    extractor2.clip = clip2
-
-    return [extractor1, extractor2]
-  }
-
-  /**
-   * 克隆视频
-   * @returns Promise<FrameExtractor> - 克隆的视频实例
-   */
-  async clone(): Promise<FrameExtractor> {
-    await this.load()
-    const clonedClip = await this.clip.clone()
-
-    const extractor = new FrameExtractor('')
-    extractor.clip = clonedClip
-
-    return extractor
-  }
-
-  /**
-   * 检查视频是否已加载
-   */
-  isLoaded(): boolean {
-    return !!this.clip && this.clip.meta.duration > 0
-  }
-
-  /**
-   * 销毁实例，释放资源
-   */
-  destroy(): void {
-    if (this.clip) {
-      this.clip.destroy()
-      this.clip = undefined as any
-    }
-    this._frameCache = {}
   }
 }

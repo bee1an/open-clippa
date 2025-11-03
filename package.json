@@ -16,7 +16,6 @@
     "typecheck": "tsc --noEmit && pnpm -C app typecheck"
   },
   "dependencies": {
-    "@webav/av-cliper": "catalog:",
     "mediabunny": "catalog:",
     "pixi.js": "catalog:"
   },

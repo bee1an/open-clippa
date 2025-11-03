@@ -1,4 +1,4 @@
-export const DEBUG = true
+export const DEBUG = false
 
 /**
  * 防止抽帧的图片影响debug文字显示, 可以在这里关闭抽帧
