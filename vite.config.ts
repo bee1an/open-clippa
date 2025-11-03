@@ -33,7 +33,7 @@ export default defineConfig({
     Vue(),
 
     AutoImport({
-      imports: ['vue', '@vueuse/core'],
+      imports: ['vue', '@vueuse/core', 'vue-router'],
       dts: 'types/auto-imports.d.ts',
     }),
 

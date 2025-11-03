@@ -97,7 +97,12 @@ function handleSelectionDelete(id: string) {
 </script>
 
 <template>
-  <div class="selection-group-container">
+  <div 
+    absolute 
+    inset-0 
+    w-full 
+    h-full
+  >
     <Selection
       v-if="selectionItem"
       :item="selectionItem"
@@ -111,13 +116,3 @@ function handleSelectionDelete(id: string) {
     />
   </div>
 </template>
-
-<style scoped>
-.selection-group-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-</style>

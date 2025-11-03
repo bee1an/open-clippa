@@ -1,6 +1,5 @@
 import { Clippa } from 'open-clippa'
 import { defineStore } from 'pinia'
-import { markRaw, ref } from 'vue'
 
 export const useEditorStore = defineStore('editor', () => {
   const clippa = markRaw(new Clippa())

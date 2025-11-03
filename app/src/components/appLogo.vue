@@ -28,27 +28,11 @@ function handleClick() {
 </script>
 
 <template>
-  <div class="logo-container" :class="{ 'cursor-pointer': clickable }" @click="handleClick">
-    <span :class="sizeClasses[size]" class="font-light text-gray-300">clippa</span>
+  <div
+    select-none tracking-tight class="font-['Inter',-apple-system,BlinkMacSystemFont,sans-serif]"
+    :class="[clickable ? 'cursor-pointer hover:text-blue-400' : '']"
+    @click="handleClick"
+  >
+    <span :class="sizeClasses[size]" font-light text-gray-300>clippa</span>
   </div>
 </template>
-
-<style scoped>
-.logo-container {
-  user-select: none;
-  font-family:
-    'Inter',
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
-  letter-spacing: -0.02em;
-}
-
-.logo-container.cursor-pointer {
-  cursor: pointer;
-}
-
-.logo-container.cursor-pointer:hover span:first-child {
-  color: #60a5fa;
-}
-</style>

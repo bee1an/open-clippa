@@ -1,7 +1,6 @@
 import type { PerformerBounds, PerformerClickEvent } from '@clippa/performer'
 import { Video } from '@clippa/performer'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
 
 /**
  * Performer 配置选项
