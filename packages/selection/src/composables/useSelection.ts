@@ -147,7 +147,6 @@ export function useSelection(
     throttleInterval: resize?.throttleInterval,
     useRAF: resize?.useRAF,
     ...resize,
-    _debug: resize?._debug,
   })
 
   // 组合状态

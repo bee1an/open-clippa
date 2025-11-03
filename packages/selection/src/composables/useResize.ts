@@ -319,8 +319,6 @@ export function useResize(
       const localDeltaX = deltaX * cos + deltaY * sin
       const localDeltaY = -deltaX * sin + deltaY * cos
 
-      // Debug logging would happen here if debug flag is true
-
       // 计算四个角点的全局坐标（基于左上角旋转中心）
       // 左上角点 (TL) - 旋转中心，位置不变
       const tlX = originalX
@@ -405,8 +403,6 @@ export function useResize(
           newY = blY - newHeight * cos
           break
       }
-
-      // Debug logging would happen here if debug flag is true
     }
     else {
       // 没有旋转时的正常逻辑

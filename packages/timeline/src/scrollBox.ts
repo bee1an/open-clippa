@@ -1,5 +1,5 @@
 // TODO IRenderLayer is internal
-import type { ContainerChild, FederatedPointerEvent, IRenderLayer } from 'pixi.js'
+import type { ContainerChild, FederatedPointerEvent } from 'pixi.js'
 import { EventBus } from 'open-clippa'
 import { Container, Graphics } from 'pixi.js'
 
@@ -81,19 +81,19 @@ export type ScrollBoxEvents = {
 class ContainerProxy<C extends ContainerChild = ContainerChild> extends Container<C> {
   constructor(private _proxy: any) { super() }
 
-  rawAddChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+  rawAddChild<U extends C[]>(...children: U): U[0] {
     return super.addChild(...children)
   }
 
-  addChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+  addChild<U extends C[]>(...children: U): U[0] {
     return this._proxy.addChild(...children)
   }
 
-  rawRemoveChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+  rawRemoveChild<U extends C[]>(...children: U): U[0] {
     return super.removeChild(...children)
   }
 
-  removeChild<U extends (C | IRenderLayer)[]>(...children: U): U[0] {
+  removeChild<U extends C[]>(...children: U): U[0] {
     return this._proxy.removeChild(...children)
   }
 }
