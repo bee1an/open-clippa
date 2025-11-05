@@ -17,7 +17,7 @@ export interface Performer {
 
   pause: (time: number) => void
 
-  seek: (time: number) => void
+  seek: (time: number) => Promise<void>
 
   load: () => Promise<void>
 }

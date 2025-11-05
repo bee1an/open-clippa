@@ -25,8 +25,8 @@ function exportHandler() {
     canvas: editorStore.clippa.stage.app.canvas,
     duration: editorStore.duration,
     frameRate: 30,
-    nextFrame: () => {
-      editorStore.clippa.seek(editorStore.currentTime + 1000 / 30)
+    nextFrame: async () => {
+      await editorStore.clippa.seek(editorStore.currentTime + 1000 / 30)
       return new Promise((resolve) => {
         requestAnimationFrame(() => {
           resolve()

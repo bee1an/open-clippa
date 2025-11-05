@@ -1,10 +1,18 @@
-import type { FederatedPointerEvent, Texture, TextureSource, VideoResource } from 'pixi.js'
+import type {
+  InputVideoTrack,
+  VideoSample,
+} from 'mediabunny'
+import type { FederatedPointerEvent } from 'pixi.js'
 import type { Performer, PerformerOption } from '../performer'
 import { EventBus, transformSrc } from '@clippa/utils'
-import { Assets, Sprite, VideoSource } from 'pixi.js'
+import {
+  ALL_FORMATS,
+  Input,
+  UrlSource,
+  VideoSampleSink,
+} from 'mediabunny'
+import { Sprite, Texture } from 'pixi.js'
 import { PlayState, ShowState } from '../performer'
-
-VideoSource.defaultOptions.autoPlay = false
 
 export interface PerformerClickEvent {
   performer: Video
@@ -81,7 +89,21 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.load(option)
   }
 
+  private _input?: Input
+  private _videoTrack: InputVideoTrack | null = null
+  private _videoSink?: VideoSampleSink
   private _loader?: Promise<void>
+
+  /**
+   * 帧缓存：time (in ms) -> { frame: VideoFrame }
+   */
+  private _frameCache: Map<number, { frame: any }> = new Map()
+
+  /**
+   * 最后渲染的时间（避免重复渲染同一帧）
+   */
+  private _lastRenderedTime: number = -1
+
   load(option?: VideoOption): Promise<void> {
     if (this._loader)
       return this._loader
@@ -92,24 +114,29 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     this._loader = promise
 
-    Assets.load<Texture<TextureSource<VideoResource>>>({
-      src: this.src,
-      parser: 'video',
-    })
-      .then((texture) => {
-        texture.source.resource.autoplay = false
-        this._sprite = new Sprite(texture)
+    this._initMediabunny()
+      .then(async () => {
+        // 创建 Sprite
+        if (!this._sprite) {
+          this._sprite = new Sprite()
+          this.setupSpriteEvents()
+        }
 
-        width && (this._sprite.width = width)
-        height && (this._sprite.height = height)
-        x && (this._sprite.x = x)
-        y && (this._sprite.y = y)
+        // 设置尺寸和位置
+        if (width !== undefined)
+          this._sprite.width = width
+        if (height !== undefined)
+          this._sprite.height = height
+        if (x !== undefined)
+          this._sprite.x = x
+        if (y !== undefined)
+          this._sprite.y = y
 
-        this.setupSpriteEvents()
         this.valid = true
         resolve()
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Video load error:', error)
         this.error = true
         this.valid = false
         reject(new Error('video load error'))
@@ -118,17 +145,38 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     return this._loader
   }
 
+  /**
+   * 初始化 mediabunny 相关资源
+   */
+  private async _initMediabunny(): Promise<void> {
+    this._input = new Input({
+      formats: ALL_FORMATS,
+      source: new UrlSource(this.src),
+    })
+
+    // 获取视频轨道
+    this._videoTrack = await this._input.getPrimaryVideoTrack()
+
+    if (!this._videoTrack) {
+      throw new Error('未找到视频轨道')
+    }
+
+    // 检查是否可以解码
+    if (!(await this._videoTrack.canDecode())) {
+      throw new Error('该视频格式无法在当前环境中解码')
+    }
+
+    // 创建视频采样器
+    this._videoSink = new VideoSampleSink(this._videoTrack)
+  }
+
   play(time: number): void {
     this.update(time)
-    if (!this._sprite)
-      return
 
     if (this.playState === PlayState.PLAYING)
       return
 
     this.playState = PlayState.PLAYING
-
-    this._sprite.texture.source.resource.play()
   }
 
   update(time: number): void {
@@ -136,48 +184,111 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     if (this.currentTime < 0) {
       this.showState = ShowState.UNPLAYED
-
-      const resource = this._sprite?.texture.source.resource || {} as HTMLVideoElement
-      resource.currentTime = 0
+      this._lastRenderedTime = -1
       return
     }
 
     if (this.currentTime > this.duration) {
       this.showState = ShowState.PLAYED
+      this.playState = PlayState.PAUSED
       return
     }
 
     this.showState = ShowState.PLAYING
+
+    // 提取并渲染当前时间的帧
+    this._renderFrameAtTime(time)
   }
 
   pause(time: number): void {
     this.update(time)
 
-    if (!this._sprite)
-      return
-
-    if (this.playState === 'paused')
+    if (this.playState === PlayState.PAUSED)
       return
 
     this.playState = PlayState.PAUSED
-
-    this._sprite.texture.source.resource.pause()
-
-    this.seek(time)
   }
 
-  seek(time: number): void {
-    if (!this._sprite)
-      return
-
+  async seek(time: number): Promise<void> {
     if (time < 0 || time > this.duration)
       return
 
     this.currentTime = time
 
-    const resource = this._sprite.texture.source.resource as HTMLVideoElement
+    // 等待帧提取和渲染完成
+    await this._renderFrameAtTime(time)
+  }
 
-    resource.currentTime = (this.currentTime + this.sourceStart) / 1000
+  /**
+   * 在指定时间渲染帧
+   */
+  private async _renderFrameAtTime(time: number): Promise<void> {
+    // 避免重复渲染同一帧
+    if (time === this._lastRenderedTime && this._sprite?.texture) {
+      return
+    }
+
+    try {
+      // 检查缓存
+      const cacheKey = Math.round(time)
+      let frameData = this._frameCache.get(cacheKey)
+
+      // 如果缓存不存在，从 mediabunny 获取
+      if (!frameData) {
+        const videoSample = await this._getVideoSampleAtTime(time)
+
+        if (!videoSample) {
+          return
+        }
+
+        // 转换为 VideoFrame
+        const videoFrame = videoSample.toVideoFrame()
+
+        // 缓存帧数据
+        frameData = { frame: videoFrame }
+        this._frameCache.set(cacheKey, frameData)
+
+        // 关闭 VideoSample（保留 VideoFrame）
+        videoSample.close()
+      }
+
+      // 创建或更新纹理
+      if (this._sprite) {
+        const texture = Texture.from(frameData.frame)
+
+        // 销毁旧纹理
+        if (this._sprite.texture) {
+          this._sprite.texture.destroy(true)
+        }
+
+        this._sprite.texture = texture
+        this._lastRenderedTime = time
+      }
+    }
+    catch (error) {
+      console.error('Error rendering frame:', error)
+    }
+  }
+
+  /**
+   * 从 mediabunny 获取指定时间的视频采样
+   */
+  private async _getVideoSampleAtTime(time: number): Promise<VideoSample | null> {
+    if (!this._videoSink) {
+      return null
+    }
+
+    // 转换时间为秒
+    const timeInSeconds = time / 1000
+
+    try {
+      const sample = await this._videoSink.getSample(timeInSeconds)
+      return sample || null
+    }
+    catch (error) {
+      console.error('Error getting video sample:', error)
+      return null
+    }
   }
 
   protected setupSpriteEvents(): void {
@@ -259,20 +370,6 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     }
   }
 
-  getCanvasPosition(): { x: number, y: number } {
-    const bounds = this.getBounds()
-    return {
-      x: bounds.x + bounds.width / 2,
-      y: bounds.y + bounds.height / 2,
-    }
-  }
-
-  setSprite(sprite: Sprite): void {
-    this._sprite = sprite
-    this.setupSpriteEvents()
-    // 不在这里触发位置更新事件，避免初始化时的不必要事件
-  }
-
   setPosition(x: number, y: number): void {
     if (this._sprite) {
       this._sprite.x = x
@@ -297,10 +394,36 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   }
 
   destroy(): void {
+    // 清理帧缓存
+    for (const [, frameData] of this._frameCache) {
+      frameData.frame.close()
+    }
+    this._frameCache.clear()
+
+    // 关闭 mediabunny 资源
+
+    if (this._input) {
+      this._input[Symbol.dispose]()
+      this._input = undefined
+    }
+
+    this._videoTrack = null
+    this._videoSink = undefined
+
+    // 清理 Sprite
     if (this._sprite) {
       this._sprite.removeAllListeners()
+      if (this._sprite.texture) {
+        this._sprite.texture.destroy(true)
+      }
       this._sprite.destroy()
       this._sprite = undefined
     }
+
+    // 重置状态
+    this.valid = false
+    this.error = false
+    this.showState = ShowState.UNPLAYED
+    this.playState = PlayState.PAUSED
   }
 }

@@ -32,8 +32,8 @@ export class Clippa extends EventBus<ClippaEvents> {
     this.timeline.on('pause', () => {
       this.director.pause()
     })
-    this.timeline.on('seeked', (time) => {
-      this.director.seek(time)
+    this.timeline.on('seeked', async (time) => {
+      await this.director.seek(time)
     })
   }
 
@@ -77,7 +77,7 @@ export class Clippa extends EventBus<ClippaEvents> {
     this.timeline.pause()
   }
 
-  seek(time: number): void {
-    this.timeline.seek(time)
+  async seek(time: number): Promise<void> {
+    await this.timeline.seek(time)
   }
 }

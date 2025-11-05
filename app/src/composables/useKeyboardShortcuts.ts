@@ -39,20 +39,20 @@ export function useKeyboardShortcuts() {
     }
   }
 
-  function handleRewind() {
+  async function handleRewind() {
     try {
       const newTime = Math.max(0, currentTime.value - 10000) // 快退10秒
-      clippa.seek(newTime)
+      await clippa.seek(newTime)
     }
     catch (error) {
       console.error('快退错误:', error)
     }
   }
 
-  function handleFastForward() {
+  async function handleFastForward() {
     try {
       const newTime = Math.min(duration.value, currentTime.value + 10000) // 快进10秒
-      clippa.seek(newTime)
+      await clippa.seek(newTime)
     }
     catch (error) {
       console.error('快进错误:', error)
@@ -83,7 +83,7 @@ export function useKeyboardShortcuts() {
   })
 
   // 键盘事件处理
-  useEventListener('keydown', (e: KeyboardEvent) => {
+  useEventListener('keydown', async (e: KeyboardEvent) => {
     // 如果焦点在输入框中，不处理快捷键
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
@@ -97,11 +97,11 @@ export function useKeyboardShortcuts() {
         break
       case 'ArrowLeft':
         e.preventDefault()
-        handleRewind()
+        await handleRewind()
         break
       case 'ArrowRight':
         e.preventDefault()
-        handleFastForward()
+        await handleFastForward()
         break
       case 'KeyF':
         e.preventDefault()
