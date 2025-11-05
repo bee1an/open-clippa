@@ -209,14 +209,58 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.playState = PlayState.PAUSED
   }
 
+  /**
+   * seek 待执行任务（单个任务而非队列）
+   */
+  private _seekTask: { time: number, resolve: () => void, reject: (error: unknown) => void } | null = null
+  private _isSeeking: boolean = false
   async seek(time: number): Promise<void> {
     if (time < 0 || time > this.duration)
       return
 
-    this.currentTime = time
+    // 清空待执行任务，始终只保留最新的 seek 请求
+    this._seekTask = null
 
-    // 等待帧提取和渲染完成
-    await this._renderFrameAtTime(time)
+    // 创建 Promise 并添加到任务
+    const { promise, resolve, reject } = Promise.withResolvers<void>()
+    this._seekTask = { time, resolve, reject }
+
+    // 开始处理任务
+    this._processSeekTask()
+
+    return promise
+  }
+
+  /**
+   * 处理 seek 任务
+   */
+  private async _processSeekTask(): Promise<void> {
+    // 如果正在执行或任务为空，直接返回
+    if (this._isSeeking || !this._seekTask || !this._seekTask)
+      return
+
+    this._isSeeking = true
+
+    try {
+      const { time, resolve } = this._seekTask
+
+      // 更新当前时间
+      this.currentTime = time
+
+      // 执行 seek（等待帧提取和渲染完成）
+      await this._renderFrameAtTime(time)
+
+      resolve()
+
+      this._seekTask = null
+
+      this._isSeeking = false
+    }
+    catch (error) {
+      console.error('Seek error:', error)
+      this._seekTask = null
+      this._isSeeking = false
+    }
   }
 
   /**

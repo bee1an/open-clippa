@@ -173,11 +173,16 @@ export class Director extends EventBus<DirectorEvents> {
 
     this.currentTime = time
 
+    const seekPool: Promise<void>[] = []
+
+    this.updatePerformers({
+      in: (p) => {
+        seekPool.push(p.seek(this.currentTime - p.start))
+      },
+    })
+
     // 等待所有表演者 seek 完成
-    const performersArray = Array.from(this.stage.performers)
-    await Promise.all(performersArray.map(async (p: Performer) => {
-      await p.seek(this.currentTime - p.start)
-    }))
+    await Promise.all(seekPool)
   }
 
   /**
