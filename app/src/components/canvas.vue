@@ -91,15 +91,6 @@ onMounted(async () => {
   await createVideoPerformer({
     id: 'video1',
     src: 'https://pixijs.com/assets/video.mp4',
-    start: 4000,
-    x: 100,
-    y: 50,
-    zIndex: 1,
-  })
-
-  await createVideoPerformer({
-    id: 'video2',
-    src: '/bunny.mp4',
     start: 0,
     x: 0,
     y: 0,
@@ -107,6 +98,17 @@ onMounted(async () => {
     height: 561,
     zIndex: 0,
   })
+
+  // await createVideoPerformer({
+  //   id: 'video2',
+  //   src: '/bunny.mp4',
+  //   start: 0,
+  //   x: 0,
+  //   y: 0,
+  //   width: 996,
+  //   height: 561,
+  //   zIndex: 0,
+  // })
 })
 
 onUnmounted(() => {
