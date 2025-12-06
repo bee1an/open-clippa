@@ -23,7 +23,10 @@ export class VideoTrain extends Train<VideoTrainEvents> {
   }
 
   async init(): Promise<void> {
-    await this.generateThumnail()
+    // Fire and forget: generate thumbnails in background to avoid blocking initialization
+    this.generateThumnail().catch((e) => {
+      console.warn('Generate thumbnail failed', e)
+    })
   }
 
   async generateThumnail(): Promise<void> {

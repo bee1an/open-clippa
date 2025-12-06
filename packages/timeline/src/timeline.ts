@@ -108,13 +108,12 @@ export class Timeline extends EventBus<TimlineEvents> {
 
     app.stage.addChild(this.container)
 
+    // Sync flush for immediate rendering
+    this._updateChildrenSize()
+
     const queueRun = new QueueRun(async () => {
       // 等待PIXI应用完成resize，确保应用内部尺寸稳定
-      await new Promise<void>((resolve) => {
-        app.queueResize()
-        // 等待下一帧确保resize完成
-        requestAnimationFrame(() => resolve())
-      })
+      app.queueResize()
       // 然后更新子元素尺寸，此时能获取到正确的应用尺寸
       this._updateChildrenSize()
     })
