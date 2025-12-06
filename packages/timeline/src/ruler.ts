@@ -114,16 +114,6 @@ export class Ruler extends EventBus<RulerEvents> {
     this._bgByDuration = bg
   }
 
-  private _drawDot(x: number): Graphics {
-    const graphics = new Graphics()
-
-    graphics.circle(0, 0, TIMELINE_DOT_RADIUS)
-    graphics.position.set(x, TIMELINE_RULER_HEIGHT / 2)
-    graphics.fill(TIMELINE_DOT_FILL)
-
-    return graphics
-  }
-
   private _drawTextTime(x: number, content: string): Text {
     const text = new Text({
       style: {
@@ -153,63 +143,73 @@ export class Ruler extends EventBus<RulerEvents> {
   private _drawTick(): void {
     const ticksWrapper = new Container()
 
-    let x = 0
+    // Batching: One Graphics for all dots
+    const dotsGraphics = new Graphics()
+    ticksWrapper.addChild(dotsGraphics)
+
     const tick = this._tick
     const gap = getPxByMs(tick, this.state.pxPerMs)
-
     const dotGap = gap / (TIMELINE_DOT_NUM + 1)
 
+    // Calculate visible range with buffer
+    const buffer = 200 // 200px buffer to prevent pop-in
+    const startX = -this.offsetX - buffer
+    const endX = -this.offsetX + this.screenWidth + buffer
+
+    // Calculate start index to skip invisible ticks
+    const startIndex = Math.max(0, Math.floor(startX / gap))
+
     const rightLimitX = Math.max(this.screenWidth - this.offsetX, this.width)
+    const effectiveEndX = Math.min(endX, rightLimitX)
 
-    const drawDotGroup = (): void => {
+    const drawDotGroup = (baseX: number): void => {
       for (let index = 0; index < TIMELINE_DOT_NUM; index++) {
-        const dot = this._drawDot(x + dotGap * (index + 1))
-
-        const dotRightX = dot.x + dot.width
-
-        if (dotRightX < rightLimitX) {
-          ticksWrapper!.addChild(this._drawDot(x + dotGap * (index + 1)))
-        }
-        else {
-          break
+        const dotX = baseX + dotGap * (index + 1)
+        if (dotX >= startX && dotX <= effectiveEndX) {
+          // Batching: Draw directly to shared graphics
+          dotsGraphics.circle(dotX, TIMELINE_RULER_HEIGHT / 2, TIMELINE_DOT_RADIUS)
         }
       }
     }
 
-    // 绘制0刻度
-    const zeroText = this._drawTextTime(0, '0')
-    const zeroTextRightX = zeroText.x + zeroText.width
-    if (zeroTextRightX < rightLimitX) {
+    // Draw 0 tick if visible
+    if (startX <= 0 && effectiveEndX >= 0) {
+      const zeroText = this._drawTextTime(0, '0')
       ticksWrapper.addChild(zeroText)
     }
 
-    // 如果width < screenWidth, 会补足screenWidth, 防止出现空隙
-    for (let i = 0; i < rightLimitX / gap - 1; i++) {
-      drawDotGroup()
+    // Loop through ticks, starting from visible range
+    for (let i = startIndex; ; i++) {
+      const currentTickX = i * gap
+      if (currentTickX > effectiveEndX)
+        break
 
-      x += gap
+      // Draw dots after this tick
+      drawDotGroup(currentTickX)
 
-      const text = this._drawTextTime(x, ms2TimeStr((i + 1) * tick))
+      // Draw next tick text
+      const nextTickX = (i + 1) * gap
 
-      const textRightX = text.x + text.width
-
-      if (textRightX < rightLimitX) {
-        ticksWrapper.addChild(text)
-      }
-      else {
+      // Stop if we go beyond visible range or physical limit
+      if (nextTickX > effectiveEndX) {
         break
       }
+
+      const text = this._drawTextTime(nextTickX, ms2TimeStr((i + 1) * tick))
+      ticksWrapper.addChild(text)
     }
 
-    drawDotGroup()
+    // Batching: Fill all dots at once
+    dotsGraphics.fill(TIMELINE_DOT_FILL)
 
     if (this._ticksWrapper) {
-      this.container.replaceChild(this._ticksWrapper, ticksWrapper)
-    }
-    else {
-      this.container.addChild(ticksWrapper)
+      if (!this._ticksWrapper.destroyed) {
+        this._ticksWrapper.destroy({ children: true })
+      }
+      this.container.removeChild(this._ticksWrapper)
     }
 
+    this.container.addChild(ticksWrapper)
     this._ticksWrapper = ticksWrapper
   }
 
@@ -241,6 +241,7 @@ export class Ruler extends EventBus<RulerEvents> {
 
   updateOffsetX(offsetX: number): void {
     this.offsetX = offsetX
+    this.render()
   }
 
   updateDuration(duration: number): void {
