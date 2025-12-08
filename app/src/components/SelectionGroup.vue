@@ -61,30 +61,40 @@ function handleSelectionUpdate(item: SelectionItem) {
   // 将 DOM 坐标转换回 Canvas 坐标
   const canvasX = item.x / scaleRatio
   const canvasY = item.y / scaleRatio
+  const canvasWidth = item.width / scaleRatio
+  const canvasHeight = item.height / scaleRatio
 
-  // 更新 performer 位置
+  // 更新 performer 属性
   const performer = performerStore.getAllPerformers().find(p => p.id === currentSelection.value?.id)
   if (performer) {
+    const currentBounds = performer.getBounds()
+
+    // 更新位置
     performer.setPosition(canvasX, canvasY)
+
+    // 更新尺寸（通过缩放）
+    if (canvasWidth !== currentBounds.width || canvasHeight !== currentBounds.height) {
+      performer.setScale(
+        canvasWidth / currentBounds.width,
+        canvasHeight / currentBounds.height
+      )
+    }
+
+    // 更新旋转
+    if (item.rotation !== undefined) {
+      performer.setRotation(item.rotation)
+    }
   }
 }
 
 function handleSelectionResize(_id: string, _direction: ResizeDirection, item: SelectionItem) {
-  if (!currentSelection.value)
-    return
-
-  // 将 DOM 坐标转换回 Canvas 坐标
-  const canvasX = item.x / scaleRatio
-  const canvasY = item.y / scaleRatio
-  const canvasWidth = item.width / scaleRatio
-  const canvasHeight = item.height / scaleRatio
-
-  // 更新 performer 位置和尺寸
-  const performer = performerStore.getAllPerformers().find(p => p.id === currentSelection.value?.id)
-  if (performer) {
-    performer.setPosition(canvasX, canvasY)
-    performer.setScale(canvasWidth / performer.getBounds().width, canvasHeight / performer.getBounds().height)
-  }
+  // resizing 过程中也会触发 update 事件，这里只需要转发给统一的处理函数
+  // 或者如果 Selection.vue 在 resize 过程中不仅 emit resize 还 emit update，
+  // 那么这里其实可以留空，或者为了实时响应性 specifically handle it.
+  // Selection.vue's useResize emits 'update' onEnd.
+  // During resize (onUpdate), it emits 'resize' AND 'update'.
+  // So handleSelectionUpdate is sufficient for both realtime and final updates.
+  handleSelectionUpdate(item)
 }
 
 function handleSelectionSelect(id: string) {

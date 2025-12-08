@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'vue'
 import type { ThemeName } from '../themes'
 import type { ResizeDirection, SelectionItem } from '../types'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, toRef } from 'vue'
 import { useDrag } from '../composables/useDrag'
 import { useResize } from '../composables/useResize'
 import { getTheme, mergeTheme } from '../themes'
@@ -88,7 +88,7 @@ const containerStyle = computed(() => {
     height: `${props.item.height}px`,
     zIndex: props.item.zIndex,
     transform: `rotate(${props.item.rotation}deg)`,
-    transformOrigin: 'top left',
+    transformOrigin: 'center center',
     pointerEvents: props.disabled ? 'none' : 'auto',
     opacity: props.disabled ? 0.5 : 1,
     cursor: props.disabled ? 'not-allowed' : 'move',
@@ -162,7 +162,7 @@ const resizeDirections: ResizeDirection[] = [
 ]
 
 // 拖拽功能
-const { isDragging, startDrag, endDrag, updatePosition, cleanup: cleanupDrag } = useDrag(props.item, {
+const { isDragging, startDrag, endDrag, updatePosition, cleanup: cleanupDrag } = useDrag(toRef(props, 'item'), {
   onStart: (event) => {
     if (props.disabled)
       return
@@ -186,7 +186,7 @@ const { isDragging, startDrag, endDrag, updatePosition, cleanup: cleanupDrag } =
 })
 
 // 调整大小功能
-const { isResizing, startResize, endResize, updateSize, cleanup: cleanupResize } = useResize(props.item, {
+const { isResizing, startResize, endResize, updateSize, cleanup: cleanupResize } = useResize(toRef(props, 'item'), {
   minWidth: props.minWidth,
   minHeight: props.minHeight,
   onStart: (direction, event) => {
@@ -275,7 +275,15 @@ function updateRotation(clientX: number, clientY: number) {
   const currentAngle = Math.atan2(clientY - centerY, clientX - centerX) * 180 / Math.PI
 
   // 计算角度变化量
-  const angleDelta = currentAngle - rotateStartAngle.value
+  let angleDelta = currentAngle - rotateStartAngle.value
+
+  // 标准化角度变化量到 -180 到 180 度之间，防止跨越 ±180 度时的跳变
+  if (angleDelta > 180) {
+    angleDelta -= 360
+  }
+  else if (angleDelta < -180) {
+    angleDelta += 360
+  }
 
   // 更新旋转角度：初始角度 + 角度变化量
   let newRotation = initialRotation.value + angleDelta
