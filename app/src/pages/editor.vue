@@ -5,6 +5,7 @@ import { useEditorStore } from '@/store/useEditorStore'
 definePage({ redirect: '/editor/media' })
 
 const siderCollapsed = useStorage('siderCollapsed', false)
+const rightSiderCollapsed = useStorage('rightSiderCollapsed', false)
 
 const editorStore = useEditorStore()
 const isClippaReady = ref(false)
@@ -64,32 +65,39 @@ function exportHandler() {
         导出
       </yy-button>
     </yy-layout-header>
-
-    <yy-layout has-sider max-w-full>
-      <yy-layout-sider
-        w300px
-        content-class="h-[calc(100vh-50px)] p-y-2"
-        collapsed-width="65"
-        :collapsed="siderCollapsed"
-        @collapsed="siderCollapsed = true"
-        @expanded="siderCollapsed = false"
+    <div flex w-full overflow-hidden>
+      <div
+        :w="siderCollapsed ? '65px' : '300px'"
+        flex="shrink-0"
+        h="[calc(100vh-50px)]"
+        p-y-2
+        transition="width 300ms"
+        overflow-hidden
+        @click="siderCollapsed = !siderCollapsed"
       >
         <Sider />
-      </yy-layout-sider>
+      </div>
 
-      <div flex-1 flex="~ col" relative bg="#1e1e29">
+      <div flex="~ 1 col" min-w-0 relative bg="#1e1e29">
         <Canvas />
         <ResizableTimeline />
-        <!-- <KeyboardShortcutsHelp /> -->
+      <!-- <KeyboardShortcutsHelp /> -->
       </div>
-      <!-- <yy-layout overflow-hidden>
-        <yy-layout-content content-class="h-[calc(100vh-300px)]">
 
-        </yy-layout-content>
-        <yy-layout-footer>
-
-        </yy-layout-footer>
-      </yy-layout> -->
-    </yy-layout>
+      <div
+        :w="rightSiderCollapsed ? '65px' : '300px'"
+        flex="shrink-0"
+        h="[calc(100vh-50px)]"
+        p-y-2
+        transition="width 300ms"
+        overflow-hidden
+        style="direction: rtl"
+        @click="rightSiderCollapsed = !rightSiderCollapsed"
+      >
+        <div style="direction: ltr">
+        <!-- 右侧 Sider 内容 -->
+        </div>
+      </div>
+    </div>
   </yy-layout>
 </template>
