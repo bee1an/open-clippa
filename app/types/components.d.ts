@@ -11,18 +11,18 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    AppLogo: typeof import('./../src/components/appLogo.vue')['default']
+    AppLogo: typeof import('./../src/components/AppLogo.vue')['default']
     AppLogoLarge: typeof import('./../src/components/appLogoLarge.vue')['default']
-    Canvas: typeof import('./../src/components/canvas.vue')['default']
-    Nav: typeof import('./../src/components/sider/nav.vue')['default']
-    NavItem: typeof import('./../src/components/sider/nav-item.vue')['default']
-    PlaybackControls: typeof import('./../src/components/playbackControls.vue')['default']
-    ResizableTimeline: typeof import('./../src/components/resizableTimeline.vue')['default']
+    Canvas: typeof import('./../src/components/Canvas.vue')['default']
+    Nav: typeof import('./../src/components/sider/Nav.vue')['default']
+    NavItem: typeof import('./../src/components/sider/NavItem.vue')['default']
+    PlaybackControls: typeof import('./../src/components/PlaybackControls.vue')['default']
+    ResizableTimeline: typeof import('./../src/components/ResizableTimeline.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SelectionGroup: typeof import('./../src/components/SelectionGroup.vue')['default']
-    Sider: typeof import('./../src/components/sider/sider.vue')['default']
-    TimelineWrapper: typeof import('./../src/components/timelineWrapper.vue')['default']
+    Sider: typeof import('./../src/components/sider/Sider.vue')['default']
+    TimelineWrapper: typeof import('./../src/components/TimelineWrapper.vue')['default']
     VideoPreviewCard: typeof import('./../src/components/VideoPreviewCard.vue')['default']
     VideoPreviewList: typeof import('./../src/components/VideoPreviewList.vue')['default']
   }
