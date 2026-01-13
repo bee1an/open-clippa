@@ -1,11 +1,11 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div wfull hfull flex>
+  <div w-full h-full flex bg-zinc-900>
     <Nav />
 
-    <div p-r-2 flex-1>
-      <div bg="#13131b" hfull border-rd-xl>
+    <div class="flex-1 overflow-hidden">
+      <div class="h-full bg-zinc-900 overflow-y-auto">
         <RouterView />
       </div>
     </div>
