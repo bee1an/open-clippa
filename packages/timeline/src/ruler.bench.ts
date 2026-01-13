@@ -1,8 +1,7 @@
 import { bench, describe } from 'vitest'
 import { Ruler } from './ruler'
-import { Application } from 'pixi.js'
 
-describe('Ruler render performance', () => {
+describe('ruler render performance', () => {
   const ruler = new Ruler({
     screenWidth: 1000,
     duration: 60000,
@@ -13,7 +12,7 @@ describe('Ruler render performance', () => {
 
   let offsetX = 0
 
-  bench('Ruler.render', () => {
+  bench('ruler.render', () => {
     offsetX += 10
     ruler.updateOffsetX(offsetX)
   })

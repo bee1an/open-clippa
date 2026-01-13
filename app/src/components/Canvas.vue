@@ -6,11 +6,14 @@ import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import SelectionGroup from './SelectionGroup.vue'
 
+const CANVAS_WIDTH = 996
+const CANVAS_HEIGHT = CANVAS_WIDTH / 16 * 9
+
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
 const { clippa } = editorStore
-clippa.stage.init({ width: 996, height: 996 / 16 * 9 })
+clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
 
 // 异步加载视频并获取真实时长
 async function loadVideoWithDuration(src: string): Promise<number> {
@@ -39,16 +42,15 @@ const canvasScaleRatio = ref(1)
 
 // 获取 Canvas 元素并计算缩放率
 function calculateCanvasScaleRatio() {
-  // TODO: 后面采用内部的值
-  const canvasElement = document.querySelector('#canvas canvas') as HTMLCanvasElement
-  if (!canvasElement)
+  const app = clippa.stage.app
+  if (!app)
     return
 
-  // Canvas 内在尺寸 (初始化时设置的尺寸)
-  const internalWidth = 996
-  const _internalHeight = 561
+  // Canvas 内在尺寸
+  const internalWidth = app.renderer.width
 
   // Canvas 实际显示尺寸 (CSS尺寸)
+  const canvasElement = app.canvas as HTMLCanvasElement
   const displayWidth = canvasElement.clientWidth
 
   // 计算缩放率 (由于宽高比固定，只需计算一个值)
@@ -94,8 +96,8 @@ onMounted(async () => {
     start: 0,
     x: 0,
     y: 0,
-    width: 996,
-    height: 561,
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT,
     zIndex: 0,
   })
 
@@ -105,8 +107,8 @@ onMounted(async () => {
   //   start: 0,
   //   x: 0,
   //   y: 0,
-  //   width: 996,
-  //   height: 561,
+  //   width: CANVAS_WIDTH,
+  //   height: CANVAS_HEIGHT,
   //   zIndex: 0,
   // })
 })
