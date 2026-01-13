@@ -78,18 +78,16 @@ export class Ruler extends EventBus<RulerEvents> {
 
   private _bg?: Graphics
   private _drawBg(): void {
-    const bg = new Graphics({ label: 'bg' })
-    bg.rect(0, 0, Math.max(this.width, this.screenWidth - this.offsetX), TIMELINE_RULER_HEIGHT)
-    bg.fill(TIMELINE_RULER_FILL)
-
     if (this._bg) {
-      this.container.replaceChild(this._bg, bg)
+      this._bg.clear()
     }
     else {
-      this.container.addChild(bg)
+      this._bg = new Graphics({ label: 'bg' })
+      this.container.addChild(this._bg)
     }
 
-    this._bg = bg
+    this._bg.rect(0, 0, Math.max(this.width, this.screenWidth - this.offsetX), TIMELINE_RULER_HEIGHT)
+    this._bg.fill(TIMELINE_RULER_FILL)
   }
 
   private _bgByDuration?: Graphics
