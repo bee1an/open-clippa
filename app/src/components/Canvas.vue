@@ -117,8 +117,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div hfull flex="~ col" items-center justify-center>
-    <div id="canvas" class="aspect-ratio-16/9 h-60%" relative mb-5>
+  <div h-full flex="~ col" items-center justify-center bg-zinc-950>
+    <div
+      id="canvas"
+      class="aspect-ratio-16/9 h-60% shadow-2xl rounded-lg overflow-hidden border border-zinc-800/50"
+      relative mb-5
+    >
       <!-- Selection Group 组件 -->
       <SelectionGroup :scale-ratio="canvasScaleRatio" />
     </div>

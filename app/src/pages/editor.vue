@@ -57,41 +57,49 @@ function exportHandler() {
 </script>
 
 <template>
-  <yy-layout w-screen>
-    <yy-layout-header h50px bordered flex items-center px-4>
+  <yy-layout w-screen bg-zinc-950 text-zinc-200>
+    <yy-layout-header h-14 border-b border-zinc-800 bg-zinc-900 flex items-center px-4 shadow-sm z-10>
       <AppLogo size="md" />
       <div class="flex-1" />
-      <yy-button @click="exportHandler">
-        导出
-      </yy-button>
+      <button
+        class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md shadow-sm text-sm font-medium transition-colors border-none outline-none cursor-pointer flex items-center justify-center gap-2"
+        @click="exportHandler"
+      >
+        <div i-carbon-export text-lg />
+        <span>导出</span>
+      </button>
     </yy-layout-header>
-    <div flex w-full overflow-hidden>
+    <div flex w-full overflow-hidden h="[calc(100vh-3.5rem)]">
       <div
-        :w="siderCollapsed ? '65px' : '300px'"
+        :w="siderCollapsed ? '65px' : '280px'"
         flex="shrink-0"
-        h="[calc(100vh-50px)]"
-        p-y-2
-        transition="width 300ms"
+        h-full
+        bg-zinc-900
+        border-r border-zinc-800
+        transition="width 300ms ease-in-out"
         overflow-hidden
+        class="z-20"
         @click="siderCollapsed = !siderCollapsed"
       >
         <Sider />
       </div>
 
-      <div flex="~ 1 col" min-w-0 relative bg="#1e1e29">
+      <div flex="~ 1 col" min-w-0 relative bg-zinc-950>
         <Canvas />
         <ResizableTimeline />
       <!-- <KeyboardShortcutsHelp /> -->
       </div>
 
       <div
-        :w="rightSiderCollapsed ? '65px' : '300px'"
+        :w="rightSiderCollapsed ? '65px' : '280px'"
         flex="shrink-0"
-        h="[calc(100vh-50px)]"
-        p-y-2
-        transition="width 300ms"
+        h-full
+        bg-zinc-900
+        border-l border-zinc-800
+        transition="width 300ms ease-in-out"
         overflow-hidden
         style="direction: rtl"
+        class="z-20"
         @click="rightSiderCollapsed = !rightSiderCollapsed"
       >
         <div style="direction: ltr">
