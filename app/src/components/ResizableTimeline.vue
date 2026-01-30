@@ -75,23 +75,30 @@ onMounted(() => {
 </script>
 
 <template>
-  <div w-full>
+  <div w-full class="flex flex-col">
+    <!-- Resize Handle -->
     <div
-      h-2px
-      bg="transparent"
-      cursor="ns-resize"
+      h-1.5
+      bg-zinc-800
+      cursor-row-resize
       w-full
-      transition="~ all-200"
-      hover:bg="#ffffff"
-      border="t-1 solid #444444"
+      transition="colors duration-200"
+      hover:bg-blue-600
+      border-t border-zinc-700
+      flex items-center justify-center
+      class="group relative z-20"
       @mousedown="startDrag"
-    />
+    >
+      <!-- Visual cue for dragging -->
+      <div class="w-12 h-1 rounded-full bg-zinc-600 opacity-50 group-hover:opacity-100 transition-opacity absolute top-0.5" />
+    </div>
 
     <PlaybackControls />
 
     <div
       w-full
       overflow-hidden
+      class="bg-zinc-900 border-t border-zinc-800"
       :style="{ height: `${timelineHeight}px` }"
     >
       <TimelineWrapper />

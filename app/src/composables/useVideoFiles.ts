@@ -29,27 +29,26 @@ export function useVideoFiles() {
    * 递归读取文件夹内的所有文件
    */
   async function readAllFilesInDirectory(directoryEntry: FileSystemDirectoryEntry): Promise<File[]> {
-    const files: File[] = []
-
     const reader = directoryEntry.createReader()
     const entries = await new Promise<FileSystemEntry[]>((resolve) => {
       reader.readEntries(resolve)
     })
 
-    for (const entry of entries) {
+    const promises = entries.map(async (entry) => {
       if (entry.isFile) {
         const file = await new Promise<File>((resolve, reject) => {
           (entry as FileSystemFileEntry).file(resolve, reject)
         })
-        files.push(file)
+        return [file]
       }
       else if (entry.isDirectory) {
-        const subFiles = await readAllFilesInDirectory(entry as FileSystemDirectoryEntry)
-        files.push(...subFiles)
+        return await readAllFilesInDirectory(entry as FileSystemDirectoryEntry)
       }
-    }
+      return []
+    })
 
-    return files
+    const results = await Promise.all(promises)
+    return results.flat()
   }
 
   /**

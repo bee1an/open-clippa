@@ -76,7 +76,7 @@ function handleSelectionUpdate(item: SelectionItem) {
     if (canvasWidth !== currentBounds.width || canvasHeight !== currentBounds.height) {
       performer.setScale(
         canvasWidth / currentBounds.width,
-        canvasHeight / currentBounds.height
+        canvasHeight / currentBounds.height,
       )
     }
 

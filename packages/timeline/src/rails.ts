@@ -343,10 +343,8 @@ export class Rails extends EventBus<RailsEvents> {
       // 拖拽到rail上
       const { x, y } = e.getLocalPosition(this.railsContainer)
       const rail = this.rails.find((rail) => {
-        const bounds = rail.container.getLocalBounds()
-        bounds.y = rail.y
-
-        return rail.container.getLocalBounds().containsPoint(x, y)
+        // Simple arithmetic check is O(1) and much faster than getLocalBounds
+        return x >= 0 && x <= rail.width && y >= rail.y && y <= rail.y + RAIL_HEIGHT
       })
 
       const atTrain = this.state.atDragTrain!

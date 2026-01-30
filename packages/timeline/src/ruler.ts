@@ -78,18 +78,16 @@ export class Ruler extends EventBus<RulerEvents> {
 
   private _bg?: Graphics
   private _drawBg(): void {
-    const bg = new Graphics({ label: 'bg' })
-    bg.rect(0, 0, Math.max(this.width, this.screenWidth - this.offsetX), TIMELINE_RULER_HEIGHT)
-    bg.fill(TIMELINE_RULER_FILL)
-
     if (this._bg) {
-      this.container.replaceChild(this._bg, bg)
+      this._bg.clear()
     }
     else {
-      this.container.addChild(bg)
+      this._bg = new Graphics({ label: 'bg' })
+      this.container.addChild(this._bg)
     }
 
-    this._bg = bg
+    this._bg.rect(0, 0, Math.max(this.width, this.screenWidth - this.offsetX), TIMELINE_RULER_HEIGHT)
+    this._bg.fill(TIMELINE_RULER_FILL)
   }
 
   private _bgByDuration?: Graphics
@@ -114,18 +112,29 @@ export class Ruler extends EventBus<RulerEvents> {
     this._bgByDuration = bg
   }
 
-  private _drawTextTime(x: number, content: string): Text {
-    const text = new Text({
-      style: {
-        fontSize: TIMELINE_TICK_FONT_SIZE,
-        fill: TIMELINE_TICK_COLOR,
-      },
-      x,
-      y: TIMELINE_RULER_HEIGHT / 2,
-      text: content,
-    })
+  private _textPool: Text[] = []
 
-    text.anchor.set(0.5)
+  private _drawTextTime(x: number, content: string): Text {
+    let text: Text
+    if (this._textPool.length > 0) {
+      text = this._textPool.pop()!
+      text.text = content
+      text.x = x
+      text.y = TIMELINE_RULER_HEIGHT / 2
+      text.visible = true
+    }
+    else {
+      text = new Text({
+        style: {
+          fontSize: TIMELINE_TICK_FONT_SIZE,
+          fill: TIMELINE_TICK_COLOR,
+        },
+        x,
+        y: TIMELINE_RULER_HEIGHT / 2,
+        text: content,
+      })
+      text.anchor.set(0.5)
+    }
 
     return text
   }
@@ -203,8 +212,20 @@ export class Ruler extends EventBus<RulerEvents> {
     dotsGraphics.fill(TIMELINE_DOT_FILL)
 
     if (this._ticksWrapper) {
+      // Recycle Text objects and destroy others
+      const children = this._ticksWrapper.removeChildren()
+      for (const child of children) {
+        if (child instanceof Text) {
+          child.visible = false
+          this._textPool.push(child)
+        }
+        else {
+          child.destroy()
+        }
+      }
+
       if (!this._ticksWrapper.destroyed) {
-        this._ticksWrapper.destroy({ children: true })
+        this._ticksWrapper.destroy()
       }
       this.container.removeChild(this._ticksWrapper)
     }
