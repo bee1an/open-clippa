@@ -1,0 +1,204 @@
+@layer base {
+  :root {
+    /* ===== 极简深色主题 (Minimalist Dark) ===== */
+
+    /* 背景层级 - 纯粹的深灰色系 */
+    --background: 0 0% 6%; /* #0f0f0f - 近乎纯黑 */
+    --background-elevated: 0 0% 10%; /* #1a1a1a - 稍微抬升 */
+    --background-overlay: 0 0% 13%; /* #212121 - 悬浮 */
+
+    /* 前景色 - 提高对比度，减少视觉噪音 */
+    --foreground: 0 0% 95%; /* 亮白 */
+    --foreground-muted: 0 0% 60%; /* 中灰 */
+    --foreground-subtle: 0 0% 40%; /* 暗灰 */
+
+    /* 组件背景 */
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
+
+    /* 主色调 - 极简主义通常使用单色或克制的强调色 */
+    /* 这里使用一种精致的“白热”色或保持原有的橙色但更收敛 */
+    --primary: 0 0% 95%; /* 变更为白色作为主强调色 (类似 Vercel/Notion Dark) */
+    --primary-foreground: 0 0% 0%;
+    --primary-hover: 0 0% 100%;
+    --primary-glow: 0 0% 100% / 0.1;
+
+    /* 次要色 */
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 90%;
+    --secondary-hover: 0 0% 20%;
+
+    /* 静音与边框 - 更细微 */
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 50%;
+
+    --border: 0 0% 16%; /* 非常微妙的边框 */
+    --border-subtle: 0 0% 12%;
+    --border-emphasis: 0 0% 25%;
+
+    --input: 0 0% 12%;
+    --input-focus: 0 0% 15%;
+    --ring: 0 0% 80%;
+
+    /* 状态色 - 保持但降低饱和度 */
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 140 30% 50%;
+    --success-foreground: 140 10% 95%;
+    --warning: 40 50% 50%;
+    --warning-foreground: 40 10% 95%;
+
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
+    --accent-hover: 0 0% 20%;
+
+    /* ===== 圆角 - 更锐利 ===== */
+    --radius: 0.375rem; /* 6px */
+    --radius-xs: 0.125rem; /* 2px */
+    --radius-sm: 0.25rem; /* 4px */
+    --radius-lg: 0.5rem; /* 8px */
+    --radius-xl: 0.75rem; /* 12px */
+    --radius-2xl: 1rem; /* 16px */
+
+    /* ===== 阴影 - 更加扁平 ===== */
+    --shadow-xs: 0 1px 1px rgb(0 0 0 / 0.2);
+    --shadow-sm: 0 2px 4px rgb(0 0 0 / 0.2);
+    --shadow-md: 0 4px 8px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 12px 24px rgb(0 0 0 / 0.4);
+    --shadow-xl: 0 20px 40px rgb(0 0 0 / 0.5);
+    --shadow-glow: 0 0 10px rgb(255 255 255 / 0.1);
+    --shadow-inner: inset 0 1px 2px rgb(0 0 0 / 0.2);
+
+    /* ===== 间距 ===== */
+    --space-0: 0;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+
+    /* ===== 动画 - 更快更干脆 ===== */
+    --duration-fast: 100ms;
+    --duration-normal: 150ms;
+    --duration-slow: 250ms;
+    --duration-slower: 400ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 优化滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* 优化选中状态 */
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
+    color: hsl(var(--foreground));
+  }
+}
+
+/* ===== 编辑器专用层 ===== */
+@layer components {
+  /* 面板容器 */
+  .panel {
+    background: hsl(var(--background-elevated));
+    border: 1px solid hsl(var(--border-subtle));
+    border-radius: var(--radius-lg);
+  }
+
+  .panel-header {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid hsl(var(--border-subtle));
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground-muted));
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  /* 玻璃态效果 */
+  .glass {
+    background: hsl(var(--background-elevated) / 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* 微光边框 */
+  .border-glow {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(hsl(var(--background-elevated)), hsl(var(--background-elevated))) padding-box,
+      linear-gradient(
+          135deg,
+          hsl(var(--border-emphasis)) 0%,
+          hsl(var(--border-subtle)) 50%,
+          hsl(var(--border-emphasis)) 100%
+        )
+        border-box;
+  }
+
+  /* 交互状态基础 */
+  .interactive {
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
+  }
+
+  .interactive:hover {
+    background-color: hsl(var(--accent));
+  }
+
+  .interactive:active {
+    transform: scale(0.98);
+  }
+
+  /* 焦点环 */
+  .focus-ring {
+    outline: none;
+  }
+
+  .focus-ring:focus-visible {
+    box-shadow:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--ring));
+  }
+}
