@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useVideoFiles } from '@/composables/useVideoFiles'
 import { useMediaStore } from '@/store/useMediaStore'
@@ -7,9 +8,15 @@ const mediaStore = useMediaStore()
 const { filterVideoFiles, handleDroppedFiles } = useVideoFiles()
 const { isDragging, onDragEnter, onDragLeave, onDragOver, onDrop } = useDragDrop()
 
-function fileSelected([file]: FileList) {
-  // 添加到媒体库
-  mediaStore.addVideoFile(file)
+function fileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = input.files
+  if (files?.length) {
+    Array.from(files).forEach((file) => {
+      mediaStore.addVideoFile(file)
+    })
+  }
+  input.value = ''
 }
 
 async function handleFiles(files: FileList) {
@@ -47,58 +54,64 @@ function onDragDrop(event: DragEvent) {
 
 <template>
   <div
-    class="media-page"
     hfull flex="~ col" relative
     :class="{
-      'border-2 border-dashed border-blue-500 bg-blue-500/10 transition-all duration-200': isDragging,
+      'border-2 border-dashed border-primary bg-primary/10 transition-all duration-200': isDragging,
     }"
     @drop="onDragDrop"
     @dragover="onDragOver"
     @dragenter="onDragEnter"
     @dragleave="onDragLeave"
   >
-    <div p-4 p-b-0>
+    <div p-4 p-b-0 text-foreground>
       你的媒体
     </div>
 
     <!-- 上传区域 -->
-    <div class="upload-section" p-4 border-b border="#2a2a3a">
-      <yy-upload wfull @change="fileSelected">
-        <!-- w-full 不生效, 因为使用了unset -->
-        <yy-button
-          type="primary"
-          style="width: 100%;"
+    <div p-4 border-b border-border>
+      <input
+        id="media-upload"
+        type="file"
+        accept="video/*"
+        multiple
+        hidden
+        @change="fileSelected"
+      >
+      <label for="media-upload" wfull block cursor-pointer>
+        <Button
+          variant="outline"
+          class="w-full pointer-events-none"
           :class="{
-            'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20': isDragging,
+            'border-primary bg-primary/20': isDragging,
           }"
         >
-          <div flex items-center gap-2>
-            <span>导入媒体</span>
-          </div>
-        </yy-button>
-      </yy-upload>
+          <div i-carbon-add text-lg mr-2 />
+          <span>导入媒体</span>
+        </Button>
+      </label>
     </div>
 
     <!-- 视频预览列表 -->
-    <div class="preview-section" flex-1 overflow-hidden>
+    <div flex-1 overflow-hidden>
       <VideoPreviewList />
     </div>
 
     <!-- 拖拽遮罩层 -->
     <div
       v-if="isDragging"
-      class="drag-overlay bg-#13131b/80 z-20"
+      class="z-20"
       absolute inset-0 backdrop-blur-sm flex items-center justify-center
+      bg="background/80"
       @dragenter="onDragEnter"
       @dragover="onDragOver"
       @dragleave="onDragLeave"
       @drop="onDragDrop"
     >
       <div
-        class="drag-message bg-#13131b/90"
-        text-base font-normal text-blue-400 px-6 py-3 border-rd-xl shadow-xl
+        text-base font-normal text-primary px-6 py-3 rounded-xl shadow-xl
         flex items-center gap-3 max-w-fit
-        border="1px solid #ffffff0d"
+        bg="background/90"
+        border="1 border"
         transform-gpu transition-all duration-200
       >
         <div class="i-carbon-cloud-upload text-xl" />

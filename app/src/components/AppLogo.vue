@@ -15,9 +15,9 @@ const props = withDefaults(defineProps<Props>(), {
 const router = useRouter()
 
 const sizeClasses = {
-  sm: 'text-lg',
-  md: 'text-xl',
-  lg: 'text-2xl',
+  sm: 'text-sm',
+  md: 'text-base',
+  lg: 'text-lg',
 }
 
 function handleClick() {
@@ -29,10 +29,15 @@ function handleClick() {
 
 <template>
   <div
-    select-none tracking-tight class="font-['Inter',-apple-system,BlinkMacSystemFont,sans-serif]"
-    :class="[clickable ? 'cursor-pointer hover:text-blue-400' : '']"
+    select-none tracking-tight font-sans flex items-center gap-2 transition-opacity duration-200
+    :class="[clickable ? 'cursor-pointer hover:opacity-80' : '']"
     @click="handleClick"
   >
-    <span :class="sizeClasses[size]" font-light text-gray-300>clippa</span>
+    <span
+      font-bold text-foreground tracking-tight
+      :class="sizeClasses[size]"
+    >
+      clippa
+    </span>
   </div>
 </template>

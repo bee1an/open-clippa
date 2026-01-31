@@ -1,13 +1,11 @@
 <template>
-  <yy-config-provider theme="dark">
-    <div h-screen flex="~ col" items-center justify-center>
-      <router-view />
-    </div>
-  </yy-config-provider>
+  <div h-screen w-screen overflow-hidden bg-background text-foreground>
+    <router-view />
+  </div>
 </template>
 
 <style>
-  html {
+html {
   color-scheme: dark;
   overflow: hidden;
 }

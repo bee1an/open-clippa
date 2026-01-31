@@ -6,14 +6,13 @@ const { active = true } = defineProps<{
 
 <template>
   <div
-    w-14 h-14 rounded-xl flex flex-col items-center justify-center cursor-pointer
-    transition-colors duration-200
-    class="group"
-    :class="active ? 'bg-zinc-800 text-zinc-100' : 'hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200'"
+    w-10 h-10 mb-2 rounded-lg flex items-center justify-center cursor-pointer relative group transition-all duration-200
+    :class="active ? 'bg-foreground text-background' : 'hover:bg-secondary text-foreground-muted hover:text-foreground'"
   >
-    <div i-material-symbols-service-directory text-2xl mb-1 />
-    <span text-xs font-medium>媒体</span>
+    <!-- Icon -->
+    <div
+      text-lg transition-transform duration-200
+      :class="active ? 'i-ph-film-strip-fill' : 'i-ph-film-strip-bold'"
+    />
   </div>
 </template>
-
-<style scoped></style>

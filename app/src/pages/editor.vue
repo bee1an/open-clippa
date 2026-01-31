@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CanvasExport } from 'open-clippa'
+import { Button } from '@/components/ui/button'
 import { useEditorStore } from '@/store/useEditorStore'
 
 definePage({ redirect: '/editor/media' })
@@ -57,55 +58,82 @@ function exportHandler() {
 </script>
 
 <template>
-  <yy-layout w-screen bg-zinc-950 text-zinc-200>
-    <yy-layout-header h-14 border-b border-zinc-800 bg-zinc-900 flex items-center px-4 shadow-sm z-10>
-      <AppLogo size="md" />
-      <div class="flex-1" />
-      <button
-        class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md shadow-sm text-sm font-medium transition-colors border-none outline-none cursor-pointer flex items-center justify-center gap-2"
-        @click="exportHandler"
-      >
-        <div i-carbon-export text-lg />
-        <span>导出</span>
-      </button>
-    </yy-layout-header>
-    <div flex w-full overflow-hidden h="[calc(100vh-3.5rem)]">
-      <div
-        :w="siderCollapsed ? '65px' : '280px'"
-        flex="shrink-0"
-        h-full
-        bg-zinc-900
-        border-r border-zinc-800
-        transition="width 300ms ease-in-out"
-        overflow-hidden
-        class="z-20"
-        @click="siderCollapsed = !siderCollapsed"
+  <div w-full h-full bg-background text-foreground flex="~ col">
+    <!-- Header - Minimalist Compact -->
+    <header h-12 border-b border-border bg-background flex items-center px-4 z-50 shrink-0 gap-4>
+      <div flex items-center gap-3>
+        <AppLogo size="sm" />
+      </div>
+
+      <div flex-1 />
+
+      <div flex items-center gap-1>
+        <!-- Left Sidebar Toggle -->
+        <button
+          w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
+          title="Toggle Left Sidebar"
+          @click="siderCollapsed = !siderCollapsed"
+        >
+          <div :class="!siderCollapsed ? 'i-ph-sidebar-simple-fill' : 'i-ph-sidebar-simple-bold'" text-lg />
+        </button>
+
+        <!-- Right Sidebar Toggle -->
+        <button
+          w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
+          title="Toggle Right Sidebar"
+          @click="rightSiderCollapsed = !rightSiderCollapsed"
+        >
+          <div :class="!rightSiderCollapsed ? 'i-ph-sidebar-simple-fill' : 'i-ph-sidebar-simple-bold'" text-lg transform="scale-x-[-1]" />
+        </button>
+
+        <div w-px h-4 bg-border mx-2 />
+
+        <Button
+          h-8 px-3 rounded text-xs font-medium bg-foreground text-background hover:bg-foreground-90 transition-colors gap-1.5 shadow-sm
+          @click="exportHandler"
+        >
+          <div i-ph-export-bold text-sm />
+          <span>Export</span>
+        </Button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div flex flex-1 w-full overflow-hidden relative>
+      <!-- Left Sider -->
+      <aside
+        :style="{ width: siderCollapsed ? '56px' : '280px' }"
+        flex-shrink-0 bg-background-elevated border-r border="border/50" transition-all duration-300 ease="[cubic-bezier(0.25,1,0.5,1)]" z-40 flex flex-col relative group
       >
         <Sider />
-      </div>
+      </aside>
 
-      <div flex="~ 1 col" min-w-0 relative bg-zinc-950>
-        <Canvas />
-        <ResizableTimeline />
-      <!-- <KeyboardShortcutsHelp /> -->
-      </div>
-
-      <div
-        :w="rightSiderCollapsed ? '65px' : '280px'"
-        flex="shrink-0"
-        h-full
-        bg-zinc-900
-        border-l border-zinc-800
-        transition="width 300ms ease-in-out"
-        overflow-hidden
-        style="direction: rtl"
-        class="z-20"
-        @click="rightSiderCollapsed = !rightSiderCollapsed"
-      >
-        <div style="direction: ltr">
-        <!-- 右侧 Sider 内容 -->
+      <!-- Center Stage -->
+      <main flex-1 flex flex-col min-w-0 bg-background relative z-0>
+        <div flex-1 relative overflow-hidden flex items-center justify-center bg-background>
+          <!-- Canvas Container with subtle pattern or shadow -->
+          <Canvas />
         </div>
-      </div>
+        <ResizableTimeline />
+      </main>
+
+      <!-- Right Sider -->
+      <aside
+        :style="{ width: rightSiderCollapsed ? '0px' : '280px' }"
+        flex-shrink-0
+        bg-background-elevated
+        border-l border="border/50"
+        transition-all duration-300 ease-in-out
+        z-40
+        flex flex-col
+      >
+        <div h-full overflow-hidden w-280px>
+          <!-- Right Sider Content -->
+          <div p-4 text-sm text-foreground-muted text-center mt-10>
+            属性面板
+          </div>
+        </div>
+      </aside>
     </div>
-  </yy-layout>
+  </div>
 </template>
