@@ -100,17 +100,6 @@ onMounted(async () => {
     height: CANVAS_HEIGHT,
     zIndex: 0,
   })
-
-  // await createVideoPerformer({
-  //   id: 'video2',
-  //   src: '/bunny.mp4',
-  //   start: 0,
-  //   x: 0,
-  //   y: 0,
-  //   width: CANVAS_WIDTH,
-  //   height: CANVAS_HEIGHT,
-  //   zIndex: 0,
-  // })
 })
 
 onUnmounted(() => {
@@ -119,18 +108,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div h-full flex="~ col" items-center justify-center bg-zinc-950>
+  <div h-full flex flex-col items-center justify-center bg-background relative overflow-hidden>
+    <!-- Background Pattern - Subtle -->
+    <div absolute inset-0 pointer-events-none class="opacity-[0.03] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
+
     <div
       id="canvas"
-      class="aspect-ratio-16/9 h-60% shadow-2xl rounded-lg overflow-hidden border border-zinc-800/50"
-      relative mb-5
+      aspect-video max-h="[85%]" max-w="[95%]" shadow="2xl black/50" rounded-sm overflow-hidden border="white/5" relative bg-black
     >
       <!-- Selection Group 组件 -->
       <SelectionGroup :scale-ratio="canvasScaleRatio" />
     </div>
-    <!-- <div w-130 mb-2>
-      <yy-slider v-model="sliderValue" :max="1" @change="seekBySlider" />
-    </div> -->
   </div>
 </template>
 
@@ -139,6 +127,7 @@ onUnmounted(() => {
   position: absolute;
   width: 100%;
   height: 100%;
+  border-radius: inherit;
 }
 
 /* 全屏样式 */

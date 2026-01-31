@@ -14,11 +14,15 @@
   "dependencies": {
     "@iconify/json": "catalog:app",
     "@vueuse/core": "catalog:app",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "pinia": "catalog:app",
+    "radix-vue": "^1.9.17",
+    "tailwind-merge": "^2.6.0",
     "unocss": "catalog:app",
+    "unocss-preset-animations": "^1.1.0",
     "vue": "catalog:app",
-    "vue-router": "catalog:app",
-    "yy-craft": "catalog:app"
+    "vue-router": "catalog:app"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "catalog:app",

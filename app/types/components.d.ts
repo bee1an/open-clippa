@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppLogo: typeof import('./../src/components/AppLogo.vue')['default']
     AppLogoLarge: typeof import('./../src/components/appLogoLarge.vue')['default']
+    Button: typeof import('./../src/components/ui/button/Button.vue')['default']
     Canvas: typeof import('./../src/components/Canvas.vue')['default']
     Nav: typeof import('./../src/components/sider/Nav.vue')['default']
     NavItem: typeof import('./../src/components/sider/NavItem.vue')['default']
@@ -23,6 +24,10 @@ declare module 'vue' {
     SelectionGroup: typeof import('./../src/components/SelectionGroup.vue')['default']
     Sider: typeof import('./../src/components/sider/Sider.vue')['default']
     TimelineWrapper: typeof import('./../src/components/TimelineWrapper.vue')['default']
+    Tooltip: typeof import('./../src/components/ui/tooltip/Tooltip.vue')['default']
+    TooltipContent: typeof import('./../src/components/ui/tooltip/TooltipContent.vue')['default']
+    TooltipProvider: typeof import('./../src/components/ui/tooltip/TooltipProvider.vue')['default']
+    TooltipTrigger: typeof import('./../src/components/ui/tooltip/TooltipTrigger.vue')['default']
     VideoPreviewCard: typeof import('./../src/components/VideoPreviewCard.vue')['default']
     VideoPreviewList: typeof import('./../src/components/VideoPreviewList.vue')['default']
   }

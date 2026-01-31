@@ -45,101 +45,67 @@ function _toggleSelect() {
 </script>
 
 <template>
-  <div class="group" hover:bg="#2a2a2a" rounded-sm p-1.5 wfull>
+  <div class="group hover:bg-secondary" rounded-md p-2 w-full transition-colors cursor-pointer>
     <!-- 视频预览区 -->
-    <div bg-black rounded-sm relative flex items-center justify-center overflow-hidden>
+    <div class="bg-black/50 border-border/50 group-hover:border-border" aspect-video rounded-md relative flex items-center justify-center overflow-hidden border transition-colors>
       <!-- 缩略图或默认图标 -->
       <img
         v-if="videoFile.thumbnail"
         :src="videoFile.thumbnail"
         :alt="videoFile.name"
-        w-full
-        h-full
-        object-cover
+        w-full h-full object-cover
       >
-      <div
-        v-else
-        flex
-        items-center
-        justify-center
-        w-full
-        h-full
-        bg-black
-      >
-        <div i-carbon-video text-4xl text-gray-600 />
+      <div v-else flex items-center justify-center w-full h-full text-foreground-muted>
+        <div i-ph-video-camera-slash-duotone text-3xl opacity-50 />
       </div>
 
       <!-- 时间码 -->
       <div
         v-if="videoFile.duration > 0"
         group-hover:opacity-0
-        text-white
-        text-xs
-        font-sans
-        absolute
-        bottom-1
-        left-1
-        bg="#2d3427"
-        p-x-1
-        rounded-1
+        text="xs foreground-muted"
+        font-mono
+        absolute bottom-1 right-1
+        class="bg-black/60 backdrop-blur-sm"
+        px-1.5 py-0.5 rounded-sm
         transition-opacity
       >
         {{ ms2TimeStr(videoFile.duration) }}
       </div>
 
+      <!-- 悬浮操作层 -->
+      <div
+        absolute inset-0 class="bg-black/40" opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2
+      >
+        <!-- 添加到时间轴 -->
+        <button
+          w-8 h-8 rounded-full bg-primary text-background flex items-center justify-center
+          hover:scale-110 active:scale-95 transition-all shadow-lg
+          title="Add to timeline"
+          @click.stop="addToTimeline"
+        >
+          <div i-ph-plus-bold text-lg />
+        </button>
+      </div>
+
       <!-- 右上角菜单按钮 -->
       <button
-        group-hover:opacity-100
-        opacity-0
-        absolute
-        top-1
-        right-1
-        bg="#333333"
-        w-8
-        h-8
-        rounded-md
-        flex
-        items-center
-        justify-center
-        text-white
-        hover:bg="#444444"
-        transition-colors
-        transition-opacity
+        opacity-0 group-hover:opacity-100
+        absolute top-1 right-1
+        w-6 h-6 rounded flex items-center justify-center
+        class="bg-black/50 hover:bg-black/70" text-white
+        transition-all
         @click.stop="_showMenu"
       >
-        <div i-carbon-overflow-menu-horizontal text-lg />
-      </button>
-
-      <!-- 右下角加号按钮 -->
-      <button
-        group-hover:opacity-100
-        opacity-0
-        absolute
-        bottom-1
-        right-1
-        bg="#10b981"
-        w-8
-        h-8
-        rounded-md
-        flex
-        items-center
-        justify-center
-        text="white 2xl"
-        font-bold
-        hover:bg="#059669"
-        transition-colors
-        transition-opacity
-        @click.stop="addToTimeline"
-      >
-        +
+        <div i-ph-dots-three-vert-bold text-sm />
       </button>
     </div>
 
     <!-- 文件信息栏 -->
-    <div flex items-center justify-between mt-1>
+    <div flex items-center justify-between mt-2 gap-2>
       <span
-        text="xs white"
-        font-sans
+        text="xs foreground"
+        font-medium
         truncate
         flex-1
         :title="videoFile.name"
@@ -147,29 +113,15 @@ function _toggleSelect() {
         {{ videoFile.name }}
       </span>
 
-      <!-- 勾选框 -->
-      <div
-        w-3
-        h-3
-        border="~ white"
-        rounded-full
-        flex
-        items-center
-        justify-center
-        cursor-pointer
-        transition-all
-        hover:scale-110
-        :class="{ 'bg-white': isSelected }"
+      <!-- 勾选框 - 简化为圆点 -->
+      <button
+        w-4 h-4 rounded-full class="border-border/50" border flex items-center justify-center
+        hover:border-primary transition-colors
+        :class="{ 'bg-primary border-primary': isSelected, 'bg-transparent': !isSelected }"
         @click.stop="_toggleSelect"
       >
-        <div
-          v-if="isSelected"
-          text="black xs"
-          font-bold
-        >
-          ✓
-        </div>
-      </div>
+        <div v-if="isSelected" i-ph-check-bold text="xs background" />
+      </button>
     </div>
   </div>
 </template>

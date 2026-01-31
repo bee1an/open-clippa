@@ -38,4 +38,3 @@ catalogs:
     vue: ^3.5.22
     vue-router: ^4.5.1
     vue-tsc: ^3.1.2
-    yy-craft: ^1.2.1
