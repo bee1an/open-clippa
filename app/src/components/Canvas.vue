@@ -108,13 +108,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div h-full flex flex-col items-center justify-center bg-background relative overflow-hidden>
+  <div h-full w-full flex flex-col items-center justify-center bg-background relative overflow-hidden>
     <!-- Background Pattern - Subtle -->
-    <div absolute inset-0 pointer-events-none class="opacity-[0.03] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
 
     <div
       id="canvas"
-      aspect-video max-h="[85%]" max-w="[95%]" shadow="2xl black/50" rounded-sm overflow-hidden border="white/5" relative bg-black
+      flex-1 aspect-video max-h="[85%]" max-w="[95%]" rounded-sm overflow-hidden border="white/5" relative bg-black
     >
       <!-- Selection Group 组件 -->
       <SelectionGroup :scale-ratio="canvasScaleRatio" />

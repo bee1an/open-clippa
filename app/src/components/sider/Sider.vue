@@ -1,11 +1,17 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+const siderCollapsed = useStorage('siderCollapsed', false)
+</script>
 
 <template>
   <div w-full h-full flex bg-background-elevated>
-    <Nav />
+    <Nav :expanded="!siderCollapsed" @toggle="siderCollapsed = !siderCollapsed" />
 
-    <div flex-1 overflow-hidden bg-background-elevated class="border-l border-border/50">
-      <div h-full overflow-y-auto w-220px>
+    <div
+      v-if="!siderCollapsed"
+      overflow-hidden bg-background-elevated w-220px
+      class="border-l border-border/50"
+    >
+      <div h-full overflow-y-auto>
         <RouterView />
       </div>
     </div>
