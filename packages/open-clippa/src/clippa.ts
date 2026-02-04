@@ -1,7 +1,8 @@
 import type { MaybeArray } from 'type-aide'
 import type { Performer } from './performer'
-import { VideoTrain } from '@clippa/timeline'
+import { TextTrain, VideoTrain } from '@clippa/timeline'
 import { Director, Stage, Theater } from './canvas'
+import { Text } from './performer'
 import { Timeline } from './timeline'
 import { EventBus } from './utils'
 
@@ -43,12 +44,28 @@ export class Clippa extends EventBus<ClippaEvents> {
   async hire(p: Performer): Promise<void> {
     this.theater.hire(p)
 
+    if (p instanceof Text) {
+      const train = new TextTrain({
+        id: `text-${Date.now()}`,
+        start: p.start,
+        duration: p.duration,
+        label: p.getText(),
+        textColor: p.getStyle().fill,
+      })
+      this.timeline.addTrainByZIndex(train, p.zIndex)
+      return
+    }
+
+    const performerWithSrc = p as { src?: string }
+    if (!performerWithSrc.src)
+      return
+
     // 创建VideoTrain实例，传递必要的参数
     const videoTrain = new VideoTrain({
       id: `video-${Date.now()}`,
       start: p.start,
       duration: p.duration,
-      src: (p as any).src || '',
+      src: performerWithSrc.src,
     })
     this.timeline.addTrainByZIndex(videoTrain, p.zIndex)
     await videoTrain.init()
