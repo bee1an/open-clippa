@@ -1,11 +1,11 @@
-import type { Sprite } from 'pixi.js'
+import type { Text as PixiText, Sprite } from 'pixi.js'
 
 export interface Performer {
   id: string
   start: number
   duration: number
   zIndex: number
-  sprite?: Sprite
+  sprite?: Sprite | PixiText
 
   showState: ShowState
 

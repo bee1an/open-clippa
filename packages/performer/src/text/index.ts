@@ -125,13 +125,13 @@ export class Text extends EventBus<TextEvents> implements Performer {
       fontSize: option.fontSize || 26,
       fontWeight: option.fontWeight as any,
       fontStyle: option.fontStyle,
-      fill: option.fill,
+      fill: option.fill ?? '#fff',
       stroke: option.stroke,
       align: option.align,
       wordWrap: option.wordWrap,
       wordWrapWidth: option.wordWrapWidth,
       lineHeight: option.lineHeight,
-      letterSpacing: option.letterSpacing,
+      letterSpacing: option.letterSpacing ?? 0,
       dropShadow: option.dropShadow,
     })
   }
