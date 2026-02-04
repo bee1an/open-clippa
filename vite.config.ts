@@ -26,7 +26,6 @@ export default defineConfig({
 
     VueRouter({
       routesFolder: 'src/pages',
-      dts: 'types/typed-router.d.ts',
       root: './app',
     }),
 
@@ -34,12 +33,9 @@ export default defineConfig({
 
     AutoImport({
       imports: ['vue', '@vueuse/core', 'vue-router'],
-      dts: 'types/auto-imports.d.ts',
     }),
 
-    VueComponents({
-      dts: 'types/components.d.ts',
-    }),
+    VueComponents(),
 
     UnoCSS(),
 
