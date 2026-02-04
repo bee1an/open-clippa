@@ -380,23 +380,19 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         && canvasY >= bounds.y && canvasY <= bounds.y + bounds.height
     }
 
-    const centerX = bounds.x + bounds.width / 2
-    const centerY = bounds.y + bounds.height / 2
     const angle = -bounds.rotation * Math.PI / 180
 
     const cos = Math.cos(angle)
     const sin = Math.sin(angle)
 
-    const dx = canvasX - centerX
-    const dy = canvasY - centerY
+    const dx = canvasX - bounds.x
+    const dy = canvasY - bounds.y
 
-    const rotatedX = dx * cos - dy * sin
-    const rotatedY = dx * sin + dy * cos
+    const localX = dx * cos - dy * sin
+    const localY = dx * sin + dy * cos
 
-    const halfWidth = bounds.width / 2
-    const halfHeight = bounds.height / 2
-
-    return Math.abs(rotatedX) <= halfWidth && Math.abs(rotatedY) <= halfHeight
+    return localX >= 0 && localX <= bounds.width
+      && localY >= 0 && localY <= bounds.height
   }
 
   getBounds(): Required<PerformerBounds> {

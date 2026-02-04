@@ -38,14 +38,14 @@ export type PerformerConfig = VideoPerformerConfig | ImagePerformerConfig | Text
 
 type CanvasPerformer = Video | Image | Text
 
-interface PerformerPointerEvent {
+type PerformerPointerEvent = {
   performer: CanvasPerformer
   canvasX: number
   canvasY: number
   timestamp: number
 }
 
-interface PendingSelectionDrag {
+type PendingSelectionDrag = {
   id: string
   clientX: number
   clientY: number

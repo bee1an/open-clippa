@@ -38,7 +38,6 @@ export interface Performer {
   setScale: (scaleX: number, scaleY: number) => void
 
   setRotation: (angle: number) => void
-
   setFilters: (filters: Filter[] | null) => void
 }
 

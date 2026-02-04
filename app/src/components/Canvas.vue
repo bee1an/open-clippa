@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { PerformerConfig } from '@/store/usePerformerStore'
+import type { PerformerConfig, VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
+import { loadVideoMetadata } from '@/utils/media'
 import SelectionGroup from './SelectionGroup.vue'
 
 const CANVAS_WIDTH = 996
@@ -14,26 +15,6 @@ const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
 const { clippa } = editorStore
 clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
-
-// 异步加载视频并获取真实时长
-async function loadVideoWithDuration(src: string): Promise<number> {
-  return new Promise((resolve) => {
-    const video = document.createElement('video')
-    video.src = src
-    video.preload = 'metadata'
-
-    video.onloadedmetadata = () => {
-      // 视频时长以毫秒为单位
-      const duration = video.duration * 1000
-      resolve(duration)
-    }
-
-    video.onerror = () => {
-      // 如果无法获取时长，使用默认值
-      resolve(5000)
-    }
-  })
-}
 
 const sliderValue = ref(0)
 
@@ -58,17 +39,58 @@ function calculateCanvasScaleRatio() {
   canvasScaleRatio.value = ratio
 }
 
+function handleCanvasPointerDown(event: PointerEvent) {
+  const app = clippa.stage.app
+  if (!app)
+    return
+
+  const canvasElement = app.canvas as HTMLCanvasElement
+  const rect = canvasElement.getBoundingClientRect()
+  const clientX = event.clientX
+  const clientY = event.clientY
+
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom)
+    return
+
+  const ratio = canvasScaleRatio.value || 1
+  const canvasX = (clientX - rect.left) / ratio
+  const canvasY = (clientY - rect.top) / ratio
+
+  const hitPerformers = Array.from(clippa.stage.performers)
+    .filter(performer => performer.containsPoint(canvasX, canvasY))
+
+  if (hitPerformers.length === 0) {
+    performerStore.clearSelection()
+    performerStore.clearPendingSelectionDrag()
+    return
+  }
+
+  const target = hitPerformers.sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))[0]
+  if (!target)
+    return
+
+  performerStore.selectPerformer(target.id)
+  performerStore.requestSelectionDrag({
+    id: target.id,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    timestamp: Date.now(),
+  })
+}
+
 watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
 
 // 创建 performer 的辅助函数
-async function createVideoPerformer(config: Omit<PerformerConfig, 'duration'>): Promise<void> {
-  const videoDuration = await loadVideoWithDuration(config.src as string)
+async function createVideoPerformer(config: Omit<VideoPerformerConfig, 'duration'>): Promise<void> {
+  const { duration, width, height } = await loadVideoMetadata(config.src as string)
 
   const performerConfig: PerformerConfig = {
     ...config,
-    duration: videoDuration,
+    duration: duration || 5000,
+    width: (config.width ?? width) || CANVAS_WIDTH,
+    height: (config.height ?? height) || CANVAS_HEIGHT,
   }
 
   const performer = performerStore.addPerformer(performerConfig)
@@ -96,8 +118,6 @@ onMounted(async () => {
     start: 0,
     x: 0,
     y: 0,
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
     zIndex: 0,
   })
 })
@@ -113,7 +133,8 @@ onUnmounted(() => {
 
     <div
       id="canvas"
-      flex-1 aspect-video max-h="[85%]" max-w="[95%]" rounded-sm overflow-hidden border="white/5" relative bg-black
+      flex-1 aspect-video max-h="[85%]" max-w="[95%]" rounded-sm overflow-visible border="white/5" relative bg-black
+      @pointerdown="handleCanvasPointerDown"
     >
       <!-- Selection Group 组件 -->
       <SelectionGroup :scale-ratio="canvasScaleRatio" />

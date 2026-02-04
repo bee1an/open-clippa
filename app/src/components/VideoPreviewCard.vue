@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { VideoFile } from '@/store'
-import { ms2TimeStr, Video } from 'open-clippa'
+import { ms2TimeStr } from 'open-clippa'
 import { useEditorStore, useMediaStore } from '@/store'
+import { usePerformerStore } from '@/store/usePerformerStore'
+import { loadVideoMetadata } from '@/utils/media'
 
 interface Props {
   videoFile: VideoFile
@@ -11,21 +13,34 @@ const props = defineProps<Props>()
 
 const mediaStore = useMediaStore()
 const editorStore = useEditorStore()
+const performerStore = usePerformerStore()
 const { clippa } = editorStore
 
 // 勾选状态
 const isSelected = ref(false)
 
 // 添加到时间轴
-function addToTimeline() {
-  const video = new Video({
+async function addToTimeline() {
+  await clippa.ready
+
+  const { duration, width, height } = await loadVideoMetadata(props.videoFile.url)
+  const stageWidth = clippa.stage.app?.renderer.width ?? 0
+  const stageHeight = clippa.stage.app?.renderer.height ?? 0
+
+  const performer = performerStore.addPerformer({
     id: props.videoFile.id,
+    type: 'video',
     src: props.videoFile.file,
     start: 0,
-    duration: props.videoFile.duration,
+    duration: props.videoFile.duration || duration || 5000,
+    width: width || stageWidth,
+    height: height || stageHeight,
+    x: 0,
+    y: 0,
     zIndex: clippa.timeline.rails!.maxZIndex + 1,
   })
-  clippa.hire(video)
+
+  clippa.hire(performer)
 }
 
 // 删除视频文件

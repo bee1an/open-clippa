@@ -17,14 +17,14 @@ const props = withDefaults(defineProps<Props>(), {
 const scaleRatio = computed(() => props.scaleRatio)
 
 const performerStore = usePerformerStore()
-interface SelectionExpose {
+type SelectionExpose = {
   startExternalDrag?: (clientX: number, clientY: number) => void
 }
 
 const { selectedPerformers, pendingSelectionDrag } = storeToRefs(performerStore)
 const selectionRef = ref<SelectionExpose | null>(null)
 
-interface BoundsLike {
+type BoundsLike = {
   x: number
   y: number
   width: number
@@ -32,7 +32,7 @@ interface BoundsLike {
   rotation?: number
 }
 
-function rotateVector(x: number, y: number, rotation: number): { x: number, y: number } {
+const rotateVector = (x: number, y: number, rotation: number): { x: number, y: number } => {
   if (!rotation) {
     return { x, y }
   }
@@ -47,7 +47,7 @@ function rotateVector(x: number, y: number, rotation: number): { x: number, y: n
   }
 }
 
-function toCenterRotationPosition(bounds: BoundsLike): { x: number, y: number } {
+const toCenterRotationPosition = (bounds: BoundsLike): { x: number, y: number } => {
   const rotation = bounds.rotation ?? 0
   const offset = rotateVector(bounds.width / 2, bounds.height / 2, rotation)
   const centerX = bounds.x + offset.x
@@ -59,7 +59,7 @@ function toCenterRotationPosition(bounds: BoundsLike): { x: number, y: number } 
   }
 }
 
-function toTopLeftRotationBounds(item: BoundsLike): BoundsLike {
+const toTopLeftRotationBounds = (item: BoundsLike): BoundsLike => {
   const rotation = item.rotation ?? 0
   const centerX = item.x + item.width / 2
   const centerY = item.y + item.height / 2

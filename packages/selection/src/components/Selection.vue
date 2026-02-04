@@ -116,34 +116,37 @@ const boxStyle = computed(() => {
 })
 
 // 手柄样式
+// Updated for square look as requested
 const handleStyle = computed(() => ({
   position: 'absolute' as const,
   width: `${computedTheme.value.handleSize}px`,
   height: `${computedTheme.value.handleSize}px`,
-  backgroundColor: computedTheme.value.handleColor,
-  border: '1px solid #fff',
-  borderRadius: '2px',
+  backgroundColor: '#fff',
+  border: `1px solid ${computedTheme.value.handleColor}`,
+  borderRadius: '0', // Square
   zIndex: 1,
   pointerEvents: 'auto' as const,
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)', // Slightly sharper shadow for square
 }))
 
 // 旋转手柄样式
 const rotateHandleStyle = computed(() => ({
   position: 'absolute' as const,
-  top: '-30px',
+  top: '-36px',
   left: '50%',
   transform: 'translateX(-50%)',
-  width: '20px',
-  height: '20px',
-  backgroundColor: computedTheme.value.handleColor,
-  border: '2px solid #fff',
-  borderRadius: '50%',
+  width: '24px',
+  height: '24px',
+  backgroundColor: '#fff',
+  border: `1px solid ${computedTheme.value.handleColor}`,
+  borderRadius: '50%', // Rotate handle often stays round to indicate rotation, or we can make it square too if desired. Keeping round for distinction usually.
   cursor: 'grab',
   zIndex: 2,
   pointerEvents: 'auto' as const,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.15)',
 }))
 
 // 旋转连接线样式
@@ -185,10 +188,13 @@ const { isDragging, startDrag, endDrag, updatePosition, cleanup: cleanupDrag } =
   throttleInterval: 0, // 禁用节流间隔
 })
 
+const shouldKeepAspectRatio = (direction: ResizeDirection): boolean => direction.includes('-')
+
 // 调整大小功能
 const { isResizing, startResize, endResize, updateSize, cleanup: cleanupResize } = useResize(toRef(props, 'item'), {
   minWidth: props.minWidth,
   minHeight: props.minHeight,
+  keepAspectRatio: shouldKeepAspectRatio,
   onStart: (direction, event) => {
     if (props.disabled)
       return
@@ -209,6 +215,23 @@ const { isResizing, startResize, endResize, updateSize, cleanup: cleanupResize }
   },
   useRAF: false, // 禁用 RAF 节流，允许实时更新
   throttleInterval: 0, // 禁用节流间隔
+})
+
+function startExternalDrag(clientX: number, clientY: number) {
+  if (props.disabled || isResizing.value || isDragging.value)
+    return
+
+  const event = new MouseEvent('mousedown', {
+    clientX,
+    clientY,
+    button: 0,
+  })
+
+  startDrag(event)
+}
+
+defineExpose({
+  startExternalDrag,
 })
 
 // 鼠标事件处理
@@ -419,8 +442,9 @@ onUnmounted(() => {
     class="selection-container"
     :style="containerStyle"
     tabindex="-1"
-    @mousedown="handleMouseDown"
-    @touchstart="handleTouchStart"
+    @pointerdown.stop
+    @mousedown.stop="handleMouseDown"
+    @touchstart.stop="handleTouchStart"
     @keydown="handleKeyDown"
   >
     <!-- 选框主体 -->
@@ -428,28 +452,20 @@ onUnmounted(() => {
       <!-- 旋转控件 (仅在选中状态下显示) -->
       <template v-if="props.active">
         <!-- 连接线 -->
-        <svg
+        <div
           class="rotate-line"
           :style="{
             position: 'absolute',
-            top: '0',
+            top: '-24px',
             left: '50%',
-            transform: 'translateX(-50%)',
+            height: '24px',
             width: '1px',
-            height: '30px',
+            backgroundColor: rotateLineStroke,
+            transform: 'translateX(-50%)',
             zIndex: 1,
             pointerEvents: 'none',
           }"
-        >
-          <line
-            x1="0.5"
-            y1="0"
-            x2="0.5"
-            y2="30"
-            :stroke="rotateLineStroke"
-            stroke-width="1"
-          />
-        </svg>
+        />
 
         <!-- 旋转手柄 -->
         <div
@@ -458,14 +474,14 @@ onUnmounted(() => {
           @mousedown.stop="handleRotateStart($event)"
           @touchstart.stop="handleRotateStart($event)"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12">
+          <svg width="14" height="14" viewBox="0 0 24 24" :style="{ color: computedTheme.handleColor }">
             <path
-              d="M6 1.5L6 6M6 6L9.5 2.5M6 6L2.5 2.5"
-              stroke="white"
-              stroke-width="1.5"
+              d="M21 12C21 16.9706 16.9706 21 12 21C9.696 21 7.59041 20.1375 5.99999 18.7M3 12C3 7.02944 7.02944 3 12 3C14.304 3 16.4096 3.8625 18 5.3M18 5.3V1M18 5.3H13.5M6 18.7V23M6 18.7H10.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
               stroke-linecap="round"
               stroke-linejoin="round"
-              fill="none"
             />
           </svg>
         </div>
@@ -498,97 +514,102 @@ onUnmounted(() => {
 }
 
 .resize-handle {
-  transition: transform 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   opacity: 1;
 }
 
 .resize-handle:hover {
-  transform: scale(1.2);
+  transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.3) !important;
+  z-index: 10 !important;
 }
 
 /* 8个方向的手柄位置 */
+/* Use translate to center handle on the anchor point */
 .resize-handle-top-left {
-  top: calc(-1 * var(--handle-size) / 2);
-  left: calc(-1 * var(--handle-size) / 2);
+  top: 0;
+  left: 0;
+  --tx: -50%;
+  --ty: -50%;
+  transform: translate(-50%, -50%);
   cursor: nw-resize;
 }
 
 .resize-handle-top-right {
-  top: calc(-1 * var(--handle-size) / 2);
-  right: calc(-1 * var(--handle-size) / 2);
+  top: 0;
+  right: 0;
+  --tx: 50%;
+  --ty: -50%;
+  transform: translate(50%, -50%);
   cursor: ne-resize;
 }
 
 .resize-handle-bottom-left {
-  bottom: calc(-1 * var(--handle-size) / 2);
-  left: calc(-1 * var(--handle-size) / 2);
+  bottom: 0;
+  left: 0;
+  --tx: -50%;
+  --ty: 50%;
+  transform: translate(-50%, 50%);
   cursor: sw-resize;
 }
 
 .resize-handle-bottom-right {
-  bottom: calc(-1 * var(--handle-size) / 2);
-  right: calc(-1 * var(--handle-size) / 2);
+  bottom: 0;
+  right: 0;
+  --tx: 50%;
+  --ty: 50%;
+  transform: translate(50%, 50%);
   cursor: se-resize;
 }
 
 .resize-handle-top {
-  top: calc(-1 * var(--handle-size) / 2);
+  top: 0;
   left: 50%;
-  transform: translateX(-50%);
+  --tx: -50%;
+  --ty: -50%;
+  transform: translate(-50%, -50%);
   cursor: n-resize;
-}
-
-.resize-handle-top:hover {
-  transform: translateX(-50%) scale(1.2);
 }
 
 .resize-handle-right {
   top: 50%;
-  right: calc(-1 * var(--handle-size) / 2);
-  transform: translateY(-50%);
+  right: 0;
+  --tx: 50%;
+  --ty: -50%;
+  transform: translate(50%, -50%);
   cursor: e-resize;
 }
 
-.resize-handle-right:hover {
-  transform: translateY(-50%) scale(1.2);
-}
-
 .resize-handle-bottom {
-  bottom: calc(-1 * var(--handle-size) / 2);
+  bottom: 0;
   left: 50%;
-  transform: translateX(-50%);
+  --tx: -50%;
+  --ty: 50%;
+  transform: translate(-50%, 50%);
   cursor: s-resize;
-}
-
-.resize-handle-bottom:hover {
-  transform: translateX(-50%) scale(1.2);
 }
 
 .resize-handle-left {
   top: 50%;
-  left: calc(-1 * var(--handle-size) / 2);
-  transform: translateY(-50%);
+  left: 0;
+  --tx: -50%;
+  --ty: -50%;
+  transform: translate(-50%, -50%);
   cursor: w-resize;
-}
-
-.resize-handle-left:hover {
-  transform: translateY(-50%) scale(1.2);
 }
 
 /* 旋转控件样式 */
 .rotate-handle {
   transition:
-    transform 0.2s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
     background-color 0.2s ease;
 }
 
 .rotate-handle:hover {
-  transform: translateX(-50%) scale(1.1);
-  background-color: var(--handle-color, #3b82f6) !important;
+  transform: translateX(-50%) scale(1.15);
 }
 
 .rotate-handle:active {
-  cursor: 'grabbing';
+  cursor: grabbing;
 }
 
 .rotate-line {
@@ -598,6 +619,5 @@ onUnmounted(() => {
 /* 自定义CSS变量 */
 .selection-container {
   --handle-size: 8px;
-  --handle-color: #3b82f6;
 }
 </style>

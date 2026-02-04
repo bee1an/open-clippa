@@ -43,9 +43,9 @@ export interface UseSelectionOptions {
       maxY?: number
     }
     /** 是否保持宽高比 */
-    keepAspectRatio?: boolean
+    keepAspectRatio?: boolean | ((direction: ResizeDirection) => boolean)
     /** 调整开始回调 */
-    onStart?: (direction: string, event: MouseEvent | TouchEvent) => void
+    onStart?: (direction: ResizeDirection, event: MouseEvent | TouchEvent) => void
     /** 调整结束回调 */
     onEnd?: (event: MouseEvent | TouchEvent) => void
     /** 调整更新回调 */

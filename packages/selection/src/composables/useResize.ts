@@ -25,7 +25,7 @@ interface UseResizeOptions {
     maxY?: number
   }
   /** 是否保持宽高比 */
-  keepAspectRatio?: boolean
+  keepAspectRatio?: boolean | ((direction: ResizeDirection) => boolean)
   /** 节流间隔（毫秒），默认16ms (60fps） */
   throttleInterval?: number
   /** 是否启用requestAnimationFrame优化 */
@@ -93,6 +93,20 @@ export function useResize(
     }
 
     return trigCache.get(normalizedRotation)!
+  }
+
+  const resolveKeepAspectRatio = (direction: ResizeDirection | null): boolean => {
+    if (!direction) {
+      return false
+    }
+
+    return typeof keepAspectRatio === 'function'
+      ? keepAspectRatio(direction)
+      : keepAspectRatio
+  }
+
+  const clampValue = (value: number, min: number, max: number): number => {
+    return Math.min(max, Math.max(min, value))
   }
 
   // 获取当前item值（带错误处理）
@@ -304,166 +318,115 @@ export function useResize(
     const currentItem = getCurrentItem()
     const rotation = currentItem.rotation || 0
 
-    let newX = originalX
-    let newY = originalY
+    if (!direction) {
+      return {
+        x: originalX,
+        y: originalY,
+        width: originalWidth,
+        height: originalHeight,
+      }
+    }
+
+    const centerX = originalX + originalWidth / 2
+    const centerY = originalY + originalHeight / 2
+
+    const { cos, sin } = getCachedTrig(rotation)
+    const localDeltaX = deltaX * cos + deltaY * sin
+    const localDeltaY = -deltaX * sin + deltaY * cos
+
     let newWidth = originalWidth
     let newHeight = originalHeight
 
-    // 如果有旋转角度，使用基于角点固定的逻辑
-    if (rotation !== 0) {
-      // 使用缓存的三角函数值
-      const { cos, sin } = getCachedTrig(rotation)
+    switch (direction) {
+      case 'top-left':
+        newWidth = originalWidth - localDeltaX
+        newHeight = originalHeight - localDeltaY
+        break
+      case 'top-right':
+        newWidth = originalWidth + localDeltaX
+        newHeight = originalHeight - localDeltaY
+        break
+      case 'bottom-left':
+        newWidth = originalWidth - localDeltaX
+        newHeight = originalHeight + localDeltaY
+        break
+      case 'bottom-right':
+        newWidth = originalWidth + localDeltaX
+        newHeight = originalHeight + localDeltaY
+        break
+      case 'left':
+        newWidth = originalWidth - localDeltaX
+        break
+      case 'right':
+        newWidth = originalWidth + localDeltaX
+        break
+      case 'top':
+        newHeight = originalHeight - localDeltaY
+        break
+      case 'bottom':
+        newHeight = originalHeight + localDeltaY
+        break
+    }
 
-      // 将鼠标移动向量转换到元素的本地坐标系
-      // 这里使用正确的反变换公式
-      const localDeltaX = deltaX * cos + deltaY * sin
-      const localDeltaY = -deltaX * sin + deltaY * cos
+    const keepAspect = resolveKeepAspectRatio(direction)
+    if (keepAspect && originalWidth > 0 && originalHeight > 0) {
+      const aspectRatio = originalWidth / originalHeight
+      if (direction.includes('left') || direction.includes('right')) {
+        newHeight = newWidth / aspectRatio
+      }
+      else if (direction.includes('top') || direction.includes('bottom')) {
+        newWidth = newHeight * aspectRatio
+      }
 
-      // 计算四个角点的全局坐标（基于左上角旋转中心）
-      // 左上角点 (TL) - 旋转中心，位置不变
-      const tlX = originalX
-      const tlY = originalY
-
-      // 右上角点 (TR)
-      const trX = originalX + originalWidth * cos
-      const trY = originalY + originalWidth * sin
-
-      // 右下角点 (BR)
-      const brX = originalX + originalWidth * cos - originalHeight * sin
-      const brY = originalY + originalWidth * sin + originalHeight * cos
-
-      // 左下角点 (BL)
-      const blX = originalX - originalHeight * sin
-      const blY = originalY + originalHeight * cos
-
-      // 根据拖拽方向计算新的尺寸和位置
-      switch (direction) {
-        case 'bottom-right':
-          // 固定左上角点，只改变宽高，位置不变
-          newWidth = Math.max(10, originalWidth + localDeltaX)
-          newHeight = Math.max(10, originalHeight + localDeltaY)
-          newX = tlX // 保持左上角不变
-          newY = tlY
-          break
-
-        case 'top-left':
-          // 固定右下角点，需要重新计算位置
-          newWidth = Math.max(10, originalWidth - localDeltaX)
-          newHeight = Math.max(10, originalHeight - localDeltaY)
-          // 新的左上角位置 = 固定右下角位置 - 新的右上角向量 - 新的左下角向量
-          newX = brX - newWidth * cos + newHeight * sin
-          newY = brY - newWidth * sin - newHeight * cos
-          break
-
-        case 'top-right':
-          // 固定左下角点
-          newWidth = Math.max(10, originalWidth + localDeltaX)
-          newHeight = Math.max(10, originalHeight - localDeltaY)
-          // 新的左上角位置 = 固定左下角位置 - 新的左下角向量
-          newX = blX - newHeight * sin
-          newY = blY - newHeight * cos
-          break
-
-        case 'bottom-left':
-          // 固定右上角点
-          newWidth = Math.max(10, originalWidth - localDeltaX)
-          newHeight = Math.max(10, originalHeight + deltaY)
-          // 新的左上角位置 = 固定右上角位置 - 新的右上角向量
-          newX = trX - newWidth * cos
-          newY = trY - newWidth * sin
-          break
-
-        case 'right':
-          // 固定左边线，只改变宽度，位置不变
-          newWidth = Math.max(10, originalWidth + localDeltaX)
-          newX = tlX // 保持左上角不变
-          newY = tlY
-          break
-
-        case 'left':
-          // 固定右边线
-          newWidth = Math.max(10, originalWidth - localDeltaX)
-          // 新的左上角位置 = 固定右上角位置 - 新的右上角向量
-          newX = trX - newWidth * cos
-          newY = trY - newWidth * sin
-          break
-
-        case 'bottom':
-          // 固定上边线，只改变高度，位置不变
-          newHeight = Math.max(10, originalHeight + localDeltaY)
-          newX = tlX // 保持左上角不变
-          newY = tlY
-          break
-
-        case 'top':
-          // 固定下边线
-          newHeight = Math.max(10, originalHeight - localDeltaY)
-          // 新的左上角位置 = 固定左下角位置 - 新的左下角向量
-          newX = blX - newHeight * sin
-          newY = blY - newHeight * cos
-          break
+      const constrainedWidth = clampValue(newWidth, minWidth, maxWidth)
+      const constrainedHeight = clampValue(newHeight, minHeight, maxHeight)
+      const scale = Math.min(constrainedWidth / newWidth, constrainedHeight / newHeight)
+      if (Number.isFinite(scale) && scale > 0) {
+        newWidth *= scale
+        newHeight *= scale
       }
     }
     else {
-      // 没有旋转时的正常逻辑
-      switch (direction) {
+      newWidth = clampValue(newWidth, minWidth, maxWidth)
+      newHeight = clampValue(newHeight, minHeight, maxHeight)
+    }
+
+    const getFixedLocalPoint = (dir: ResizeDirection, width: number, height: number): { x: number, y: number } => {
+      const halfW = width / 2
+      const halfH = height / 2
+
+      switch (dir) {
         case 'top-left':
-          newX = originalX + deltaX
-          newY = originalY + deltaY
-          newWidth = originalWidth - deltaX
-          newHeight = originalHeight - deltaY
-          break
-
+          return { x: halfW, y: halfH }
         case 'top-right':
-          newY = originalY + deltaY
-          newWidth = originalWidth + deltaX
-          newHeight = originalHeight - deltaY
-          break
-
+          return { x: -halfW, y: halfH }
         case 'bottom-left':
-          newX = originalX + deltaX
-          newWidth = originalWidth - deltaX
-          newHeight = originalHeight + deltaY
-          break
-
+          return { x: halfW, y: -halfH }
         case 'bottom-right':
-          newWidth = originalWidth + deltaX
-          newHeight = originalHeight + deltaY
-          break
-
-        case 'top':
-          newY = originalY + deltaY
-          newHeight = originalHeight - deltaY
-          break
-
-        case 'right':
-          newWidth = originalWidth + deltaX
-          break
-
-        case 'bottom':
-          newHeight = originalHeight + deltaY
-          break
-
+          return { x: -halfW, y: -halfH }
         case 'left':
-          newX = originalX + deltaX
-          newWidth = originalWidth - deltaX
-          break
+          return { x: halfW, y: 0 }
+        case 'right':
+          return { x: -halfW, y: 0 }
+        case 'top':
+          return { x: 0, y: halfH }
+        case 'bottom':
+          return { x: 0, y: -halfH }
+        default:
+          return { x: 0, y: 0 }
       }
     }
 
-    // 保持宽高比
-    if (keepAspectRatio && originalWidth > 0 && originalHeight > 0) {
-      const aspectRatio = originalWidth / originalHeight
+    const fixedLocalOriginal = getFixedLocalPoint(direction, originalWidth, originalHeight)
+    const fixedWorldX = centerX + fixedLocalOriginal.x * cos - fixedLocalOriginal.y * sin
+    const fixedWorldY = centerY + fixedLocalOriginal.x * sin + fixedLocalOriginal.y * cos
 
-      if (direction?.includes('left') || direction?.includes('right')) {
-        // 以宽度为准
-        newHeight = newWidth / aspectRatio
-      }
-      else {
-        // 以高度为准
-        newWidth = newHeight * aspectRatio
-      }
-    }
+    const fixedLocalNew = getFixedLocalPoint(direction, newWidth, newHeight)
+    const newCenterX = fixedWorldX - (fixedLocalNew.x * cos - fixedLocalNew.y * sin)
+    const newCenterY = fixedWorldY - (fixedLocalNew.x * sin + fixedLocalNew.y * cos)
+
+    const newX = newCenterX - newWidth / 2
+    const newY = newCenterY - newHeight / 2
 
     return { x: newX, y: newY, width: newWidth, height: newHeight }
   }
@@ -472,26 +435,9 @@ export function useResize(
   const applyConstraints = (dimensions: { x: number, y: number, width: number, height: number }): { x: number, y: number, width: number, height: number } => {
     let { x, y, width, height } = dimensions
 
-    // 最小尺寸限制
-    width = Math.max(minWidth, width)
-    height = Math.max(minHeight, height)
+    width = clampValue(width, minWidth, maxWidth)
+    height = clampValue(height, minHeight, maxHeight)
 
-    // 最大尺寸限制
-    width = Math.min(maxWidth, width)
-    height = Math.min(maxHeight, height)
-
-    // 如果因为最小尺寸限制调整了宽度/高度，需要重新计算位置
-    const { direction, originalX, originalY, originalWidth, originalHeight } = resizeState.value
-
-    if (direction?.includes('left') && width !== dimensions.width) {
-      x = originalX + originalWidth - width
-    }
-
-    if (direction?.includes('top') && height !== dimensions.height) {
-      y = originalY + originalHeight - height
-    }
-
-    // 边界限制
     if (boundary) {
       x = Math.max(boundary.minX ?? 0, x)
       y = Math.max(boundary.minY ?? 0, y)

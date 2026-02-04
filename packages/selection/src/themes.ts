@@ -9,7 +9,7 @@ export const defaultTheme: SelectionTheme = {
   border: '2px solid #3b82f6',
   background: 'rgba(59, 130, 246, 0.1)',
   handleColor: '#3b82f6',
-  handleSize: 8,
+  handleSize: 10,
 }
 
 export const darkTheme: SelectionTheme = {
@@ -17,7 +17,7 @@ export const darkTheme: SelectionTheme = {
   border: '2px solid #60a5fa',
   background: 'rgba(96, 165, 250, 0.15)',
   handleColor: '#60a5fa',
-  handleSize: 8,
+  handleSize: 10,
 }
 
 export const successTheme: SelectionTheme = {
@@ -25,7 +25,7 @@ export const successTheme: SelectionTheme = {
   border: '2px solid #10b981',
   background: 'rgba(16, 185, 129, 0.1)',
   handleColor: '#10b981',
-  handleSize: 8,
+  handleSize: 10,
 }
 
 export const warningTheme: SelectionTheme = {
@@ -33,7 +33,7 @@ export const warningTheme: SelectionTheme = {
   border: '2px solid #f59e0b',
   background: 'rgba(245, 158, 11, 0.1)',
   handleColor: '#f59e0b',
-  handleSize: 8,
+  handleSize: 10,
 }
 
 export const errorTheme: SelectionTheme = {
@@ -41,7 +41,7 @@ export const errorTheme: SelectionTheme = {
   border: '2px solid #ef4444',
   background: 'rgba(239, 68, 68, 0.1)',
   handleColor: '#ef4444',
-  handleSize: 8,
+  handleSize: 10,
 }
 
 export const themes = {
