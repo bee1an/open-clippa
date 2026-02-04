@@ -7,7 +7,7 @@ export default antfu({
   },
   type: 'lib',
   pnpm: true,
-  ignores: ['app/**'],
+  ignores: ['app/**', '.agents/skills/**'],
 }, {
   rules: {
     'ts/consistent-type-definitions': 'off',
