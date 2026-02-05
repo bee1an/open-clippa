@@ -12,6 +12,7 @@
     "vue-tsc": "vue-tsc"
   },
   "dependencies": {
+    "@clippa/filter": "workspace:*",
     "@iconify/json": "catalog:app",
     "@vueuse/core": "catalog:app",
     "class-variance-authority": "^0.7.1",

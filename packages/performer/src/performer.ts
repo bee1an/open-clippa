@@ -1,4 +1,12 @@
-import type { Text as PixiText, Sprite } from 'pixi.js'
+import type { Filter, Text as PixiText, Sprite } from 'pixi.js'
+
+export interface PerformerBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation?: number
+}
 
 export interface Performer {
   id: string
@@ -20,6 +28,18 @@ export interface Performer {
   seek: (time: number) => Promise<void>
 
   load: () => Promise<void>
+
+  containsPoint: (canvasX: number, canvasY: number) => boolean
+
+  getBounds: () => PerformerBounds
+
+  setPosition: (x: number, y: number) => void
+
+  setScale: (scaleX: number, scaleY: number) => void
+
+  setRotation: (angle: number) => void
+
+  setFilters: (filters: Filter[] | null) => void
 }
 
 export interface PerformerOption {

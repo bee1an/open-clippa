@@ -2,7 +2,7 @@ import type {
   InputVideoTrack,
   VideoSample,
 } from 'mediabunny'
-import type { FederatedPointerEvent } from 'pixi.js'
+import type { FederatedPointerEvent, Filter } from 'pixi.js'
 import type { Performer, PerformerOption } from '../performer'
 import { EventBus, transformSrc } from '@clippa/utils'
 import {
@@ -93,6 +93,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   private _videoTrack: InputVideoTrack | null = null
   private _videoSink?: VideoSampleSink
   private _loader?: Promise<void>
+  private _pendingFilters: Filter[] | null = null
 
   /**
    * 帧缓存：time (in ms) -> { frame: VideoFrame }
@@ -120,6 +121,10 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         if (!this._sprite) {
           this._sprite = new Sprite()
           this.setupSpriteEvents()
+        }
+
+        if (this._pendingFilters) {
+          this._sprite.filters = this._pendingFilters
         }
 
         // 设置尺寸和位置
@@ -435,6 +440,15 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       this._sprite.scale.y = scaleY
       this.notifyPositionUpdate()
     }
+  }
+
+  setFilters(filters: Filter[] | null): void {
+    if (this._sprite) {
+      this._sprite.filters = filters
+      return
+    }
+
+    this._pendingFilters = filters
   }
 
   destroy(): void {

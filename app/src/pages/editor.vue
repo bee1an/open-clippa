@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CanvasExport } from 'open-clippa'
 import { Button } from '@/components/ui/button'
+import { useFilterEngine } from '@/composables/useFilterEngine'
 import { useEditorStore } from '@/store/useEditorStore'
 
 definePage({ redirect: '/editor/media' })
@@ -10,6 +11,8 @@ const rightSiderCollapsed = useStorage('rightSiderCollapsed', false)
 
 const editorStore = useEditorStore()
 const isClippaReady = ref(false)
+
+useFilterEngine()
 
 // 等待 clippa 准备就绪
 onMounted(async () => {

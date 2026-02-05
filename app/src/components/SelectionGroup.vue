@@ -2,7 +2,7 @@
 import type { ResizeDirection, SelectionItem } from '@clippa/selection'
 import { Selection } from '@clippa/selection'
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 // Props
@@ -10,10 +10,69 @@ interface Props {
   scaleRatio?: number
 }
 
-const { scaleRatio = 1 } = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  scaleRatio: 1,
+})
+
+const scaleRatio = computed(() => props.scaleRatio)
 
 const performerStore = usePerformerStore()
-const { selectedPerformers } = storeToRefs(performerStore)
+interface SelectionExpose {
+  startExternalDrag?: (clientX: number, clientY: number) => void
+}
+
+const { selectedPerformers, pendingSelectionDrag } = storeToRefs(performerStore)
+const selectionRef = ref<SelectionExpose | null>(null)
+
+interface BoundsLike {
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation?: number
+}
+
+function rotateVector(x: number, y: number, rotation: number): { x: number, y: number } {
+  if (!rotation) {
+    return { x, y }
+  }
+
+  const radians = rotation * Math.PI / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+
+  return {
+    x: x * cos - y * sin,
+    y: x * sin + y * cos,
+  }
+}
+
+function toCenterRotationPosition(bounds: BoundsLike): { x: number, y: number } {
+  const rotation = bounds.rotation ?? 0
+  const offset = rotateVector(bounds.width / 2, bounds.height / 2, rotation)
+  const centerX = bounds.x + offset.x
+  const centerY = bounds.y + offset.y
+
+  return {
+    x: centerX - bounds.width / 2,
+    y: centerY - bounds.height / 2,
+  }
+}
+
+function toTopLeftRotationBounds(item: BoundsLike): BoundsLike {
+  const rotation = item.rotation ?? 0
+  const centerX = item.x + item.width / 2
+  const centerY = item.y + item.height / 2
+  const offset = rotateVector(item.width / 2, item.height / 2, rotation)
+
+  return {
+    x: centerX - offset.x,
+    y: centerY - offset.y,
+    width: item.width,
+    height: item.height,
+    rotation,
+  }
+}
 
 // 计算当前选中的 performer 信息（包含响应式 bounds）
 const currentSelectionInfo = computed(() => {
@@ -31,14 +90,13 @@ const selectionItem = computed<SelectionItem | null>(() => {
   if (!currentSelectionInfo.value || !currentSelection.value)
     return null
 
-  // 使用响应式 bounds 信息，而不是直接调用 getBounds()
   const bounds = currentSelectionInfo.value.bounds
+  const centerPosition = toCenterRotationPosition(bounds)
 
-  // 应用缩放率：将 Canvas 坐标转换为 DOM 坐标
-  const scaledX = bounds.x * scaleRatio
-  const scaledY = bounds.y * scaleRatio
-  const scaledWidth = bounds.width * scaleRatio
-  const scaledHeight = bounds.height * scaleRatio
+  const scaledX = centerPosition.x * scaleRatio.value
+  const scaledY = centerPosition.y * scaleRatio.value
+  const scaledWidth = bounds.width * scaleRatio.value
+  const scaledHeight = bounds.height * scaleRatio.value
 
   return {
     id: currentSelection.value.id,
@@ -58,26 +116,32 @@ function handleSelectionUpdate(item: SelectionItem) {
   if (!currentSelection.value)
     return
 
-  // 将 DOM 坐标转换回 Canvas 坐标
-  const canvasX = item.x / scaleRatio
-  const canvasY = item.y / scaleRatio
-  const canvasWidth = item.width / scaleRatio
-  const canvasHeight = item.height / scaleRatio
+  const canvasItem: BoundsLike = {
+    x: item.x / scaleRatio.value,
+    y: item.y / scaleRatio.value,
+    width: item.width / scaleRatio.value,
+    height: item.height / scaleRatio.value,
+    rotation: item.rotation,
+  }
+
+  const topLeftBounds = toTopLeftRotationBounds(canvasItem)
 
   // 更新 performer 属性
   const performer = performerStore.getAllPerformers().find(p => p.id === currentSelection.value?.id)
   if (performer) {
     const currentBounds = performer.getBounds()
+    const currentScaleX = performer.sprite?.scale.x ?? 1
+    const currentScaleY = performer.sprite?.scale.y ?? 1
 
-    // 更新位置
-    performer.setPosition(canvasX, canvasY)
+    const widthRatio = currentBounds.width ? topLeftBounds.width / currentBounds.width : 1
+    const heightRatio = currentBounds.height ? topLeftBounds.height / currentBounds.height : 1
 
-    // 更新尺寸（通过缩放）
-    if (canvasWidth !== currentBounds.width || canvasHeight !== currentBounds.height) {
-      performer.setScale(
-        canvasWidth / currentBounds.width,
-        canvasHeight / currentBounds.height,
-      )
+    if (currentBounds.width && currentBounds.height && (Math.abs(widthRatio - 1) > 1e-3 || Math.abs(heightRatio - 1) > 1e-3)) {
+      performer.setScale(currentScaleX * widthRatio, currentScaleY * heightRatio)
+    }
+
+    if (topLeftBounds.x !== currentBounds.x || topLeftBounds.y !== currentBounds.y) {
+      performer.setPosition(topLeftBounds.x, topLeftBounds.y)
     }
 
     // 更新旋转
@@ -104,6 +168,20 @@ function handleSelectionSelect(id: string) {
 function handleSelectionDelete(id: string) {
   performerStore.removePerformer(id)
 }
+
+watch(
+  [selectionItem, pendingSelectionDrag],
+  async ([item, pending]) => {
+    if (!item || !pending || pending.id !== item.id)
+      return
+
+    await nextTick()
+
+    selectionRef.value?.startExternalDrag?.(pending.clientX, pending.clientY)
+    performerStore.consumeSelectionDrag(pending.id)
+  },
+  { flush: 'post' },
+)
 </script>
 
 <template>
@@ -117,6 +195,7 @@ function handleSelectionDelete(id: string) {
   >
     <Selection
       v-if="selectionItem"
+      ref="selectionRef"
       :item="selectionItem"
       :active="true"
       :min-width="20"

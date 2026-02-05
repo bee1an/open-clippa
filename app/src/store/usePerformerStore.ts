@@ -1,11 +1,12 @@
-import type { PerformerBounds, PerformerClickEvent } from '@clippa/performer'
-import { Video } from '@clippa/performer'
+import type { PerformerBounds, TextStyleOption } from '@clippa/performer'
+import { Image, Text, Video } from '@clippa/performer'
 import { defineStore } from 'pinia'
+import { useEditorStore } from '@/store/useEditorStore'
 
 /**
  * Performer 配置选项
  */
-export interface PerformerConfig {
+interface PerformerConfigBase {
   id: string
   start: number
   duration: number
@@ -15,8 +16,40 @@ export interface PerformerConfig {
   height?: number
   zIndex?: number
   rotation?: number
+}
+
+export interface VideoPerformerConfig extends PerformerConfigBase {
+  type?: 'video'
   src: string | File | Blob
-  type?: 'video' | 'image' | 'audio'
+}
+
+export interface ImagePerformerConfig extends PerformerConfigBase {
+  type: 'image'
+  src: string | File | Blob
+}
+
+export interface TextPerformerConfig extends PerformerConfigBase {
+  type: 'text'
+  content: string
+  style?: TextStyleOption
+}
+
+export type PerformerConfig = VideoPerformerConfig | ImagePerformerConfig | TextPerformerConfig
+
+type CanvasPerformer = Video | Image | Text
+
+interface PerformerPointerEvent {
+  performer: CanvasPerformer
+  canvasX: number
+  canvasY: number
+  timestamp: number
+}
+
+interface PendingSelectionDrag {
+  id: string
+  clientX: number
+  clientY: number
+  timestamp: number
 }
 
 /**
@@ -32,11 +65,16 @@ export interface SelectedPerformer {
  * Performer Store
  */
 export const usePerformerStore = defineStore('performer', () => {
+  const editorStore = useEditorStore()
+
   // 所有 performers - 使用普通 Map 存储，避免响应式追踪大型对象
-  const performerMap = new Map<string, Video>()
+  const performerMap = new Map<string, CanvasPerformer>()
+
+  const fittedPerformers = new WeakSet<CanvasPerformer>()
 
   // 选中的 performers
   const selectedPerformers = ref<SelectedPerformer[]>([])
+  const pendingSelectionDrag = ref<PendingSelectionDrag | null>(null)
 
   // 获取所有 performers
   const getAllPerformers = () => Array.from(performerMap.values())
@@ -67,7 +105,7 @@ export const usePerformerStore = defineStore('performer', () => {
   }
 
   // 事件处理器
-  const handlePerformerPointerDown = (performer: Video) => {
+  const handlePerformerPointerDown = (performer: CanvasPerformer, _event?: PerformerPointerEvent) => {
     // 避免重复选择同一个 performer
     const performerId = performer.id
     if (!selectedPerformers.value.find(s => s.id === performerId)) {
@@ -75,7 +113,7 @@ export const usePerformerStore = defineStore('performer', () => {
     }
   }
 
-  const handlePerformerPositionUpdate = (performer: Video, bounds: PerformerBounds) => {
+  const handlePerformerPositionUpdate = (performer: CanvasPerformer, bounds: PerformerBounds) => {
     // 更新选中的 performer 中的 bounds 信息
     const selectedIndex = selectedPerformers.value.findIndex(s => s.id === performer.id)
     if (selectedIndex > -1) {
@@ -87,19 +125,84 @@ export const usePerformerStore = defineStore('performer', () => {
     }
   }
 
+  const fitPerformerToStage = async (performer: CanvasPerformer) => {
+    if (fittedPerformers.has(performer))
+      return
+
+    await editorStore.clippa.ready
+
+    const app = editorStore.clippa.stage.app
+    if (!app)
+      return
+
+    const bounds = performer.getBounds()
+    if (!bounds.width || !bounds.height)
+      return
+
+    const stageWidth = app.renderer.width
+    const stageHeight = app.renderer.height
+
+    if (!stageWidth || !stageHeight)
+      return
+
+    const scale = Math.min(1, stageWidth / bounds.width, stageHeight / bounds.height)
+    if (scale < 1) {
+      const currentScaleX = performer.sprite?.scale.x ?? 1
+      const currentScaleY = performer.sprite?.scale.y ?? 1
+      performer.setScale(currentScaleX * scale, currentScaleY * scale)
+    }
+
+    const updatedBounds = performer.getBounds()
+    const maxX = Math.max(0, stageWidth - updatedBounds.width)
+    const maxY = Math.max(0, stageHeight - updatedBounds.height)
+    const nextX = Math.min(Math.max(updatedBounds.x, 0), maxX)
+    const nextY = Math.min(Math.max(updatedBounds.y, 0), maxY)
+
+    if (nextX !== updatedBounds.x || nextY !== updatedBounds.y) {
+      performer.setPosition(nextX, nextY)
+    }
+
+    fittedPerformers.add(performer)
+  }
+
   // 创建新的 performer
-  const createPerformer = (config: PerformerConfig): Video => {
-    const performer = new Video({
-      ...config,
-      zIndex: config.zIndex ?? performerMap.size + 1,
+  const createPerformer = (config: PerformerConfig): CanvasPerformer => {
+    const zIndex = config.zIndex ?? performerMap.size + 1
+
+    let performer: CanvasPerformer
+
+    if (config.type === 'image') {
+      const { type: _type, rotation: _rotation, ...imageConfig } = config
+      performer = new Image({
+        ...imageConfig,
+        zIndex,
+      })
+    }
+    else if (config.type === 'text') {
+      const { type: _type, rotation: _rotation, ...textConfig } = config
+      performer = new Text({
+        ...textConfig,
+        zIndex,
+      })
+    }
+    else {
+      const { type: _type, rotation: _rotation, ...videoConfig } = config
+      performer = new Video({
+        ...videoConfig,
+        zIndex,
+      })
+    }
+
+    const eventTarget = performer as {
+      on: (event: 'pointerdown', handler: (event: PerformerPointerEvent) => void) => void
+      on: (event: 'positionUpdate', handler: (bounds: PerformerBounds) => void) => void
+    }
+
+    eventTarget.on('pointerdown', (event) => {
+      handlePerformerPointerDown(performer, event)
     })
 
-    // 监听 performer 事件
-    performer.on('pointerdown', (_event: PerformerClickEvent) => {
-      handlePerformerPointerDown(performer)
-    })
-
-    performer.on('positionUpdate', (bounds: PerformerBounds) => {
+    eventTarget.on('positionUpdate', (bounds) => {
       handlePerformerPositionUpdate(performer, bounds)
     })
 
@@ -107,14 +210,24 @@ export const usePerformerStore = defineStore('performer', () => {
   }
 
   // 添加 performer
-  const addPerformer = (config: PerformerConfig): Video => {
+  const addPerformer = (config: PerformerConfig): CanvasPerformer => {
     const performer = createPerformer(config)
     performerMap.set(performer.id, performer)
 
     // 自动选中新添加的 performer (等待 sprite 加载完成)
-    performer.on('positionUpdate', () => {
+    ;(performer as any).on?.('positionUpdate', () => {
       // selectPerformer(performer.id)
     })
+
+    performer.load()
+      .then(() => {
+        if (config.rotation !== undefined) {
+          performer.setRotation(config.rotation)
+        }
+
+        return fitPerformerToStage(performer)
+      })
+      .catch(() => {})
 
     return performer
   }
@@ -152,7 +265,11 @@ export const usePerformerStore = defineStore('performer', () => {
         const currentBounds = performer.getBounds()
         const newWidth = updates.width ?? currentBounds.width
         const newHeight = updates.height ?? currentBounds.height
-        performer.setScale(newWidth / currentBounds.width, newHeight / currentBounds.height)
+        const currentScaleX = performer.sprite?.scale.x ?? 1
+        const currentScaleY = performer.sprite?.scale.y ?? 1
+        const widthRatio = currentBounds.width ? newWidth / currentBounds.width : 1
+        const heightRatio = currentBounds.height ? newHeight / currentBounds.height : 1
+        performer.setScale(currentScaleX * widthRatio, currentScaleY * heightRatio)
       }
 
       if (updates.rotation !== undefined) {
@@ -176,6 +293,23 @@ export const usePerformerStore = defineStore('performer', () => {
   // 清空所有选中
   const clearSelection = () => {
     selectedPerformers.value = []
+  }
+
+  const requestSelectionDrag = (payload: PendingSelectionDrag) => {
+    pendingSelectionDrag.value = payload
+  }
+
+  const consumeSelectionDrag = (performerId: string): PendingSelectionDrag | null => {
+    const pending = pendingSelectionDrag.value
+    if (!pending || pending.id !== performerId)
+      return null
+
+    pendingSelectionDrag.value = null
+    return pending
+  }
+
+  const clearPendingSelectionDrag = () => {
+    pendingSelectionDrag.value = null
   }
 
   // 切换选中状态
@@ -209,6 +343,7 @@ export const usePerformerStore = defineStore('performer', () => {
   return {
     // 状态
     selectedPerformers,
+    pendingSelectionDrag,
 
     // 方法
     getAllPerformers,
@@ -220,6 +355,9 @@ export const usePerformerStore = defineStore('performer', () => {
     selectPerformer,
     deselectPerformer,
     clearSelection,
+    requestSelectionDrag,
+    consumeSelectionDrag,
+    clearPendingSelectionDrag,
     togglePerformerSelection,
     isPerformerSelected,
     deleteSelectedPerformers,

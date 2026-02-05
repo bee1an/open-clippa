@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { TooltipContentProps } from 'radix-vue'
 import type { HTMLAttributes } from 'vue'
 import {
   TooltipContent,
-  type TooltipContentProps,
+
   TooltipPortal,
 } from 'radix-vue'
 import { cn } from '@/lib/utils'

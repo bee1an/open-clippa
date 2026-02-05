@@ -17,6 +17,12 @@ const navItems = [
     title: 'Media',
   },
   {
+    path: '/editor/filter',
+    icon: 'i-ph-magic-wand-bold',
+    activeIcon: 'i-ph-magic-wand-fill',
+    title: 'Filter',
+  },
+  {
     path: '/editor/text',
     icon: 'i-ph-text-t-bold',
     activeIcon: 'i-ph-text-t-fill',

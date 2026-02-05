@@ -1,49 +1,17 @@
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
 import type { Performer, PerformerOption } from '../performer'
-import { EventBus } from '@clippa/utils'
-import { Text as PixiText, TextStyle } from 'pixi.js'
+import { EventBus, transformSrc } from '@clippa/utils'
+import { Sprite, Texture } from 'pixi.js'
 import { PlayState, ShowState } from '../performer'
 
-export interface TextStyleOption {
-  fontFamily?: string | string[]
-  fontSize?: number
-  fontWeight?: 'normal' | 'bold' | 'bolder' | 'lighter' | number
-  fontStyle?: 'normal' | 'italic' | 'oblique'
-  fill?: string | number
-  stroke?: { color?: string | number, width?: number }
-  align?: 'left' | 'center' | 'right'
-  wordWrap?: boolean
-  wordWrapWidth?: number
-  lineHeight?: number
-  letterSpacing?: number
-  dropShadow?: {
-    alpha?: number
-    angle?: number
-    blur?: number
-    color?: string | number
-    distance?: number
-  }
-}
-
-export interface TextOption extends PerformerOption {
-  id: string
-  content: string
-  zIndex: number
-  x?: number
-  y?: number
-  width?: number
-  height?: number
-  style?: TextStyleOption
-}
-
-export interface TextClickEvent {
-  performer: Text
+export interface ImageClickEvent {
+  performer: Image
   canvasX: number
   canvasY: number
   timestamp: number
 }
 
-export interface TextBounds {
+export interface ImageBounds {
   x: number
   y: number
   width: number
@@ -51,19 +19,30 @@ export interface TextBounds {
   rotation?: number
 }
 
-export type TextEvents = {
-  pointerdown: [TextClickEvent]
-  positionUpdate: [TextBounds]
+export type ImageEvents = {
+  pointerdown: [ImageClickEvent]
+  positionUpdate: [ImageBounds]
 }
 
-export class Text extends EventBus<TextEvents> implements Performer {
+export interface ImageOption extends PerformerOption {
+  id: string
+  src: string | File | Blob
+  zIndex: number
+  width?: number
+  height?: number
+  x?: number
+  y?: number
+}
+
+export class Image extends EventBus<ImageEvents> implements Performer {
   id: string
   start: number
   duration: number
+  src: string
   zIndex: number
 
-  protected _sprite?: PixiText
-  get sprite(): PixiText | undefined {
+  protected _sprite?: Sprite
+  get sprite(): Sprite | undefined {
     return this._sprite
   }
 
@@ -74,70 +53,100 @@ export class Text extends EventBus<TextEvents> implements Performer {
   showState: ShowState = ShowState.UNPLAYED
   playState: PlayState = PlayState.PAUSED
 
-  private _content: string
-  private _styleOption: TextStyleOption
+  private _loader?: Promise<void>
+  private _objectUrl?: string
+  private _texture?: Texture
+  private _naturalSize?: { width: number, height: number }
   private _pendingFilters: Filter[] | null = null
 
-  constructor(option: TextOption) {
+  constructor(option: ImageOption) {
     super()
-    const { id, start, duration, zIndex, content, style } = option
+    const { id, start, duration, src, zIndex } = option
 
     this.id = id
     this.start = start
     this.duration = duration
     this.zIndex = zIndex
-    this._content = content
-    this._styleOption = style || {}
+    this.src = transformSrc(src)
+
+    if (typeof src !== 'string')
+      this._objectUrl = this.src
 
     this.load(option)
   }
 
-  load(option?: TextOption): Promise<void> {
-    const { height, width, x, y, content, style } = option || {}
+  load(option?: ImageOption): Promise<void> {
+    if (this._loader)
+      return this._loader
 
-    // Text is synchronous, no async loading needed
-    if (!this._sprite) {
-      const textStyle = this._createTextStyle(style || this._styleOption)
-      this._sprite = new PixiText({
-        text: content || this._content,
-        style: textStyle,
+    const { height, width, x, y } = option || {}
+
+    const { promise, resolve, reject } = Promise.withResolvers<void>()
+    this._loader = promise
+
+    this._loadTexture()
+      .then(() => {
+        if (!this._sprite) {
+          const texture = this._texture
+          if (!texture)
+            throw new Error('image texture missing')
+
+          this._sprite = new Sprite(texture)
+          this.setupSpriteEvents()
+        }
+
+        if (this._pendingFilters) {
+          this._sprite.filters = this._pendingFilters
+        }
+
+        if (width !== undefined)
+          this._sprite.width = width
+        else if (this._naturalSize)
+          this._sprite.width = this._naturalSize.width
+
+        if (height !== undefined)
+          this._sprite.height = height
+        else if (this._naturalSize)
+          this._sprite.height = this._naturalSize.height
+
+        if (x !== undefined)
+          this._sprite.x = x
+        if (y !== undefined)
+          this._sprite.y = y
+
+        this.valid = true
+        resolve()
       })
-      this.setupSpriteEvents()
-    }
+      .catch((error) => {
+        console.error('Image load error:', error)
+        this.error = true
+        this.valid = false
+        reject(new Error('image load error'))
+      })
 
-    if (this._pendingFilters) {
-      this._sprite.filters = this._pendingFilters
-    }
-
-    // Set dimensions and position
-    if (width !== undefined)
-      this._sprite.width = width
-    if (height !== undefined)
-      this._sprite.height = height
-    if (x !== undefined)
-      this._sprite.x = x
-    if (y !== undefined)
-      this._sprite.y = y
-
-    this.valid = true
-
-    return Promise.resolve()
+    return this._loader
   }
 
-  private _createTextStyle(option: TextStyleOption): TextStyle {
-    return new TextStyle({
-      fontFamily: option.fontFamily || 'Arial',
-      fontSize: option.fontSize || 26,
-      fontWeight: option.fontWeight as any,
-      fontStyle: option.fontStyle,
-      fill: option.fill ?? '#fff',
-      stroke: option.stroke,
-      align: option.align,
-      wordWrap: option.wordWrap,
-      wordWrapWidth: option.wordWrapWidth,
-      lineHeight: option.lineHeight,
-      letterSpacing: option.letterSpacing ?? 0,
-      dropShadow: option.dropShadow,
+  private async _loadTexture(): Promise<void> {
+    if (this._texture)
+      return
+
+    const image = await this._loadImage(this.src)
+    this._naturalSize = {
+      width: image.naturalWidth || image.width,
+      height: image.naturalHeight || image.height,
+    }
+
+    this._texture = Texture.from(image)
+  }
+
+  private _loadImage(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const image = new globalThis.Image()
+      image.crossOrigin = 'anonymous'
+      image.onload = () => resolve(image)
+      image.onerror = () => reject(new Error('image load error'))
+      image.src = src
     })
   }
 
@@ -184,34 +193,6 @@ export class Text extends EventBus<TextEvents> implements Performer {
     this.update(time)
   }
 
-  // Text-specific methods
-
-  setText(content: string): void {
-    this._content = content
-    if (this._sprite) {
-      this._sprite.text = content
-      this.notifyPositionUpdate()
-    }
-  }
-
-  getText(): string {
-    return this._content
-  }
-
-  setStyle(style: TextStyleOption): void {
-    this._styleOption = { ...this._styleOption, ...style }
-    if (this._sprite) {
-      this._sprite.style = this._createTextStyle(this._styleOption)
-      this.notifyPositionUpdate()
-    }
-  }
-
-  getStyle(): TextStyleOption {
-    return { ...this._styleOption }
-  }
-
-  // Event handling (same as Video)
-
   protected setupSpriteEvents(): void {
     if (!this._sprite)
       return
@@ -227,7 +208,7 @@ export class Text extends EventBus<TextEvents> implements Performer {
       return
 
     const globalPosition = event.global
-    const clickEvent: TextClickEvent = {
+    const clickEvent: ImageClickEvent = {
       performer: this,
       canvasX: globalPosition.x,
       canvasY: globalPosition.y,
@@ -245,8 +226,6 @@ export class Text extends EventBus<TextEvents> implements Performer {
     this.emit('positionUpdate', bounds)
   }
 
-  // Transform methods (same as Video)
-
   containsPoint(canvasX: number, canvasY: number): boolean {
     const bounds = this.getBounds()
     if (bounds.rotation === 0) {
@@ -254,26 +233,22 @@ export class Text extends EventBus<TextEvents> implements Performer {
         && canvasY >= bounds.y && canvasY <= bounds.y + bounds.height
     }
 
-    const centerX = bounds.x + bounds.width / 2
-    const centerY = bounds.y + bounds.height / 2
     const angle = -bounds.rotation * Math.PI / 180
 
     const cos = Math.cos(angle)
     const sin = Math.sin(angle)
 
-    const dx = canvasX - centerX
-    const dy = canvasY - centerY
+    const dx = canvasX - bounds.x
+    const dy = canvasY - bounds.y
 
-    const rotatedX = dx * cos - dy * sin
-    const rotatedY = dx * sin + dy * cos
+    const localX = dx * cos - dy * sin
+    const localY = dx * sin + dy * cos
 
-    const halfWidth = bounds.width / 2
-    const halfHeight = bounds.height / 2
-
-    return Math.abs(rotatedX) <= halfWidth && Math.abs(rotatedY) <= halfHeight
+    return localX >= 0 && localX <= bounds.width
+      && localY >= 0 && localY <= bounds.height
   }
 
-  getBounds(): Required<TextBounds> {
+  getBounds(): Required<ImageBounds> {
     if (!this._sprite) {
       return {
         x: 0,
@@ -326,14 +301,23 @@ export class Text extends EventBus<TextEvents> implements Performer {
   }
 
   destroy(): void {
-    // Clean up Sprite
     if (this._sprite) {
       this._sprite.removeAllListeners()
+      if (this._sprite.texture) {
+        this._sprite.texture.destroy(true)
+      }
       this._sprite.destroy()
       this._sprite = undefined
     }
 
-    // Reset state
+    if (this._objectUrl) {
+      URL.revokeObjectURL(this._objectUrl)
+      this._objectUrl = undefined
+    }
+
+    this._texture = undefined
+    this._naturalSize = undefined
+
     this.valid = false
     this.error = false
     this.showState = ShowState.UNPLAYED
