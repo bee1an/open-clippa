@@ -303,6 +303,11 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
       // 创建或更新纹理
       if (this._sprite) {
+        const preservedSize = {
+          width: this._sprite.width,
+          height: this._sprite.height,
+        }
+
         const texture = Texture.from(frameData.frame)
 
         // 销毁旧纹理
@@ -311,6 +316,12 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         }
 
         this._sprite.texture = texture
+
+        if (preservedSize.width > 0 && preservedSize.height > 0) {
+          this._sprite.width = preservedSize.width
+          this._sprite.height = preservedSize.height
+        }
+
         this._lastRenderedTime = time
       }
     }

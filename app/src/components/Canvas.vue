@@ -21,6 +21,10 @@ clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
 const sliderValue = ref(0)
 const isSyncingFromTimeline = ref(false)
 const isSyncingFromSelection = ref(false)
+const canvasPointerTarget = ref<HTMLCanvasElement | null>(null)
+const canvasWrapperRef = ref<HTMLElement | null>(null)
+let stopSelectionWatch: (() => void) | null = null
+let isTimelineListenerActive = false
 
 // Canvas 缩放率
 const canvasScaleRatio = ref(1)
@@ -82,6 +86,24 @@ function handleCanvasPointerDown(event: PointerEvent) {
   })
 }
 
+function handleCanvasPointerCapture(event: PointerEvent) {
+  event.stopPropagation()
+  handleCanvasPointerDown(event)
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  const wrapper = canvasWrapperRef.value
+  const target = event.target as Node | null
+  if (!wrapper || !target)
+    return
+
+  if (wrapper.contains(target))
+    return
+
+  performerStore.clearSelection()
+  performerStore.clearPendingSelectionDrag()
+}
+
 watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
@@ -138,6 +160,10 @@ function syncSelectionToTimeline(selectedId: string | null) {
   })
 }
 
+const handleActiveTrainChange = (train: Train | null) => {
+  syncTimelineToSelection(train)
+}
+
 // 创建 performer 的辅助函数
 async function createVideoPerformer(config: Omit<VideoPerformerConfig, 'duration'>): Promise<void> {
   const { duration, width, height } = await loadVideoMetadata(config.src as string)
@@ -159,6 +185,14 @@ onMounted(async () => {
   await clippa.ready
   clippa.stage.mount('canvas')
 
+  const canvasElement = clippa.stage.app?.canvas as HTMLCanvasElement | undefined
+  if (canvasElement) {
+    canvasPointerTarget.value = canvasElement
+    canvasElement.addEventListener('pointerdown', handleCanvasPointerCapture, { capture: true })
+  }
+
+  document.addEventListener('pointerdown', handleDocumentPointerDown, { capture: true })
+
   // 计算初始缩放率
   nextTick(() => {
     calculateCanvasScaleRatio()
@@ -177,13 +211,10 @@ onMounted(async () => {
     zIndex: 0,
   })
 
-  const handleActiveTrainChange = (train: Train | null) => {
-    syncTimelineToSelection(train)
-  }
-
   clippa.timeline.state.on('activeTrainChanged', handleActiveTrainChange)
+  isTimelineListenerActive = true
 
-  watch(
+  stopSelectionWatch = watch(
     () => selectedPerformers.value.map(item => item.id),
     (ids) => {
       syncSelectionToTimeline(ids[0] ?? null)
@@ -192,14 +223,24 @@ onMounted(async () => {
   )
 
   syncTimelineToSelection(clippa.timeline.state.activeTrain)
-
-  onUnmounted(() => {
-    clippa.timeline.state.off('activeTrainChanged', handleActiveTrainChange)
-  })
 })
 
 onUnmounted(() => {
+  if (canvasPointerTarget.value) {
+    canvasPointerTarget.value.removeEventListener('pointerdown', handleCanvasPointerCapture, { capture: true })
+    canvasPointerTarget.value = null
+  }
+
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, { capture: true })
   window.removeEventListener('resize', calculateCanvasScaleRatio)
+
+  if (isTimelineListenerActive) {
+    clippa.timeline.state.off('activeTrainChanged', handleActiveTrainChange)
+    isTimelineListenerActive = false
+  }
+
+  stopSelectionWatch?.()
+  stopSelectionWatch = null
 })
 </script>
 
@@ -209,6 +250,7 @@ onUnmounted(() => {
 
     <div
       id="canvas"
+      ref="canvasWrapperRef"
       flex-1 aspect-video max-h="[85%]" max-w="[95%]" rounded-sm overflow-visible border="white/5" relative bg-black
       @pointerdown="handleCanvasPointerDown"
     >
