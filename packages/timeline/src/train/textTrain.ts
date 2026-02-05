@@ -1,7 +1,7 @@
-import type { ExtendTrainEvents, ExtendTrainOption } from '.'
+import type { ExtendTrainEvents, ExtendTrainOption } from './types'
 import { TIMELINE_TRAIN_RADIUS } from '@clippa/constants'
 import { Graphics, Text } from 'pixi.js'
-import { Train } from '.'
+import { Train } from './train'
 
 // eslint-disable-next-line ts/no-empty-object-type
 type TextTrainEvents = ExtendTrainEvents<{}>

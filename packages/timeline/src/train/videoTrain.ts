@@ -1,8 +1,8 @@
-import type { ExtendTrainEvents, ExtendTrainOption } from '.'
+import type { ExtendTrainEvents, ExtendTrainOption } from './types'
 import { DEBUG_NO_FRAME } from '@clippa/constants'
 import { FrameExtractor } from 'open-clippa'
 import { Sprite, Texture } from 'pixi.js'
-import { Train } from '.'
+import { Train } from './train'
 
 // eslint-disable-next-line ts/no-empty-object-type
 type VideoTrainEvents = ExtendTrainEvents<{}>
