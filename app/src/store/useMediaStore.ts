@@ -107,6 +107,15 @@ export interface VideoFile {
   processingStatus: ProcessingStatus
 }
 
+export interface ImageFile {
+  id: string
+  name: string
+  file: File
+  url: string
+  size?: number
+  createdAt?: Date
+}
+
 export const useMediaStore = defineStore('media', () => {
   const videoFiles = ref<VideoFile[]>([])
   const isGeneratingThumbnail = ref(false)

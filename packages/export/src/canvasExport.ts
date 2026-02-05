@@ -6,6 +6,13 @@ import {
   VideoSampleSource,
 } from 'mediabunny'
 
+export class ExportCanceledError extends Error {
+  constructor() {
+    super('Export canceled')
+    this.name = 'ExportCanceledError'
+  }
+}
+
 export interface CanvasExportOptions {
   /** 要导出的 HTML Canvas 元素，作为视频帧的来源 */
   canvas: HTMLCanvasElement
@@ -21,6 +28,15 @@ export interface CanvasExportOptions {
   bitrate?: number
   /** 视频质量预设，会影响默认比特率：'low'(低质量)、'medium'(中等质量)、'high'(高质量) */
   quality?: 'low' | 'medium' | 'high'
+  /** Export progress callback */
+  onProgress?: (progress: ExportProgress) => void
+}
+
+export interface ExportProgress {
+  currentFrame: number
+  totalFrames: number
+  progress: number
+  timestamp: number
 }
 
 /**
@@ -49,6 +65,9 @@ export class CanvasExport {
   private _duration: number
   private _codec: 'avc' | 'vp9' | 'av1' | 'hevc'
   private _bitrate: number
+  private _onProgress?: (progress: ExportProgress) => void
+  private _canceled: boolean = false
+  private _output?: Output
 
   constructor(options: CanvasExportOptions) {
     this._canvas = options.canvas
@@ -60,6 +79,18 @@ export class CanvasExport {
     // 设置编解码器和比特率
     this._codec = options.codec || 'avc'
     this._bitrate = options.bitrate || QualityPresets.getBitrate(options.quality || 'medium')
+    this._onProgress = options.onProgress
+  }
+
+  async cancel(): Promise<void> {
+    if (this._canceled)
+      return
+
+    this._canceled = true
+
+    if (this._output) {
+      await this._output.cancel()
+    }
   }
 
   /**
@@ -74,21 +105,31 @@ export class CanvasExport {
       format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
       target: new BufferTarget(),
     })
+    this._output = output
 
     // 创建 VideoSampleSource
     const videoSampleSource = new VideoSampleSource({
       codec: this._codec,
       bitrate: this._bitrate,
     })
-
     output.addVideoTrack(videoSampleSource)
     await output.start()
 
     const frameDuration = 1000000 / this._frameRate // 微秒
 
     for (let i = 0; i < this._totalFrames; i++) {
+      if (this._canceled) {
+        await output.cancel()
+        throw new ExportCanceledError()
+      }
+
       // 更新 canvas
       await this._nextFrame()
+
+      if (this._canceled) {
+        await output.cancel()
+        throw new ExportCanceledError()
+      }
 
       // 将 Canvas 转换为 VideoFrame
       const videoFrame = new VideoFrame(this._canvas, {
@@ -104,6 +145,23 @@ export class CanvasExport {
       // 释放资源
       videoSample.close()
       videoFrame.close()
+
+      if (this._onProgress) {
+        const currentFrame = i + 1
+        const progress = this._totalFrames > 0 ? currentFrame / this._totalFrames : 1
+        const timestamp = currentFrame * (1000 / this._frameRate)
+        this._onProgress({
+          currentFrame,
+          totalFrames: this._totalFrames,
+          progress,
+          timestamp,
+        })
+      }
+    }
+
+    if (this._canceled) {
+      await output.cancel()
+      throw new ExportCanceledError()
     }
 
     await output.finalize()
