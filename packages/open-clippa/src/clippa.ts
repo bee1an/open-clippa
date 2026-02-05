@@ -46,7 +46,7 @@ export class Clippa extends EventBus<ClippaEvents> {
 
     if (p instanceof Text) {
       const train = new TextTrain({
-        id: `text-${Date.now()}`,
+        id: p.id,
         start: p.start,
         duration: p.duration,
         label: p.getText(),
@@ -62,7 +62,7 @@ export class Clippa extends EventBus<ClippaEvents> {
 
     // 创建VideoTrain实例，传递必要的参数
     const videoTrain = new VideoTrain({
-      id: `video-${Date.now()}`,
+      id: p.id,
       start: p.start,
       duration: p.duration,
       src: performerWithSrc.src,

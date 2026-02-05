@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Train } from 'open-clippa'
 import type { PerformerConfig, VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -13,10 +14,13 @@ const CANVAS_HEIGHT = CANVAS_WIDTH / 16 * 9
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
+const { selectedPerformers } = storeToRefs(performerStore)
 const { clippa } = editorStore
 clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
 
 const sliderValue = ref(0)
+const isSyncingFromTimeline = ref(false)
+const isSyncingFromSelection = ref(false)
 
 // Canvas 缩放率
 const canvasScaleRatio = ref(1)
@@ -82,6 +86,58 @@ watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
 
+function findTrainById(id: string): Train | null {
+  const rails = clippa.timeline.rails?.rails ?? []
+  for (const rail of rails) {
+    const train = rail.trains.find(item => item.id === id)
+    if (train)
+      return train
+  }
+  return null
+}
+
+function syncTimelineToSelection(train: Train | null) {
+  if (isSyncingFromSelection.value)
+    return
+
+  isSyncingFromTimeline.value = true
+  if (train) {
+    performerStore.selectPerformer(train.id)
+  }
+  else {
+    performerStore.clearSelection()
+  }
+
+  nextTick(() => {
+    isSyncingFromTimeline.value = false
+  })
+}
+
+function syncSelectionToTimeline(selectedId: string | null) {
+  if (isSyncingFromTimeline.value)
+    return
+
+  isSyncingFromSelection.value = true
+  const activeTrain = clippa.timeline.state.activeTrain
+
+  if (!selectedId) {
+    if (activeTrain)
+      activeTrain.updateActive(false)
+    nextTick(() => {
+      isSyncingFromSelection.value = false
+    })
+    return
+  }
+
+  const train = findTrainById(selectedId)
+  if (train && activeTrain !== train)
+    train.updateActive(true)
+
+  nextTick(() => {
+    isSyncingFromSelection.value = false
+  })
+}
+
 // 创建 performer 的辅助函数
 async function createVideoPerformer(config: Omit<VideoPerformerConfig, 'duration'>): Promise<void> {
   const { duration, width, height } = await loadVideoMetadata(config.src as string)
@@ -119,6 +175,26 @@ onMounted(async () => {
     x: 0,
     y: 0,
     zIndex: 0,
+  })
+
+  const handleActiveTrainChange = (train: Train | null) => {
+    syncTimelineToSelection(train)
+  }
+
+  clippa.timeline.state.on('activeTrainChanged', handleActiveTrainChange)
+
+  watch(
+    () => selectedPerformers.value.map(item => item.id),
+    (ids) => {
+      syncSelectionToTimeline(ids[0] ?? null)
+    },
+    { flush: 'post' },
+  )
+
+  syncTimelineToSelection(clippa.timeline.state.activeTrain)
+
+  onUnmounted(() => {
+    clippa.timeline.state.off('activeTrainChanged', handleActiveTrainChange)
   })
 })
 
