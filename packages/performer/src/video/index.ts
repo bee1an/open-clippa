@@ -3,6 +3,7 @@ import type {
   VideoSample,
 } from 'mediabunny'
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
+import type { PerformerAnimationSpec, TransformState } from '../animation'
 import type { Performer, PerformerOption } from '../performer'
 import { EventBus, transformSrc } from '@clippa/utils'
 import {
@@ -12,6 +13,7 @@ import {
   VideoSampleSink,
 } from 'mediabunny'
 import { Sprite, Texture } from 'pixi.js'
+import { AnimationController, DEFAULT_TRANSFORM_STATE } from '../animation'
 import { PlayState, ShowState } from '../performer'
 
 export interface PerformerClickEvent {
@@ -105,6 +107,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   private _videoSink?: VideoSampleSink
   private _loader?: Promise<void>
   private _pendingFilters: Filter[] | null = null
+  private _animationController?: AnimationController
 
   /**
    * 帧缓存：time (in ms) -> { frame: VideoFrame }
@@ -149,6 +152,8 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
           this._sprite.y = y
 
         this.valid = true
+        this._updateBaseTransform()
+        this._applyAnimationForCurrentTime()
         resolve()
       })
       .catch((error) => {
@@ -211,6 +216,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     }
 
     this.showState = ShowState.PLAYING
+    this._applyAnimationForCurrentTime()
 
     // 提取并渲染当前时间的帧
     this._renderFrameAtTime(this._resolveSourceTime(time))
@@ -259,6 +265,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
       // 更新当前时间
       this.currentTime = time
+      this._applyAnimationForCurrentTime()
       const sourceTime = this._resolveSourceTime(time)
 
       // 执行 seek（等待帧提取和渲染完成）
@@ -448,11 +455,38 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     }
   }
 
+  setAnimation(spec: PerformerAnimationSpec | null): void {
+    if (!spec) {
+      const baseTransform = this._animationController?.baseTransform
+
+      this._animationController?.destroy()
+      this._animationController = undefined
+
+      if (baseTransform)
+        this._applyTransform(baseTransform)
+
+      return
+    }
+
+    if (!this._animationController) {
+      this._animationController = new AnimationController(this._getCurrentTransform(), spec)
+    }
+    else {
+      this._animationController.setBaseTransform(this._getCurrentTransform())
+      this._animationController.setSpec(spec)
+    }
+
+    this._applyAnimationForCurrentTime()
+  }
+
   setPosition(x: number, y: number): void {
     if (this._sprite) {
       this._sprite.x = x
       this._sprite.y = y
       this.notifyPositionUpdate()
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
     }
   }
 
@@ -460,6 +494,9 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     if (this._sprite) {
       this._sprite.angle = angle
       this.notifyPositionUpdate()
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
     }
   }
 
@@ -468,6 +505,18 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       this._sprite.scale.x = scaleX
       this._sprite.scale.y = scaleY
       this.notifyPositionUpdate()
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
+    }
+  }
+
+  setAlpha(alpha: number): void {
+    if (this._sprite) {
+      this._sprite.alpha = alpha
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
     }
   }
 
@@ -481,6 +530,9 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   }
 
   destroy(): void {
+    this._animationController?.destroy()
+    this._animationController = undefined
+
     // 清理帧缓存
     for (const [, frameData] of this._frameCache) {
       frameData.frame.close()
@@ -512,5 +564,52 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.error = false
     this.showState = ShowState.UNPLAYED
     this.playState = PlayState.PAUSED
+  }
+
+  private _getCurrentTransform(): TransformState {
+    if (!this._sprite) {
+      return { ...DEFAULT_TRANSFORM_STATE }
+    }
+
+    return {
+      x: this._sprite.x,
+      y: this._sprite.y,
+      scaleX: this._sprite.scale.x,
+      scaleY: this._sprite.scale.y,
+      rotation: this._sprite.angle || 0,
+      alpha: this._sprite.alpha,
+    }
+  }
+
+  private _applyTransform(transform: TransformState): void {
+    if (!this._sprite)
+      return
+
+    this._sprite.x = transform.x
+    this._sprite.y = transform.y
+    this._sprite.scale.x = transform.scaleX
+    this._sprite.scale.y = transform.scaleY
+    this._sprite.angle = transform.rotation
+    this._sprite.alpha = transform.alpha
+  }
+
+  private _updateBaseTransform(): void {
+    if (!this._animationController)
+      return
+
+    this._animationController.setBaseTransform(this._getCurrentTransform())
+  }
+
+  private _applyAnimationForCurrentTime(): void {
+    if (!this._animationController || !this._sprite)
+      return
+
+    this._animationController.apply(
+      this.currentTime,
+      this.duration,
+      (transform) => {
+        this._applyTransform(transform)
+      },
+    )
   }
 }

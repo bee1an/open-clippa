@@ -12,7 +12,7 @@ const CANVAS_WIDTH = 996
 const CANVAS_HEIGHT = CANVAS_WIDTH / 16 * 9
 const DEFAULT_TEST_VIDEO_IDS = ['video1-a', 'video1-b'] as const
 const DEFAULT_TEST_VIDEO_SRC = 'https://pixijs.com/assets/video.mp4'
-const DEFAULT_TEST_VIDEO_CLIP_TARGET_MS = 2000
+const DEFAULT_TEST_VIDEO_CLIP_TARGET_MS = 20000
 const MAX_TIMELINE_SYNC_RETRIES = 24
 
 const editorStore = useEditorStore()
@@ -29,6 +29,7 @@ const canvasPointerTarget = ref<HTMLCanvasElement | null>(null)
 const canvasWrapperRef = ref<HTMLElement | null>(null)
 let stopSelectionWatch: (() => void) | null = null
 let isTimelineListenerActive = false
+const PRESERVE_SELECTION_ATTR = 'data-preserve-canvas-selection'
 
 // Canvas 缩放率
 const canvasScaleRatio = ref(1)
@@ -98,13 +99,28 @@ function handleCanvasPointerCapture(event: PointerEvent) {
 }
 
 function shouldKeepSelection(event: PointerEvent): boolean {
+  const hasPreserveFlag = (element: Element | null): boolean => {
+    return element instanceof HTMLElement && element.getAttribute(PRESERVE_SELECTION_ATTR) === 'true'
+  }
+
+  const target = event.target as Element | null
+  if (target instanceof HTMLElement && target.closest(`[${PRESERVE_SELECTION_ATTR}="true"]`)) {
+    return true
+  }
+
   return event.composedPath().some((node) => {
-    return node instanceof HTMLElement && node.dataset.preserveCanvasSelection === 'true'
+    return node instanceof Element && hasPreserveFlag(node)
   })
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
-  if (shouldKeepSelection(event))
+  // Native select popups can produce pointer events without a stable composedPath.
+  // Keep selection when current focus is already inside a preserve-selection area.
+  const activeElement = document.activeElement as Element | null
+  const keepByActiveElement = activeElement instanceof HTMLElement
+    && activeElement.closest(`[${PRESERVE_SELECTION_ATTR}="true"]`)
+
+  if (shouldKeepSelection(event) || keepByActiveElement)
     return
 
   const wrapper = canvasWrapperRef.value
@@ -241,7 +257,7 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
     DEFAULT_TEST_VIDEO_CLIP_TARGET_MS,
     Math.max(500, Math.floor(sourceDuration / 2)),
   )
-  const secondSourceStart = Math.min(sourceDuration - clipDuration, clipDuration)
+  // const secondSourceStart = Math.min(sourceDuration - clipDuration, clipDuration)
 
   const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = [
     {
@@ -257,19 +273,19 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
       height: height || CANVAS_HEIGHT,
       zIndex: 0,
     },
-    {
-      id: DEFAULT_TEST_VIDEO_IDS[1],
-      src: DEFAULT_TEST_VIDEO_SRC,
-      start: clipDuration,
-      duration: clipDuration,
-      sourceStart: secondSourceStart,
-      sourceDuration,
-      x: 0,
-      y: 0,
-      width: width || CANVAS_WIDTH,
-      height: height || CANVAS_HEIGHT,
-      zIndex: 0,
-    },
+    // {
+    //   id: DEFAULT_TEST_VIDEO_IDS[1],
+    //   src: DEFAULT_TEST_VIDEO_SRC,
+    //   start: clipDuration,
+    //   duration: clipDuration,
+    //   sourceStart: secondSourceStart,
+    //   sourceDuration,
+    //   x: 0,
+    //   y: 0,
+    //   width: width || CANVAS_WIDTH,
+    //   height: height || CANVAS_HEIGHT,
+    //   zIndex: 0,
+    // },
   ]
 
   for (const clipConfig of clipConfigs) {

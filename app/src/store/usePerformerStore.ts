@@ -1,5 +1,16 @@
-import type { PerformerBounds, TextStyleOption } from '@clippa/performer'
-import { Image, Text, Video } from '@clippa/performer'
+import type {
+  PerformerAnimationPatch,
+  PerformerAnimationSpec,
+  PerformerBounds,
+  TextStyleOption,
+} from '@clippa/performer'
+import {
+  Image,
+  mergeAnimationSpec,
+  normalizeAnimationSpec,
+  Text,
+  Video,
+} from '@clippa/performer'
 import { defineStore } from 'pinia'
 import { useEditorStore } from '@/store/useEditorStore'
 
@@ -40,14 +51,14 @@ export type PerformerConfig = VideoPerformerConfig | ImagePerformerConfig | Text
 
 export type CanvasPerformer = Video | Image | Text
 
-type PerformerPointerEvent = {
+interface PerformerPointerEvent {
   performer: CanvasPerformer
   canvasX: number
   canvasY: number
   timestamp: number
 }
 
-type PendingSelectionDrag = {
+interface PendingSelectionDrag {
   id: string
   clientX: number
   clientY: number
@@ -78,6 +89,7 @@ export const usePerformerStore = defineStore('performer', () => {
   const selectedPerformers = ref<SelectedPerformer[]>([])
   const pendingSelectionDrag = ref<PendingSelectionDrag | null>(null)
   const selectionRevision = ref(0)
+  const animationMap = ref<Record<string, PerformerAnimationSpec>>({})
 
   const bumpSelectionRevision = () => {
     selectionRevision.value += 1
@@ -263,6 +275,11 @@ export const usePerformerStore = defineStore('performer', () => {
     const performer = createPerformer(nextConfig)
     performerMap.set(performer.id, performer)
 
+    const animation = animationMap.value[performer.id]
+    if (animation) {
+      performer.setAnimation(animation)
+    }
+
     // 自动选中新添加的 performer (等待 sprite 加载完成)
     ;(performer as any).on?.('positionUpdate', () => {
       // selectPerformer(performer.id)
@@ -283,6 +300,8 @@ export const usePerformerStore = defineStore('performer', () => {
 
   // 移除 performer
   const removePerformer = (performerId: string) => {
+    clearAnimation(performerId)
+
     const performer = performerMap.get(performerId)
     if (performer) {
       removeTimelineTrainById(performerId)
@@ -389,14 +408,45 @@ export const usePerformerStore = defineStore('performer', () => {
     clearSelection()
   }
 
+  const getAnimation = (performerId: string): PerformerAnimationSpec | null => {
+    return animationMap.value[performerId] ?? null
+  }
+
+  const setAnimation = (performerId: string, spec: PerformerAnimationSpec | null): void => {
+    const normalized = normalizeAnimationSpec(spec)
+    const nextMap = { ...animationMap.value }
+
+    if (normalized) {
+      nextMap[performerId] = normalized
+    }
+    else {
+      delete nextMap[performerId]
+    }
+
+    animationMap.value = nextMap
+    performerMap.get(performerId)?.setAnimation(normalized)
+  }
+
+  const updateAnimation = (performerId: string, patch: PerformerAnimationPatch): void => {
+    const nextSpec = mergeAnimationSpec(getAnimation(performerId), patch)
+    setAnimation(performerId, nextSpec)
+  }
+
+  const clearAnimation = (performerId: string): void => {
+    setAnimation(performerId, null)
+  }
+
   // 清理所有 performers
   const clearAllPerformers = () => {
     performerMap.forEach(performer => performer.destroy())
     performerMap.clear()
+
     if (selectedPerformers.value.length > 0) {
       selectedPerformers.value = []
       bumpSelectionRevision()
     }
+
+    animationMap.value = {}
   }
 
   return {
@@ -404,6 +454,7 @@ export const usePerformerStore = defineStore('performer', () => {
     selectedPerformers,
     pendingSelectionDrag,
     selectionRevision,
+    animationMap,
 
     // 方法
     getAllPerformers,
@@ -423,5 +474,9 @@ export const usePerformerStore = defineStore('performer', () => {
     isPerformerSelected,
     deleteSelectedPerformers,
     clearAllPerformers,
+    getAnimation,
+    setAnimation,
+    updateAnimation,
+    clearAnimation,
   }
 })

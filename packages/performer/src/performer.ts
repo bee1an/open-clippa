@@ -1,4 +1,5 @@
 import type { Filter, Text as PixiText, Sprite } from 'pixi.js'
+import type { PerformerAnimationSpec } from './animation'
 
 export interface PerformerBounds {
   x: number
@@ -38,6 +39,8 @@ export interface Performer {
   setScale: (scaleX: number, scaleY: number) => void
 
   setRotation: (angle: number) => void
+  setAlpha: (alpha: number) => void
+  setAnimation: (spec: PerformerAnimationSpec | null) => void
   setFilters: (filters: Filter[] | null) => void
 }
 

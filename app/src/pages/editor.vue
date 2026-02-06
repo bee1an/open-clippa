@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CanvasExport, ExportCanceledError } from 'open-clippa'
 import { useRouter } from 'vue-router'
+import AnimationPanel from '@/components/AnimationPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
 import { useFilterEngine } from '@/composables/useFilterEngine'
@@ -242,12 +243,10 @@ async function handleExportCancel() {
         transition-all duration-300 ease-in-out
         z-40
         flex flex-col
+        data-preserve-canvas-selection="true"
       >
         <div h-full overflow-hidden w-280px>
-          <!-- Right Sider Content -->
-          <div p-4 text-sm text-foreground-muted text-center mt-10>
-            属性面板
-          </div>
+          <AnimationPanel />
         </div>
       </aside>
     </div>

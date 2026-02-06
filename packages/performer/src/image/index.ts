@@ -1,7 +1,9 @@
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
+import type { PerformerAnimationSpec, TransformState } from '../animation'
 import type { Performer, PerformerOption } from '../performer'
 import { EventBus, transformSrc } from '@clippa/utils'
 import { Sprite, Texture } from 'pixi.js'
+import { AnimationController, DEFAULT_TRANSFORM_STATE } from '../animation'
 import { PlayState, ShowState } from '../performer'
 
 export interface ImageClickEvent {
@@ -58,6 +60,7 @@ export class Image extends EventBus<ImageEvents> implements Performer {
   private _texture?: Texture
   private _naturalSize?: { width: number, height: number }
   private _pendingFilters: Filter[] | null = null
+  private _animationController?: AnimationController
 
   constructor(option: ImageOption) {
     super()
@@ -115,6 +118,8 @@ export class Image extends EventBus<ImageEvents> implements Performer {
           this._sprite.y = y
 
         this.valid = true
+        this._updateBaseTransform()
+        this._applyAnimationForCurrentTime()
         resolve()
       })
       .catch((error) => {
@@ -174,6 +179,7 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     }
 
     this.showState = ShowState.PLAYING
+    this._applyAnimationForCurrentTime()
   }
 
   pause(time: number): void {
@@ -268,11 +274,38 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     }
   }
 
+  setAnimation(spec: PerformerAnimationSpec | null): void {
+    if (!spec) {
+      const baseTransform = this._animationController?.baseTransform
+
+      this._animationController?.destroy()
+      this._animationController = undefined
+
+      if (baseTransform)
+        this._applyTransform(baseTransform)
+
+      return
+    }
+
+    if (!this._animationController) {
+      this._animationController = new AnimationController(this._getCurrentTransform(), spec)
+    }
+    else {
+      this._animationController.setBaseTransform(this._getCurrentTransform())
+      this._animationController.setSpec(spec)
+    }
+
+    this._applyAnimationForCurrentTime()
+  }
+
   setPosition(x: number, y: number): void {
     if (this._sprite) {
       this._sprite.x = x
       this._sprite.y = y
       this.notifyPositionUpdate()
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
     }
   }
 
@@ -280,6 +313,9 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     if (this._sprite) {
       this._sprite.angle = angle
       this.notifyPositionUpdate()
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
     }
   }
 
@@ -288,6 +324,18 @@ export class Image extends EventBus<ImageEvents> implements Performer {
       this._sprite.scale.x = scaleX
       this._sprite.scale.y = scaleY
       this.notifyPositionUpdate()
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
+    }
+  }
+
+  setAlpha(alpha: number): void {
+    if (this._sprite) {
+      this._sprite.alpha = alpha
+
+      if (!this._animationController?.isApplying)
+        this._updateBaseTransform()
     }
   }
 
@@ -301,6 +349,9 @@ export class Image extends EventBus<ImageEvents> implements Performer {
   }
 
   destroy(): void {
+    this._animationController?.destroy()
+    this._animationController = undefined
+
     if (this._sprite) {
       this._sprite.removeAllListeners()
       if (this._sprite.texture) {
@@ -322,5 +373,52 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     this.error = false
     this.showState = ShowState.UNPLAYED
     this.playState = PlayState.PAUSED
+  }
+
+  private _getCurrentTransform(): TransformState {
+    if (!this._sprite) {
+      return { ...DEFAULT_TRANSFORM_STATE }
+    }
+
+    return {
+      x: this._sprite.x,
+      y: this._sprite.y,
+      scaleX: this._sprite.scale.x,
+      scaleY: this._sprite.scale.y,
+      rotation: this._sprite.angle || 0,
+      alpha: this._sprite.alpha,
+    }
+  }
+
+  private _applyTransform(transform: TransformState): void {
+    if (!this._sprite)
+      return
+
+    this._sprite.x = transform.x
+    this._sprite.y = transform.y
+    this._sprite.scale.x = transform.scaleX
+    this._sprite.scale.y = transform.scaleY
+    this._sprite.angle = transform.rotation
+    this._sprite.alpha = transform.alpha
+  }
+
+  private _updateBaseTransform(): void {
+    if (!this._animationController)
+      return
+
+    this._animationController.setBaseTransform(this._getCurrentTransform())
+  }
+
+  private _applyAnimationForCurrentTime(): void {
+    if (!this._animationController || !this._sprite)
+      return
+
+    this._animationController.apply(
+      this.currentTime,
+      this.duration,
+      (transform) => {
+        this._applyTransform(transform)
+      },
+    )
   }
 }

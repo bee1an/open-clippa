@@ -2,7 +2,7 @@ import type { TransitionSpec } from '@/utils/transition'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { DEFAULT_GL_TRANSITION_TYPE, getGlTransitionDefaultParams } from '@/utils/glTransitions'
-import { DEFAULT_TRANSITION_DURATION, buildTransitionPairKey } from '@/utils/transition'
+import { buildTransitionPairKey, DEFAULT_TRANSITION_DURATION } from '@/utils/transition'
 
 export type { TransitionSpec }
 export { DEFAULT_TRANSITION_DURATION }

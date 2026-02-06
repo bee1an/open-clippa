@@ -70,6 +70,9 @@ catalogs:
     fast-glob:
       specifier: ^3.3.3
       version: 3.3.3
+    gsap:
+      specifier: ^3.13.0
+      version: 3.14.2
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -250,7 +253,11 @@ importers:
 
   packages/open-clippa: {}
 
-  packages/performer: {}
+  packages/performer:
+    dependencies:
+      gsap:
+        specifier: 'catalog:'
+        version: 3.14.2
 
   packages/selection:
     dependencies:
@@ -2319,6 +2326,9 @@ packages:
 
   graphemer@1.4.0:
     resolution: {integrity: sha512-EtKwoO6kxCL9WO5xipiHTZlSzBm7WLT627TqC/uVRd0HKmq8NXyebnNYxDoBi7wt8eTWrUrKXCOVaFq9x1kgag==}
+
+  gsap@3.14.2:
+    resolution: {integrity: sha512-P8/mMxVLU7o4+55+1TCnQrPmgjPKnwkzkXOK1asnR9Jg2lna4tEY5qBJjMmAaOBDDZWtlRjBXjLa0w53G/uBLA==}
 
   gzip-size@6.0.0:
     resolution: {integrity: sha512-ax7ZYomf6jqPTQ4+XCpUGyXKHk5WweS+e05MBO4/y3WJ5RkmPXNKvX+bx1behVILVwr6JSQvZAku021CHPXG3Q==}
@@ -5928,6 +5938,8 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   graphemer@1.4.0: {}
+
+  gsap@3.14.2: {}
 
   gzip-size@6.0.0:
     dependencies:
