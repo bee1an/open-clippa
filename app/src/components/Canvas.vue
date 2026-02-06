@@ -239,6 +239,7 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
     src: DEFAULT_TEST_VIDEO_SRC,
     start: 0,
     duration: duration || 5000,
+    sourceDuration: duration || 5000,
     x: 0,
     y: 0,
     width: width || CANVAS_WIDTH,
