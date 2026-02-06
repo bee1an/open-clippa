@@ -28,6 +28,12 @@ const navItems = [
     activeIcon: 'i-ph-text-t-fill',
     title: 'Text',
   },
+  {
+    path: '/editor/transition',
+    icon: 'i-ph-arrow-bend-up-right-bold',
+    activeIcon: 'i-ph-arrow-bend-up-right-fill',
+    title: 'Transition (Unavailable)',
+  },
 ]
 
 function handleItemClick(path: string) {

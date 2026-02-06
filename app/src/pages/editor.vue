@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
 import { useFilterEngine } from '@/composables/useFilterEngine'
+import { useTimelineBinding } from '@/composables/useTimelineBinding'
+import { useTransitionEngine } from '@/composables/useTransitionEngine'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useExportStore } from '@/store/useExportStore'
 
@@ -31,6 +33,8 @@ const isExporting = computed(() => exportState.status === 'exporting')
 const exportInstance = ref<CanvasExport | null>(null)
 
 useFilterEngine()
+useTimelineBinding()
+useTransitionEngine()
 
 // 等待 clippa 准备就绪
 onMounted(async () => {

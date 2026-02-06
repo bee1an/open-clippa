@@ -21,6 +21,8 @@ interface PerformerConfigBase {
 export interface VideoPerformerConfig extends PerformerConfigBase {
   type?: 'video'
   src: string | File | Blob
+  sourceDuration?: number
+  sourceStart?: number
 }
 
 export interface ImagePerformerConfig extends PerformerConfigBase {
@@ -36,7 +38,7 @@ export interface TextPerformerConfig extends PerformerConfigBase {
 
 export type PerformerConfig = VideoPerformerConfig | ImagePerformerConfig | TextPerformerConfig
 
-type CanvasPerformer = Video | Image | Text
+export type CanvasPerformer = Video | Image | Text
 
 type PerformerPointerEvent = {
   performer: CanvasPerformer
@@ -116,6 +118,10 @@ export const usePerformerStore = defineStore('performer', () => {
 
   // 获取所有 performers
   const getAllPerformers = () => Array.from(performerMap.values())
+
+  const getPerformerById = (performerId: string): CanvasPerformer | undefined => {
+    return performerMap.get(performerId)
+  }
 
   // 获取选中的 performers (包含 bounds 信息)
   const getSelectedPerformers = () => {
@@ -401,6 +407,7 @@ export const usePerformerStore = defineStore('performer', () => {
 
     // 方法
     getAllPerformers,
+    getPerformerById,
     getSelectedPerformers,
     createPerformer,
     addPerformer,

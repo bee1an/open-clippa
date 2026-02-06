@@ -40,6 +40,10 @@ export interface VideoOption extends PerformerOption {
 
   zIndex: number
 
+  sourceDuration?: number
+
+  sourceStart?: number
+
   width?: number
 
   height?: number
@@ -72,6 +76,11 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
    */
   sourceStart: number = 0
 
+  /**
+   * 播放源总时长
+   */
+  sourceDuration: number = 0
+
   showState: ShowState = ShowState.UNPLAYED
 
   playState: PlayState = PlayState.PAUSED
@@ -85,6 +94,8 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.duration = duration
     this.zIndex = zIndex
     this.src = transformSrc(src)
+    this.sourceDuration = option.sourceDuration ?? option.duration
+    this.sourceStart = option.sourceStart ?? 0
 
     this.load(option)
   }
@@ -202,7 +213,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.showState = ShowState.PLAYING
 
     // 提取并渲染当前时间的帧
-    this._renderFrameAtTime(time)
+    this._renderFrameAtTime(this._resolveSourceTime(time))
   }
 
   pause(time: number): void {
@@ -220,9 +231,6 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   private _seekTask: { time: number, resolve: () => void, reject: (error: unknown) => void } | null = null
   private _isSeeking: boolean = false
   async seek(time: number): Promise<void> {
-    if (time < 0 || time > this.duration)
-      return
-
     // 清空待执行任务，始终只保留最新的 seek 请求
     this._seekTask = null
 
@@ -251,9 +259,10 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
       // 更新当前时间
       this.currentTime = time
+      const sourceTime = this._resolveSourceTime(time)
 
       // 执行 seek（等待帧提取和渲染完成）
-      await this._renderFrameAtTime(time)
+      await this._renderFrameAtTime(sourceTime)
 
       resolve()
 
@@ -266,6 +275,19 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       this._seekTask = null
       this._isSeeking = false
     }
+  }
+
+  async renderFrameAtSourceTime(ms: number): Promise<void> {
+    await this._renderFrameAtTime(this._clampSourceTime(ms))
+  }
+
+  private _resolveSourceTime(time: number): number {
+    return this._clampSourceTime(this.sourceStart + time)
+  }
+
+  private _clampSourceTime(time: number): number {
+    const max = Math.max(0, this.sourceDuration)
+    return Math.min(max, Math.max(0, time))
   }
 
   /**

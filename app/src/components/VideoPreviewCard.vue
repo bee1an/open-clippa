@@ -32,6 +32,7 @@ async function addToTimeline() {
     src: props.videoFile.file,
     start: 0,
     duration: props.videoFile.duration || duration || 5000,
+    sourceDuration: duration || props.videoFile.duration || 5000,
     width: width || stageWidth,
     height: height || stageHeight,
     x: 0,

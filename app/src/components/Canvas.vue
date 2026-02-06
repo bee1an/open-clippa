@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Train } from 'open-clippa'
-import type { PerformerConfig, VideoPerformerConfig } from '@/store/usePerformerStore'
+import type { VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEditorStore } from '@/store'
@@ -10,8 +10,9 @@ import SelectionGroup from './SelectionGroup.vue'
 
 const CANVAS_WIDTH = 996
 const CANVAS_HEIGHT = CANVAS_WIDTH / 16 * 9
-const DEFAULT_TEST_VIDEO_ID = 'video1'
+const DEFAULT_TEST_VIDEO_IDS = ['video1-a', 'video1-b'] as const
 const DEFAULT_TEST_VIDEO_SRC = 'https://pixijs.com/assets/video.mp4'
+const DEFAULT_TEST_VIDEO_CLIP_TARGET_MS = 2000
 const MAX_TIMELINE_SYNC_RETRIES = 24
 
 const editorStore = useEditorStore()
@@ -228,27 +229,53 @@ function trySyncSelectionToTimeline(selectedId: string, attempt: number) {
 }
 
 async function ensureDefaultVideoPerformer(): Promise<void> {
-  if (performerStore.getAllPerformers().some(item => item.id === DEFAULT_TEST_VIDEO_ID))
+  const defaultTestVideoIdSet = new Set<string>(DEFAULT_TEST_VIDEO_IDS)
+  if (performerStore.getAllPerformers().some(item => defaultTestVideoIdSet.has(item.id)))
     return
-  if (findTrainById(DEFAULT_TEST_VIDEO_ID))
+  if (DEFAULT_TEST_VIDEO_IDS.some(id => Boolean(findTrainById(id))))
     return
 
   const { duration, width, height } = await loadVideoMetadata(DEFAULT_TEST_VIDEO_SRC)
-  const performerConfig: PerformerConfig = {
-    id: DEFAULT_TEST_VIDEO_ID,
-    src: DEFAULT_TEST_VIDEO_SRC,
-    start: 0,
-    duration: duration || 5000,
-    sourceDuration: duration || 5000,
-    x: 0,
-    y: 0,
-    width: width || CANVAS_WIDTH,
-    height: height || CANVAS_HEIGHT,
-    zIndex: 0,
-  } satisfies Omit<VideoPerformerConfig, 'type'>
+  const sourceDuration = Math.max(1000, Math.round(duration || 5000))
+  const clipDuration = Math.min(
+    DEFAULT_TEST_VIDEO_CLIP_TARGET_MS,
+    Math.max(500, Math.floor(sourceDuration / 2)),
+  )
+  const secondSourceStart = Math.min(sourceDuration - clipDuration, clipDuration)
 
-  const performer = performerStore.addPerformer(performerConfig)
-  await clippa.hire(performer)
+  const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = [
+    {
+      id: DEFAULT_TEST_VIDEO_IDS[0],
+      src: DEFAULT_TEST_VIDEO_SRC,
+      start: 0,
+      duration: clipDuration,
+      sourceStart: 0,
+      sourceDuration,
+      x: 0,
+      y: 0,
+      width: width || CANVAS_WIDTH,
+      height: height || CANVAS_HEIGHT,
+      zIndex: 0,
+    },
+    {
+      id: DEFAULT_TEST_VIDEO_IDS[1],
+      src: DEFAULT_TEST_VIDEO_SRC,
+      start: clipDuration,
+      duration: clipDuration,
+      sourceStart: secondSourceStart,
+      sourceDuration,
+      x: 0,
+      y: 0,
+      width: width || CANVAS_WIDTH,
+      height: height || CANVAS_HEIGHT,
+      zIndex: 0,
+    },
+  ]
+
+  for (const clipConfig of clipConfigs) {
+    const performer = performerStore.addPerformer(clipConfig)
+    await clippa.hire(performer)
+  }
 }
 
 onMounted(async () => {
