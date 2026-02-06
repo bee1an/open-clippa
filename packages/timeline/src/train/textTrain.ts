@@ -1,5 +1,9 @@
 import type { ExtendTrainEvents, ExtendTrainOption } from './types'
-import { TIMELINE_TRAIN_RADIUS } from '@clippa/constants'
+import {
+  TIMELINE_TEXT_TRAIN_FILL,
+  TIMELINE_TEXT_TRAIN_TEXT_FILL,
+  TIMELINE_TRAIN_RADIUS,
+} from '@clippa/constants'
 import { Graphics, Text } from 'pixi.js'
 import { Train } from './train'
 
@@ -14,8 +18,8 @@ type TextTrainOption = ExtendTrainOption<{
 
 export const TEXT_TRAIN_HEIGHT = 45
 
-const DEFAULT_TEXT_TRAIN_FILL = '#2b3747'
-const DEFAULT_TEXT_COLOR = '#f8fafc'
+const DEFAULT_TEXT_TRAIN_FILL = TIMELINE_TEXT_TRAIN_FILL
+const DEFAULT_TEXT_COLOR = TIMELINE_TEXT_TRAIN_TEXT_FILL
 const LABEL_PADDING_X = 8
 
 export class TextTrain extends Train<TextTrainEvents> {

@@ -1,5 +1,6 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
+import { TIMELINE_RAIL_FILL } from '@clippa/constants'
 import { EventBus, getMsByPx, isIntersection } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
@@ -9,11 +10,6 @@ import { Train } from './train'
  * rail height
  */
 export const RAIL_HEIGHT = 45
-/**
- * rail background color
- */
-export const RAIL_FILL = '#13131b'
-
 export interface RailOption {
   /**
    * 宽度
@@ -226,7 +222,7 @@ export class Rail extends EventBus<RailEvents> {
     const bg = new Graphics()
 
     bg.roundRect(0, 0, this.width, RAIL_HEIGHT, 8)
-    bg.fill(RAIL_FILL)
+    bg.fill(TIMELINE_RAIL_FILL)
 
     if (this._bg) {
       this.container.replaceChild(this._bg, bg)

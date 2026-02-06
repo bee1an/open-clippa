@@ -21,7 +21,7 @@ async function addToTimeline() {
   await clippa.ready
 
   const performer = performerStore.addPerformer({
-    id: props.imageFile.id,
+    id: `image-${crypto.randomUUID()}`,
     type: 'image',
     src: props.imageFile.file,
     start: 0,

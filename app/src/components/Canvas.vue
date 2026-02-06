@@ -10,11 +10,14 @@ import SelectionGroup from './SelectionGroup.vue'
 
 const CANVAS_WIDTH = 996
 const CANVAS_HEIGHT = CANVAS_WIDTH / 16 * 9
+const DEFAULT_TEST_VIDEO_ID = 'video1'
+const DEFAULT_TEST_VIDEO_SRC = 'https://pixijs.com/assets/video.mp4'
+const MAX_TIMELINE_SYNC_RETRIES = 24
 
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
-const { selectedPerformers } = storeToRefs(performerStore)
+const { selectedPerformers, selectionRevision } = storeToRefs(performerStore)
 const { clippa } = editorStore
 clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
 
@@ -70,6 +73,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
   if (hitPerformers.length === 0) {
     performerStore.clearSelection()
     performerStore.clearPendingSelectionDrag()
+    syncSelectionToTimeline(null)
     return
   }
 
@@ -78,6 +82,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
     return
 
   performerStore.selectPerformer(target.id)
+  syncSelectionToTimeline(target.id)
   performerStore.requestSelectionDrag({
     id: target.id,
     clientX: event.clientX,
@@ -91,7 +96,16 @@ function handleCanvasPointerCapture(event: PointerEvent) {
   handleCanvasPointerDown(event)
 }
 
+function shouldKeepSelection(event: PointerEvent): boolean {
+  return event.composedPath().some((node) => {
+    return node instanceof HTMLElement && node.dataset.preserveCanvasSelection === 'true'
+  })
+}
+
 function handleDocumentPointerDown(event: PointerEvent) {
+  if (shouldKeepSelection(event))
+    return
+
   const wrapper = canvasWrapperRef.value
   const target = event.target as Node | null
   if (!wrapper || !target)
@@ -100,8 +114,13 @@ function handleDocumentPointerDown(event: PointerEvent) {
   if (wrapper.contains(target))
     return
 
+  const timelineElement = document.getElementById('timeline')
+  if (timelineElement && timelineElement.contains(target))
+    return
+
   performerStore.clearSelection()
   performerStore.clearPendingSelectionDrag()
+  syncSelectionToTimeline(null)
 }
 
 watch(currentTime, () => {
@@ -139,12 +158,13 @@ function syncSelectionToTimeline(selectedId: string | null) {
   if (isSyncingFromTimeline.value)
     return
 
-  isSyncingFromSelection.value = true
   const activeTrain = clippa.timeline.state.activeTrain
 
   if (!selectedId) {
-    if (activeTrain)
+    if (activeTrain) {
+      isSyncingFromSelection.value = true
       activeTrain.updateActive(false)
+    }
     nextTick(() => {
       isSyncingFromSelection.value = false
     })
@@ -152,33 +172,82 @@ function syncSelectionToTimeline(selectedId: string | null) {
   }
 
   const train = findTrainById(selectedId)
-  if (train && activeTrain !== train)
+  if (train && activeTrain !== train) {
+    isSyncingFromSelection.value = true
     train.updateActive(true)
+  }
+  else if (!train) {
+    // train might still be creating asynchronously (e.g. hire/init not completed yet)
+    trySyncSelectionToTimeline(selectedId, 0)
+    return
+  }
 
   nextTick(() => {
     isSyncingFromSelection.value = false
   })
 }
 
-const handleActiveTrainChange = (train: Train | null) => {
+function handleActiveTrainChange(train: Train | null) {
   syncTimelineToSelection(train)
 }
 
-// 创建 performer 的辅助函数
-async function createVideoPerformer(config: Omit<VideoPerformerConfig, 'duration'>): Promise<void> {
-  const { duration, width, height } = await loadVideoMetadata(config.src as string)
+function trySyncSelectionToTimeline(selectedId: string, attempt: number) {
+  if (selectedPerformers.value[0]?.id !== selectedId)
+    return
 
-  const performerConfig: PerformerConfig = {
-    ...config,
-    duration: duration || 5000,
-    width: (config.width ?? width) || CANVAS_WIDTH,
-    height: (config.height ?? height) || CANVAS_HEIGHT,
+  if (isSyncingFromTimeline.value)
+    return
+
+  const train = findTrainById(selectedId)
+  if (train) {
+    const activeTrain = clippa.timeline.state.activeTrain
+    isSyncingFromSelection.value = true
+    if (activeTrain !== train)
+      train.updateActive(true)
+    nextTick(() => {
+      isSyncingFromSelection.value = false
+    })
+    return
   }
 
-  const performer = performerStore.addPerformer(performerConfig)
+  if (attempt >= MAX_TIMELINE_SYNC_RETRIES) {
+    const activeTrain = clippa.timeline.state.activeTrain
+    if (activeTrain) {
+      isSyncingFromSelection.value = true
+      activeTrain.updateActive(false)
+      nextTick(() => {
+        isSyncingFromSelection.value = false
+      })
+    }
+    return
+  }
 
-  // 将 performer 添加到 clippa
-  clippa.hire(performer)
+  requestAnimationFrame(() => {
+    trySyncSelectionToTimeline(selectedId, attempt + 1)
+  })
+}
+
+async function ensureDefaultVideoPerformer(): Promise<void> {
+  if (performerStore.getAllPerformers().some(item => item.id === DEFAULT_TEST_VIDEO_ID))
+    return
+  if (findTrainById(DEFAULT_TEST_VIDEO_ID))
+    return
+
+  const { duration, width, height } = await loadVideoMetadata(DEFAULT_TEST_VIDEO_SRC)
+  const performerConfig: PerformerConfig = {
+    id: DEFAULT_TEST_VIDEO_ID,
+    src: DEFAULT_TEST_VIDEO_SRC,
+    start: 0,
+    duration: duration || 5000,
+    x: 0,
+    y: 0,
+    width: width || CANVAS_WIDTH,
+    height: height || CANVAS_HEIGHT,
+    zIndex: 0,
+  } satisfies Omit<VideoPerformerConfig, 'type'>
+
+  const performer = performerStore.addPerformer(performerConfig)
+  await clippa.hire(performer)
 }
 
 onMounted(async () => {
@@ -201,26 +270,23 @@ onMounted(async () => {
   // 监听 window 大小变化
   window.addEventListener('resize', calculateCanvasScaleRatio)
 
-  // 使用 performer store 创建视频对象
-  await createVideoPerformer({
-    id: 'video1',
-    src: 'https://pixijs.com/assets/video.mp4',
-    start: 0,
-    x: 0,
-    y: 0,
-    zIndex: 0,
-  })
-
   clippa.timeline.state.on('activeTrainChanged', handleActiveTrainChange)
   isTimelineListenerActive = true
 
   stopSelectionWatch = watch(
-    () => selectedPerformers.value.map(item => item.id),
-    (ids) => {
-      syncSelectionToTimeline(ids[0] ?? null)
+    () => [selectedPerformers.value[0]?.id ?? null, selectionRevision.value] as const,
+    ([selectedId]) => {
+      syncSelectionToTimeline(selectedId)
     },
     { flush: 'post' },
   )
+
+  try {
+    await ensureDefaultVideoPerformer()
+  }
+  catch (error) {
+    console.warn('Default test video bootstrap failed:', error)
+  }
 
   syncTimelineToSelection(clippa.timeline.state.activeTrain)
 })

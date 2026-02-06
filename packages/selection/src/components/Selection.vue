@@ -78,6 +78,16 @@ const computedTheme = computed(() => {
   return props.customStyle ? mergeTheme(baseTheme, props.customStyle) : baseTheme
 })
 
+const handleColor = computed(() => computedTheme.value.handleColor || '#d6d6dc')
+
+const handleBackgroundColor = computed(() => {
+  const customHandleBackground = computedTheme.value['--selection-handle-bg']
+  if (typeof customHandleBackground === 'string')
+    return customHandleBackground
+
+  return '#1f2026'
+})
+
 // 容器样式
 const containerStyle = computed(() => {
   const style = {
@@ -105,10 +115,12 @@ const boxStyle = computed(() => {
     width: '100%',
     height: '100%',
     border: computedTheme.value.border,
-    background: 'transparent',
+    background: computedTheme.value.background ?? 'transparent',
     boxSizing: 'border-box' as const,
     position: 'relative' as const,
     userSelect: 'none',
+    borderRadius: computedTheme.value.borderRadius ?? '4px',
+    boxShadow: computedTheme.value.boxShadow ?? '0 0 0 1px rgba(0, 0, 0, 0.35)',
   }
 
   // 类型转换以满足 CSSProperties 要求
@@ -121,12 +133,12 @@ const handleStyle = computed(() => ({
   position: 'absolute' as const,
   width: `${computedTheme.value.handleSize}px`,
   height: `${computedTheme.value.handleSize}px`,
-  backgroundColor: '#fff',
-  border: `1px solid ${computedTheme.value.handleColor}`,
-  borderRadius: '0', // Square
+  backgroundColor: handleBackgroundColor.value,
+  border: `1px solid ${handleColor.value}`,
+  borderRadius: '2px',
   zIndex: 1,
   pointerEvents: 'auto' as const,
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)', // Slightly sharper shadow for square
+  boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.65), 0 1px 2px rgba(0, 0, 0, 0.45)',
 }))
 
 // 旋转手柄样式
@@ -135,22 +147,23 @@ const rotateHandleStyle = computed(() => ({
   top: '-36px',
   left: '50%',
   transform: 'translateX(-50%)',
-  width: '24px',
-  height: '24px',
-  backgroundColor: '#fff',
-  border: `1px solid ${computedTheme.value.handleColor}`,
-  borderRadius: '50%', // Rotate handle often stays round to indicate rotation, or we can make it square too if desired. Keeping round for distinction usually.
+  width: '22px',
+  height: '22px',
+  backgroundColor: handleBackgroundColor.value,
+  border: `1px solid ${handleColor.value}`,
+  borderRadius: '999px',
   cursor: 'grab',
   zIndex: 2,
   pointerEvents: 'auto' as const,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.15)',
+  color: handleColor.value,
+  boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.58), 0 2px 6px rgba(0, 0, 0, 0.45)',
 }))
 
 // 旋转连接线样式
-const rotateLineStroke = computed(() => computedTheme.value.handleColor)
+const rotateLineStroke = computed(() => handleColor.value)
 
 // 8个调整方向
 const resizeDirections: ResizeDirection[] = [
@@ -474,7 +487,7 @@ onUnmounted(() => {
           @mousedown.stop="handleRotateStart($event)"
           @touchstart.stop="handleRotateStart($event)"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" :style="{ color: computedTheme.handleColor }">
+          <svg width="14" height="14" viewBox="0 0 24 24" :style="{ color: handleColor }">
             <path
               d="M21 12C21 16.9706 16.9706 21 12 21C9.696 21 7.59041 20.1375 5.99999 18.7M3 12C3 7.02944 7.02944 3 12 3C14.304 3 16.4096 3.8625 18 5.3M18 5.3V1M18 5.3H13.5M6 18.7V23M6 18.7H10.5"
               fill="none"

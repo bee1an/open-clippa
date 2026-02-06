@@ -1,4 +1,4 @@
-import type { TextTrain, Timeline, Train } from '@clippa/timeline'
+import type { Rail, TextTrain, Timeline, Train } from '@clippa/timeline'
 import type { ColorMatrixFilter } from 'pixi.js'
 import type {
   FilterConfig,
@@ -161,11 +161,14 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
 
     const targetRail = rails.getRailByZIndex(zIndex) ?? rails.createRailByZIndex(zIndex)
 
+    const sourceRail = layer.train.parent
     if (layer.train.parent) {
       layer.train.parent.removeTrain(layer.train)
     }
 
     targetRail.insertTrain(layer.train)
+    this.removeRailIfEmpty(sourceRail)
+
     layer.train.updateActive(true)
     this.emitChange()
   }
@@ -176,12 +179,14 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
       return
 
     const layer = this.layers[index]
+    const sourceRail = layer.train.parent
     layer.train.updateActive(false)
     if (layer.train.parent) {
       layer.train.parent.removeTrain(layer.train)
     }
 
     this.layers.splice(index, 1)
+    this.removeRailIfEmpty(sourceRail)
 
     if (this.activeLayerId === id) {
       this.activeLayerId = null
@@ -234,6 +239,29 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
         start: target.start,
         duration: target.duration,
       })
+    })
+  }
+
+  private removeRailIfEmpty(rail: Rail | null): void {
+    if (!rail || rail.trains.length > 0)
+      return
+
+    const rails = this.timelineRef?.rails
+    if (!rails || !rails.rails.includes(rail))
+      return
+
+    rails.removeRail(rail)
+    this.syncLayerZIndexFromTrainParent()
+  }
+
+  private syncLayerZIndexFromTrainParent(): void {
+    this.layers.forEach((layer) => {
+      const zIndex = layer.train.parent?.zIndex
+      if (typeof zIndex !== 'number' || zIndex === layer.zIndex)
+        return
+
+      layer.zIndex = zIndex
+      layer.version += 1
     })
   }
 

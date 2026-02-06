@@ -24,6 +24,16 @@ type SelectionExpose = {
 const { selectedPerformers, pendingSelectionDrag } = storeToRefs(performerStore)
 const selectionRef = ref<SelectionExpose | null>(null)
 
+const selectionCustomStyle = {
+  'border': '1.5px solid hsl(var(--foreground) / 0.92)',
+  'background': 'hsl(var(--foreground) / 0.04)',
+  'handleColor': 'hsl(var(--foreground) / 0.88)',
+  'handleSize': 9,
+  'borderRadius': '4px',
+  'boxShadow': '0 0 0 1px hsl(var(--background) / 0.72), 0 12px 28px rgb(0 0 0 / 0.32)',
+  '--selection-handle-bg': 'hsl(var(--background-overlay))',
+} as const
+
 type BoundsLike = {
   x: number
   y: number
@@ -198,6 +208,7 @@ watch(
       ref="selectionRef"
       :item="selectionItem"
       :active="true"
+      :custom-style="selectionCustomStyle"
       :min-width="20"
       :min-height="20"
       @update="handleSelectionUpdate"

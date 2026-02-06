@@ -8,6 +8,7 @@ import {
   TIMELINE_TRAIN_BORDER_SIZE,
   TIMELINE_TRAIN_HEIGHT,
   TIMELINE_TRAIN_RADIUS,
+  TIMELINE_TRAIN_SLOT_FILL,
   TIMELINE_WIDGET_ACTIVE_FILL,
   TIMELINE_WIDGET_HOVER_FILL,
 } from '@clippa/constants'
@@ -114,7 +115,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
     const w = width
     const h = this.height
-    const fill = '#010101' // any color
+    const fill = TIMELINE_TRAIN_SLOT_FILL
 
     if (this._slot) {
       this._slotBg
@@ -483,6 +484,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
       state.activeTrain?.updateActive (false)
 
       state.setActiveTrain(this)
+      this._widget.visible = true
     }
     else if (state.activeTrain === this) {
       state.setActiveTrain(null)
@@ -588,7 +590,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         text,
         x: 20,
         zIndex: 1,
-        style: { fontSize: 12, fill: '#fff' },
+        style: { fontSize: 12, fill: TIMELINE_WIDGET_ACTIVE_FILL },
         label: 'train-debug',
         eventMode: 'none',
       })

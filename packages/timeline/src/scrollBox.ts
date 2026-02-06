@@ -1,12 +1,13 @@
 // TODO IRenderLayer is internal
 import type { ContainerChild, FederatedPointerEvent } from 'pixi.js'
+import { TIMELINE_SCROLLBAR_TRIGGER_FILL } from '@clippa/constants'
 import { EventBus } from 'open-clippa'
 import { Container, Graphics } from 'pixi.js'
 
 export const SCROLLBAR_WIDTH = 10
 export const SCROLLBAR_HEIGHT = 10
 export const RAIL_COLOR = 'transparent'
-export const TRIGGER_COLOR = '#78787f'
+export const TRIGGER_COLOR = TIMELINE_SCROLLBAR_TRIGGER_FILL
 
 export type Anyfn = (...args: any[]) => any // TODO
 

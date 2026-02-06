@@ -1,5 +1,5 @@
 import type { Train } from './train'
-import { TIMELINE_LEFT_PADDING } from '@clippa/constants'
+import { TIMELINE_APP_BACKGROUND_FILL, TIMELINE_LEFT_PADDING } from '@clippa/constants'
 import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
@@ -7,8 +7,6 @@ import { Rails } from './rails'
 import { Ruler } from './ruler'
 import { State } from './state'
 import { QueueRun } from './utils'
-
-export const APP_BACKGROUND_COLOR = '#1e1e29'
 
 export type TimlineEvents = {
   play: []
@@ -98,7 +96,7 @@ export class Timeline extends EventBus<TimlineEvents> {
 
     await app.init({
       resizeTo: wrapper,
-      backgroundColor: APP_BACKGROUND_COLOR,
+      backgroundColor: TIMELINE_APP_BACKGROUND_FILL,
       height: 250,
       antialias: true,
     })

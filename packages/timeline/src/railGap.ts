@@ -1,3 +1,4 @@
+import { TIMELINE_GAP_ACTIVE_FILL, TIMELINE_GAP_LABEL_FILL } from '@clippa/constants'
 import { Container, Graphics, Text } from 'pixi.js'
 
 export const GAP = 9
@@ -30,7 +31,7 @@ export class RailGap {
 
     this._text = new Text({
       text: this.zIndex,
-      style: { fontSize: 8, fill: 'red' },
+      style: { fontSize: 8, fill: TIMELINE_GAP_LABEL_FILL },
     })
     this.container.addChild(this._text)
   }
@@ -41,7 +42,7 @@ export class RailGap {
       this._bg
         .clear()
         .rect(0, 0, this.width, GAP)
-        .fill(this.active ? '#a966ff' : 'transparent')
+        .fill(this.active ? TIMELINE_GAP_ACTIVE_FILL : 'transparent')
       return
     }
 

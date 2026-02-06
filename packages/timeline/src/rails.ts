@@ -478,6 +478,8 @@ export class Rails extends EventBus<RailsEvents> {
 
     const rail = this._createRailByZIndexRaw(zIndex)
 
+    this._reflowRailsAndGaps()
+
     // 更新railsContainer高度
     const railsTotalHeight = this.getRailsTotalHeight()
     this.railsContainer.height = railsTotalHeight
@@ -491,47 +493,49 @@ export class Rails extends EventBus<RailsEvents> {
    * 移除rail, 伴随移除gap的副作用
    */
   removeRail(rail: Rail): void {
-    const { zIndex } = rail
+    const targetIndex = this.rails.findIndex(curRail => curRail === rail)
+    if (targetIndex === -1)
+      return
 
-    this.rails = this.rails.filter((curRail) => {
-      if (curRail.zIndex > zIndex) {
-        // filter with update
+    const removedZIndex = rail.zIndex
+
+    this.rails.splice(targetIndex, 1)
+    if (rail.container.parent === this.railsContainer) {
+      this.railsContainer.removeChild(rail.container)
+    }
+
+    this.rails.forEach((curRail) => {
+      if (curRail.zIndex > removedZIndex) {
         curRail.updateZIndex(curRail.zIndex - 1)
       }
-      else {
-        curRail.updateY(curRail.y - RAIL_HEIGHT - GAP)
-      }
-
-      return curRail !== rail
     })
 
-    this.maxZIndex = this.rails[0].zIndex
-
-    this.railGaps = this.railGaps.filter((item) => {
-      const itemZIndex = item.zIndex
-
-      if (item.zIndex > zIndex) {
-        // filter with update
-        item.updateZIndex(item.zIndex - 1)
-      }
-      else {
-        item.updateY(item.y - RAIL_HEIGHT - GAP)
+    const nextRailGaps: RailGap[] = []
+    this.railGaps.forEach((gap) => {
+      if (gap.zIndex === removedZIndex) {
+        if (gap.container.parent === this.railsContainer) {
+          this.railsContainer.removeChild(gap.container)
+        }
+        return
       }
 
-      // with remove
-      if (itemZIndex === zIndex)
-        this.railsContainer.removeChild(item.container)
+      if (gap.zIndex > removedZIndex) {
+        gap.updateZIndex(gap.zIndex - 1)
+      }
 
-      return itemZIndex !== zIndex
+      nextRailGaps.push(gap)
     })
+    this.railGaps = nextRailGaps
 
-    this.railsContainer.removeChild(rail.container)
+    this.maxZIndex = this.rails.length > 0 ? this.rails[0].zIndex : -1
+    this._reflowRailsAndGaps()
 
     this.scrollBox.update()
 
     // 更新railsContainer高度
     const railsTotalHeight = this.getRailsTotalHeight()
     this.railsContainer.height = railsTotalHeight
+    this._updateRailContainerY()
 
     // 背景绘制已移除，rails组件不负责背景
   }
@@ -558,6 +562,24 @@ export class Rails extends EventBus<RailsEvents> {
    */
   getRailsTotalHeight(): number {
     return (this.maxZIndex + 1) * (RAIL_HEIGHT + GAP) + GAP
+  }
+
+  private _reflowRailsAndGaps(): void {
+    const step = RAIL_HEIGHT + GAP
+
+    this.rails.sort((a, b) => b.zIndex - a.zIndex)
+    this.rails.forEach((rail, index) => {
+      const expectedZ = this.maxZIndex - index
+      rail.updateZIndex(expectedZ)
+      rail.updateY((this.maxZIndex - expectedZ) * step + GAP)
+    })
+
+    this.railGaps.sort((a, b) => b.zIndex - a.zIndex)
+    this.railGaps.forEach((gap, index) => {
+      const expectedZ = this.maxZIndex + 1 - index
+      gap.updateZIndex(expectedZ)
+      gap.updateY((this.maxZIndex - (expectedZ - 1)) * step)
+    })
   }
 
   /**

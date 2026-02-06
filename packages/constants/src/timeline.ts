@@ -1,5 +1,7 @@
-import { PRIMARYCOLOR } from './theme'
-
+/**
+ * timeline app background color
+ */
+export const TIMELINE_APP_BACKGROUND_FILL = '#151515'
 /**
  * train height
  */
@@ -23,15 +25,47 @@ export const TIMELINE_RESIZE_HANDLER_WIDTH = 4
 /**
  * resizer handler color
  */
-export const TIMELINE_RESIZE_HANDLER_FILL = '#21212e'
+export const TIMELINE_RESIZE_HANDLER_FILL = '#30313a'
 /**
  * widget fill color with hover
  */
-export const TIMELINE_WIDGET_HOVER_FILL = '#9a9a9a'
+export const TIMELINE_WIDGET_HOVER_FILL = '#7a7c86'
 /**
  * widget fill color with active
  */
-export const TIMELINE_WIDGET_ACTIVE_FILL = PRIMARYCOLOR
+export const TIMELINE_WIDGET_ACTIVE_FILL = '#f2f2f2'
+/**
+ * train slot fallback fill
+ */
+export const TIMELINE_TRAIN_SLOT_FILL = '#111111'
+/**
+ * text train background fill
+ */
+export const TIMELINE_TEXT_TRAIN_FILL = '#2d2f36'
+/**
+ * text train foreground fill
+ */
+export const TIMELINE_TEXT_TRAIN_TEXT_FILL = '#f3f3f5'
+/**
+ * rail background fill
+ */
+export const TIMELINE_RAIL_FILL = '#171717'
+/**
+ * gap active fill
+ */
+export const TIMELINE_GAP_ACTIVE_FILL = '#5f616b'
+/**
+ * gap label fill
+ */
+export const TIMELINE_GAP_LABEL_FILL = '#7f818b'
+/**
+ * cursor fill
+ */
+export const TIMELINE_CURSOR_FILL = '#f2f2f2'
+/**
+ * scrollbar thumb fill
+ */
+export const TIMELINE_SCROLLBAR_TRIGGER_FILL = '#666872'
 
 // Ruler constants
 /**
@@ -53,15 +87,15 @@ export const TIMELINE_TICK_FONT_SIZE = 10
 /**
  * ruler background color
  */
-export const TIMELINE_RULER_FILL = '#1e1e29'
+export const TIMELINE_RULER_FILL = '#1a1a1a'
 /**
  * time text color
  */
-export const TIMELINE_TICK_COLOR = '#838398'
+export const TIMELINE_TICK_COLOR = '#8d8f99'
 /**
  * dot color
  */
-export const TIMELINE_DOT_FILL = '#505067'
+export const TIMELINE_DOT_FILL = '#4c4f5a'
 /**
  * auto page turn threshold - percentage of viewport width from right edge
  */

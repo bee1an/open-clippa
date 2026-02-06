@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { VideoFile } from '@/store'
 import { ms2TimeStr } from 'open-clippa'
-import { useEditorStore, useMediaStore } from '@/store'
+import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { loadVideoMetadata } from '@/utils/media'
 
@@ -11,7 +11,6 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const mediaStore = useMediaStore()
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const { clippa } = editorStore
@@ -28,7 +27,7 @@ async function addToTimeline() {
   const stageHeight = clippa.stage.app?.renderer.height ?? 0
 
   const performer = performerStore.addPerformer({
-    id: props.videoFile.id,
+    id: `video-${crypto.randomUUID()}`,
     type: 'video',
     src: props.videoFile.file,
     start: 0,
@@ -41,11 +40,6 @@ async function addToTimeline() {
   })
 
   clippa.hire(performer)
-}
-
-// 删除视频文件
-function _removeVideo() {
-  mediaStore.removeVideoFile(props.videoFile.id)
 }
 
 // 显示菜单

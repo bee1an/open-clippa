@@ -75,6 +75,44 @@ export const usePerformerStore = defineStore('performer', () => {
   // 选中的 performers
   const selectedPerformers = ref<SelectedPerformer[]>([])
   const pendingSelectionDrag = ref<PendingSelectionDrag | null>(null)
+  const selectionRevision = ref(0)
+
+  const bumpSelectionRevision = () => {
+    selectionRevision.value += 1
+  }
+
+  const hasTimelineTrainId = (targetId: string): boolean => {
+    const rails = editorStore.clippa.timeline.rails?.rails ?? []
+    return rails.some(rail => rail.trains.some(train => train.id === targetId))
+  }
+
+  const ensureUniquePerformerId = (baseId: string): string => {
+    if (!performerMap.has(baseId) && !hasTimelineTrainId(baseId))
+      return baseId
+
+    let suffix = 1
+    let nextId = `${baseId}-${suffix}`
+    while (performerMap.has(nextId) || hasTimelineTrainId(nextId)) {
+      suffix += 1
+      nextId = `${baseId}-${suffix}`
+    }
+
+    return nextId
+  }
+
+  const removeTimelineTrainById = (targetId: string) => {
+    const timeline = editorStore.clippa.timeline
+    const rails = timeline.rails?.rails ?? []
+    rails.forEach((rail) => {
+      const trains = rail.trains.filter(train => train.id === targetId)
+      trains.forEach((train) => {
+        if (timeline.state.activeTrain === train) {
+          train.updateActive(false)
+        }
+        rail.removeTrain(train)
+      })
+    })
+  }
 
   // 获取所有 performers
   const getAllPerformers = () => Array.from(performerMap.values())
@@ -90,17 +128,14 @@ export const usePerformerStore = defineStore('performer', () => {
   const selectPerformer = (performerId: string) => {
     const performer = performerMap.get(performerId)
     if (performer) {
-      const existingIndex = selectedPerformers.value.findIndex(s => s.id === performerId)
-
-      if (existingIndex === -1) {
-        // 单选模式：只保存选中的 performer
-        const bounds = performer.getBounds()
-        selectedPerformers.value = [{
-          id: performerId,
-          bounds,
-          timestamp: Date.now(),
-        }]
-      }
+      // 单选模式：每次选择都刷新，避免同 id 场景下状态不同步
+      const bounds = performer.getBounds()
+      selectedPerformers.value = [{
+        id: performerId,
+        bounds,
+        timestamp: Date.now(),
+      }]
+      bumpSelectionRevision()
     }
   }
 
@@ -194,8 +229,9 @@ export const usePerformerStore = defineStore('performer', () => {
     }
 
     const eventTarget = performer as {
-      on: (event: 'pointerdown', handler: (event: PerformerPointerEvent) => void) => void
-      on: (event: 'positionUpdate', handler: (bounds: PerformerBounds) => void) => void
+      on:
+      & ((event: 'pointerdown', handler: (event: PerformerPointerEvent) => void) => void)
+      & ((event: 'positionUpdate', handler: (bounds: PerformerBounds) => void) => void)
     }
 
     eventTarget.on('pointerdown', (event) => {
@@ -211,7 +247,14 @@ export const usePerformerStore = defineStore('performer', () => {
 
   // 添加 performer
   const addPerformer = (config: PerformerConfig): CanvasPerformer => {
-    const performer = createPerformer(config)
+    const nextId = ensureUniquePerformerId(config.id)
+    const nextConfig = nextId === config.id ? config : { ...config, id: nextId }
+
+    if (nextId !== config.id) {
+      console.warn(`[performer] duplicated id "${config.id}" detected, fallback to "${nextId}"`)
+    }
+
+    const performer = createPerformer(nextConfig)
     performerMap.set(performer.id, performer)
 
     // 自动选中新添加的 performer (等待 sprite 加载完成)
@@ -236,6 +279,8 @@ export const usePerformerStore = defineStore('performer', () => {
   const removePerformer = (performerId: string) => {
     const performer = performerMap.get(performerId)
     if (performer) {
+      removeTimelineTrainById(performerId)
+
       // 清理 performer 资源
       performer.destroy()
 
@@ -246,6 +291,7 @@ export const usePerformerStore = defineStore('performer', () => {
       const selectedIndex = selectedPerformers.value.findIndex(s => s.id === performerId)
       if (selectedIndex > -1) {
         selectedPerformers.value.splice(selectedIndex, 1)
+        bumpSelectionRevision()
       }
     }
   }
@@ -287,12 +333,16 @@ export const usePerformerStore = defineStore('performer', () => {
     const index = selectedPerformers.value.findIndex(s => s.id === performerId)
     if (index > -1) {
       selectedPerformers.value.splice(index, 1)
+      bumpSelectionRevision()
     }
   }
 
   // 清空所有选中
   const clearSelection = () => {
-    selectedPerformers.value = []
+    if (selectedPerformers.value.length > 0) {
+      selectedPerformers.value = []
+      bumpSelectionRevision()
+    }
   }
 
   const requestSelectionDrag = (payload: PendingSelectionDrag) => {
@@ -337,13 +387,17 @@ export const usePerformerStore = defineStore('performer', () => {
   const clearAllPerformers = () => {
     performerMap.forEach(performer => performer.destroy())
     performerMap.clear()
-    selectedPerformers.value = []
+    if (selectedPerformers.value.length > 0) {
+      selectedPerformers.value = []
+      bumpSelectionRevision()
+    }
   }
 
   return {
     // 状态
     selectedPerformers,
     pendingSelectionDrag,
+    selectionRevision,
 
     // 方法
     getAllPerformers,

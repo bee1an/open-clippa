@@ -1,3 +1,4 @@
+import { TIMELINE_CURSOR_FILL } from '@clippa/constants'
 import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
@@ -57,10 +58,10 @@ export class Cursor extends EventBus<CursorEvents> {
     const graphics = new Graphics()
     // 将图形向左移动10px，使中心对齐
     graphics.roundRect(-10, 0, 20, 20, 6)
-    graphics.fill('#fff')
+    graphics.fill(TIMELINE_CURSOR_FILL)
 
     graphics.poly([-10, 17, 10, 17, 0, 26])
-    graphics.fill('#fff')
+    graphics.fill(TIMELINE_CURSOR_FILL)
 
     this.container.addChild(graphics)
   }
@@ -77,7 +78,7 @@ export class Cursor extends EventBus<CursorEvents> {
     this._body = new Graphics()
     // 将竖条向左移动10px，使中心对齐
     this._body.roundRect(-2, 0, 4, height, 2)
-    this._body.fill('#fff')
+    this._body.fill(TIMELINE_CURSOR_FILL)
 
     this.container.addChild(this._body)
   }

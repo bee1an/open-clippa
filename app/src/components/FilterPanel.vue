@@ -2,7 +2,7 @@
 import type { FilterConfig } from '@/store/useFilterStore'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted } from 'vue'
-import { Button } from '@/components/ui/button'
+import { Button, Slider } from '@/components/ui'
 import { useEditorStore } from '@/store'
 import {
   cloneFilterConfig,
@@ -56,6 +56,22 @@ function handleUpdateConfig(key: keyof FilterConfig, value: number) {
   filterStore.updateLayerConfig(activeLayer.value.id, patch)
 }
 
+function handleBrightnessChange(value: number) {
+  handleUpdateConfig('brightness', value)
+}
+
+function handleContrastChange(value: number) {
+  handleUpdateConfig('contrast', value)
+}
+
+function handleSaturationChange(value: number) {
+  handleUpdateConfig('saturation', value)
+}
+
+function handleHueChange(value: number) {
+  handleUpdateConfig('hue', value)
+}
+
 function handleUpdateZIndex(event: Event) {
   if (!activeLayer.value)
     return
@@ -64,18 +80,6 @@ function handleUpdateZIndex(event: Event) {
   if (Number.isNaN(value))
     return
   filterStore.updateLayerZIndex(activeLayer.value.id, value)
-}
-
-function handleRangeInput(event: Event, key: keyof FilterConfig) {
-  const input = event.target as HTMLInputElement
-  const value = Number.parseFloat(input.value)
-  if (Number.isNaN(value))
-    return
-  handleUpdateConfig(key, value)
-}
-
-function handleHueInput(event: Event) {
-  handleRangeInput(event, 'hue')
 }
 
 const isConfigDefault = computed(() => {
@@ -90,7 +94,7 @@ const hintConfig = computed(() => {
 </script>
 
 <template>
-  <div h-full flex="~ col" overflow-hidden>
+  <div h-full flex="~ col" overflow-hidden data-preserve-canvas-selection="true">
     <div p-4 border-b border-border>
       <div text-sm font-medium text-foreground>
         滤镜层
@@ -179,15 +183,14 @@ const hintConfig = computed(() => {
               <span>亮度</span>
               <span>{{ hintConfig.brightness.toFixed(2) }}</span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.01"
-              :value="config.brightness"
+            <Slider
+              :model-value="config.brightness"
+              :min="0"
+              :max="2"
+              :step="0.01"
               class="w-full"
-              @input="handleRangeInput($event, 'brightness')"
-            >
+              @update:model-value="handleBrightnessChange"
+            />
           </div>
 
           <div class="space-y-1">
@@ -195,15 +198,14 @@ const hintConfig = computed(() => {
               <span>对比度</span>
               <span>{{ hintConfig.contrast.toFixed(2) }}</span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.01"
-              :value="config.contrast"
+            <Slider
+              :model-value="config.contrast"
+              :min="0"
+              :max="2"
+              :step="0.01"
               class="w-full"
-              @input="handleRangeInput($event, 'contrast')"
-            >
+              @update:model-value="handleContrastChange"
+            />
           </div>
 
           <div class="space-y-1">
@@ -211,15 +213,14 @@ const hintConfig = computed(() => {
               <span>饱和度</span>
               <span>{{ hintConfig.saturation.toFixed(2) }}</span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.01"
-              :value="config.saturation"
+            <Slider
+              :model-value="config.saturation"
+              :min="0"
+              :max="2"
+              :step="0.01"
               class="w-full"
-              @input="handleRangeInput($event, 'saturation')"
-            >
+              @update:model-value="handleSaturationChange"
+            />
           </div>
 
           <div class="space-y-1">
@@ -227,15 +228,14 @@ const hintConfig = computed(() => {
               <span>色相</span>
               <span>{{ hintConfig.hue.toFixed(0) }}</span>
             </div>
-            <input
-              type="range"
-              min="-180"
-              max="180"
-              step="1"
-              :value="config.hue"
+            <Slider
+              :model-value="config.hue"
+              :min="-180"
+              :max="180"
+              :step="1"
               class="w-full"
-              @input="handleHueInput"
-            >
+              @update:model-value="handleHueChange"
+            />
           </div>
         </div>
       </div>
