@@ -19,9 +19,6 @@ import {
   DEFAULT_FILTER_DURATION,
 } from './utils'
 
-const FILTER_TRAIN_FILL = '#1f2937'
-const FILTER_TRAIN_TEXT_COLOR = '#f8fafc'
-
 export class FilterManager extends EventBus<FilterManagerEvents> {
   private layers: FilterLayer[] = []
   private activeLayerId: string | null = null
@@ -85,8 +82,7 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
       start,
       duration,
       label: name,
-      fill: FILTER_TRAIN_FILL,
-      textColor: FILTER_TRAIN_TEXT_COLOR,
+      variant: 'filter',
     })
 
     timeline.addTrainByZIndex(train, zIndex)
@@ -159,7 +155,10 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
       return
     }
 
-    const targetRail = rails.getRailByZIndex(zIndex) ?? rails.createRailByZIndex(zIndex)
+    let targetRail = rails.getRailByZIndex(zIndex)
+    if (!targetRail || !targetRail.canAcceptTrain(layer.train)) {
+      targetRail = rails.createRailByZIndex(zIndex, layer.train.railStyle)
+    }
 
     const sourceRail = layer.train.parent
     if (layer.train.parent) {

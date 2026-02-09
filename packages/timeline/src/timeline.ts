@@ -371,12 +371,12 @@ export class Timeline extends EventBus<TimlineEvents> {
       this.updateDuration(train.start + train.duration)
     }
 
-    const rail = this.rails.getRailByZIndex(zIndex)
+    let rail = this.rails.getRailByZIndex(zIndex)
 
-    if (!rail) {
-      this.rails.createRailByZIndex(zIndex)
+    if (!rail || !rail.canAcceptTrain(train)) {
+      rail = this.rails.createRailByZIndex(zIndex, train.railStyle)
     }
 
-    this.rails.getRailByZIndex(zIndex)!.insertTrain(train)
+    rail.insertTrain(train)
   }
 }

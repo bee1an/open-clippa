@@ -1,6 +1,6 @@
 import type { Rail, Train } from 'open-clippa'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
-import { getMsByPx } from 'open-clippa'
+import { getMsByPx, getPxByMs, VideoTrain } from 'open-clippa'
 import { onMounted, onUnmounted } from 'vue'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
@@ -41,52 +41,108 @@ export function useTimelineBinding(): void {
     })
   }
 
+  function resolveStartByVisualX(train: Train, visualX: number): number {
+    if (train.parent)
+      return train.parent.getRawMsByVisualPx(train, visualX)
+
+    return getMsByPx(visualX, clippa.timeline.state.pxPerMs)
+  }
+
   function bindTrain(train: Train): void {
     if (trainDisposers.has(train))
       return
+
+    const syncVideoTrainSource = (): void => {
+      const performer = performerStore.getPerformerById(train.id)
+      if (!performer || !hasSourceTiming(performer) || !(train instanceof VideoTrain))
+        return
+
+      train.updateSourceStart(performer.sourceStart)
+    }
+
+    const refreshVideoTrainThumbnails = (): void => {
+      if (!(train instanceof VideoTrain))
+        return
+
+      train.refreshThumbnails().catch((error) => {
+        console.warn('[timeline-binding] refresh video train thumbnails failed', error)
+      })
+    }
+
+    syncVideoTrainSource()
 
     const handleMoveEnd = (target: Train): void => {
       syncRailTiming(target.parent)
       syncTrainTiming(target)
     }
 
-    const handleBeforeLeftResize = (site: { xValue: number, wValue: number }): void => {
+    const handleBeforeLeftResize = (site: { xValue: number, wValue: number, disdrawable: boolean }): void => {
       const performer = performerStore.getPerformerById(train.id)
       if (!performer)
         return
 
+      const pxPerMs = clippa.timeline.state.pxPerMs
       const oldStart = performer.start
-      const nextStart = train.parent
-        ? train.parent.getRawMsByVisualPx(train, site.xValue)
-        : getMsByPx(site.xValue, clippa.timeline.state.pxPerMs)
-      const nextDuration = getMsByPx(site.wValue, clippa.timeline.state.pxPerMs)
+      const oldDuration = performer.duration
 
+      let nextStart = resolveStartByVisualX(train, site.xValue)
+      let nextDuration = getMsByPx(site.wValue, pxPerMs)
+
+      if (hasSourceTiming(performer)) {
+        const sourceDelta = nextStart - oldStart
+        const nextSourceStart = performer.sourceStart + sourceDelta
+
+        if (nextSourceStart < 0) {
+          const clampedDelta = -performer.sourceStart
+          const blockedDelta = clampedDelta - sourceDelta
+          const blockedPx = getPxByMs(blockedDelta, pxPerMs)
+
+          site.xValue += blockedPx
+          site.wValue -= blockedPx
+
+          nextStart = oldStart + clampedDelta
+          nextDuration = oldDuration - clampedDelta
+        }
+
+        const maxSourceStart = Math.max(0, performer.sourceDuration)
+        const clampedSourceStart = performer.sourceStart + (nextStart - oldStart)
+        performer.sourceStart = Math.min(
+          maxSourceStart,
+          Math.max(0, clampedSourceStart),
+        )
+
+        if (train instanceof VideoTrain)
+          train.updateSourceStart(performer.sourceStart)
+      }
+
+      site.wValue = Math.max(0, site.wValue)
       performer.start = nextStart
-      performer.duration = nextDuration
+      performer.duration = Math.max(0, nextDuration)
+    }
 
-      if (!hasSourceTiming(performer))
-        return
-
-      const sourceDelta = nextStart - oldStart
-      const nextSourceStart = performer.sourceStart + sourceDelta
-      performer.sourceStart = Math.min(
-        Math.max(0, performer.sourceDuration),
-        Math.max(0, nextSourceStart),
-      )
+    const handleLeftResizeEnd = (target: Train): void => {
+      syncRailTiming(target.parent)
+      syncTrainTiming(target)
+      syncVideoTrainSource()
+      refreshVideoTrainThumbnails()
     }
 
     const handleRightResizeEnd = (target: Train): void => {
       syncRailTiming(target.parent)
       syncTrainTiming(target)
+      syncVideoTrainSource()
+      refreshVideoTrainThumbnails()
     }
 
     train.on('moveEnd', handleMoveEnd)
     train.on('beforeLeftResize', handleBeforeLeftResize)
+    train.on('leftResizeEnd', handleLeftResizeEnd)
     train.on('rightResizeEnd', handleRightResizeEnd)
 
     trainDisposers.set(train, () => {
       train.off('moveEnd', handleMoveEnd)
       train.off('beforeLeftResize', handleBeforeLeftResize)
+      train.off('leftResizeEnd', handleLeftResizeEnd)
       train.off('rightResizeEnd', handleRightResizeEnd)
     })
   }

@@ -1,7 +1,7 @@
-import { TIMELINE_GAP_ACTIVE_FILL, TIMELINE_GAP_LABEL_FILL } from '@clippa/constants'
-import { Container, Graphics, Text } from 'pixi.js'
+import { TIMELINE_GAP_ACTIVE_FILL } from '@clippa/constants'
+import { Container, Graphics } from 'pixi.js'
 
-export const GAP = 9
+export const GAP = 4
 
 export interface RailGapOption {
   y: number
@@ -18,8 +18,6 @@ export class RailGap {
 
   zIndex: number
 
-  private _text: Text
-
   constructor(option: RailGapOption) {
     this.y = option.y
     this.width = option.width
@@ -28,12 +26,6 @@ export class RailGap {
     this.container = new Container({ y: option.y, label: 'label-gap' })
 
     this._drawBody()
-
-    this._text = new Text({
-      text: this.zIndex,
-      style: { fontSize: 8, fill: TIMELINE_GAP_LABEL_FILL },
-    })
-    this.container.addChild(this._text)
   }
 
   private _bg?: Graphics
@@ -86,7 +78,5 @@ export class RailGap {
       return
 
     this.zIndex = zIndex
-
-    this._text.text = this.zIndex
   }
 }

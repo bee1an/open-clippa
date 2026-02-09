@@ -1,9 +1,10 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
+import type { TrainRailStyle } from './train/types'
 import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD, TIMELINE_RULER_HEIGHT } from '@clippa/constants'
 import { EventBus, getPxByMs } from '@clippa/utils'
 import { Container } from 'pixi.js'
-import { Rail, RAIL_HEIGHT } from './rail'
+import { Rail } from './rail'
 import { GAP, RailGap } from './railGap'
 import { ScrollBox } from './scrollBox'
 import { State } from './state'
@@ -156,15 +157,14 @@ export class Rails extends EventBus<RailsEvents> {
     }
   }
 
-  private _createRail(zIndex: number, trainsOptions: TrainOption[] = []): Rail {
-    const y = (this.maxZIndex - zIndex) * (RAIL_HEIGHT + GAP) + GAP
-
+  private _createRail(zIndex: number, railStyle: TrainRailStyle = 'default', trainsOptions: TrainOption[] = []): Rail {
     const rail = new Rail(
       {
         width: Math.max(this.width, this.screenWidth),
-        y,
+        y: 0,
         duration: this.duration,
         zIndex,
+        railStyle,
         trainsOption: trainsOptions,
       },
     )
@@ -221,10 +221,8 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   private _createRailGap(zIndex: number): RailGap {
-    const y = (this.maxZIndex - (zIndex - 1)) * (RAIL_HEIGHT + GAP)
-
     const gap = new RailGap({
-      y,
+      y: 0,
       width: Math.max(this.width, this.screenWidth),
       zIndex,
     })
@@ -247,6 +245,7 @@ export class Rails extends EventBus<RailsEvents> {
       this._createRailGap(zIndex)
     }
 
+    this._reflowRailsAndGaps()
     // 设置railsContainer的高度为rails总高度，确保ScrollBox能正确计算内容高度
     const railsTotalHeight = this.getRailsTotalHeight()
     this.railsContainer.height = railsTotalHeight
@@ -344,12 +343,12 @@ export class Rails extends EventBus<RailsEvents> {
       const { x, y } = e.getLocalPosition(this.railsContainer)
       const rail = this.rails.find((rail) => {
         // Simple arithmetic check is O(1) and much faster than getLocalBounds
-        return x >= 0 && x <= rail.width && y >= rail.y && y <= rail.y + RAIL_HEIGHT
+        return x >= 0 && x <= rail.width && y >= rail.y && y <= rail.y + rail.height
       })
 
       const atTrain = this.state.atDragTrain!
 
-      if (rail && !rail.trains.includes(atTrain)) {
+      if (rail && rail.canAcceptTrain(atTrain) && !rail.trains.includes(atTrain)) {
         rail.insertTrain(atTrain)
 
         atTrain.updateState('normal')
@@ -377,7 +376,7 @@ export class Rails extends EventBus<RailsEvents> {
 
         const { zIndex } = gap
 
-        const rail = this.createRailByZIndex(zIndex)
+        const rail = this.createRailByZIndex(zIndex, atTrain.railStyle)
 
         rail.insertTrain(atTrain)
 
@@ -400,29 +399,21 @@ export class Rails extends EventBus<RailsEvents> {
   /**
    * 创建rail和railGap
    */
-  private _createRailByZIndexRaw(zIndex: number): Rail {
+  private _createRailByZIndexRaw(zIndex: number, railStyle: TrainRailStyle): Rail {
     /* update other zIndex */
     this.rails.forEach((rail) => {
-      if (rail.zIndex >= zIndex) {
+      if (rail.zIndex >= zIndex)
         rail.updateZIndex(rail.zIndex + 1)
-      }
-      else {
-        rail.updateY(rail.y + RAIL_HEIGHT + GAP)
-      }
     })
 
     this.railGaps.forEach((railGap) => {
-      if (railGap.zIndex >= zIndex) {
+      if (railGap.zIndex >= zIndex)
         railGap.updateZIndex(railGap.zIndex + 1)
-      }
-      else {
-        railGap.updateY(railGap.y + RAIL_HEIGHT + GAP)
-      }
     })
 
     this.maxZIndex = Math.max(this.rails[0]?.zIndex ?? 0, zIndex)
 
-    const rail = this._createRail(zIndex)
+    const rail = this._createRail(zIndex, railStyle)
     this._createRailGap(zIndex)
 
     this.scrollBox.update()
@@ -465,18 +456,28 @@ export class Rails extends EventBus<RailsEvents> {
   /**
    * create rail and rail gap by zIndex with update rail container
    */
-  createRailByZIndex(zIndex: number): Rail {
+  createRailByZIndex(zIndex: number, railStyle: TrainRailStyle = 'default'): Rail {
+    const existingRail = this.getRailByZIndex(zIndex)
+    if (existingRail && existingRail.trains.length === 0) {
+      existingRail.setRailStyle(railStyle)
+      this._reflowRailsAndGaps()
+      this.railsContainer.height = this.getRailsTotalHeight()
+      this._updateRailContainerY()
+      this.scrollBox.update()
+      return existingRail
+    }
+
     if (zIndex >= this.rails.length) {
       /**
        * Rails只能应对rails数组连续的情况
        * 这种情况属于越级创建, 例在zindex0未创建的情况下创建zindex1
        */
       for (let index = this.rails.length; index < zIndex; index++) {
-        this._createRailByZIndexRaw(index)
+        this._createRailByZIndexRaw(index, 'default')
       }
     }
 
-    const rail = this._createRailByZIndexRaw(zIndex)
+    const rail = this._createRailByZIndexRaw(zIndex, railStyle)
 
     this._reflowRailsAndGaps()
 
@@ -561,25 +562,44 @@ export class Rails extends EventBus<RailsEvents> {
    * 获取rails的总高度（用于滚动条判断）
    */
   getRailsTotalHeight(): number {
-    return (this.maxZIndex + 1) * (RAIL_HEIGHT + GAP) + GAP
+    const railsHeight = this.rails.reduce((acc, rail) => acc + rail.height, 0)
+    return railsHeight + (this.rails.length + 1) * GAP
   }
 
   private _reflowRailsAndGaps(): void {
-    const step = RAIL_HEIGHT + GAP
-
     this.rails.sort((a, b) => b.zIndex - a.zIndex)
     this.rails.forEach((rail, index) => {
       const expectedZ = this.maxZIndex - index
       rail.updateZIndex(expectedZ)
-      rail.updateY((this.maxZIndex - expectedZ) * step + GAP)
     })
 
     this.railGaps.sort((a, b) => b.zIndex - a.zIndex)
     this.railGaps.forEach((gap, index) => {
       const expectedZ = this.maxZIndex + 1 - index
       gap.updateZIndex(expectedZ)
-      gap.updateY((this.maxZIndex - (expectedZ - 1)) * step)
     })
+
+    const railByZIndex = new Map<number, Rail>()
+    this.rails.forEach(rail => railByZIndex.set(rail.zIndex, rail))
+
+    const gapByZIndex = new Map<number, RailGap>()
+    this.railGaps.forEach(gap => gapByZIndex.set(gap.zIndex, gap))
+
+    let cursorY = 0
+    for (let gapZ = this.maxZIndex + 1; gapZ >= 1; gapZ--) {
+      const gap = gapByZIndex.get(gapZ)
+      gap?.updateY(cursorY)
+
+      const rail = railByZIndex.get(gapZ - 1)
+      if (!rail)
+        continue
+
+      rail.updateY(cursorY + GAP)
+      cursorY += GAP + rail.height
+    }
+
+    const lastGap = gapByZIndex.get(0)
+    lastGap?.updateY(cursorY)
   }
 
   /**

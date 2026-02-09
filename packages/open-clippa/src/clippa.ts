@@ -50,13 +50,14 @@ export class Clippa extends EventBus<ClippaEvents> {
         start: p.start,
         duration: p.duration,
         label: p.getText(),
+        variant: 'text',
         textColor: p.getStyle().fill,
       })
       this.timeline.addTrainByZIndex(train, p.zIndex)
       return
     }
 
-    const performerWithSrc = p as { src?: string }
+    const performerWithSrc = p as { src?: string, sourceStart?: number }
     if (!performerWithSrc.src)
       return
 
@@ -66,6 +67,7 @@ export class Clippa extends EventBus<ClippaEvents> {
       start: p.start,
       duration: p.duration,
       src: performerWithSrc.src,
+      sourceStart: performerWithSrc.sourceStart,
     })
     this.timeline.addTrainByZIndex(videoTrain, p.zIndex)
     await videoTrain.init()

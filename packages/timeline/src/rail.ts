@@ -1,9 +1,13 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
+import type { TrainRailStyle } from './train/types'
 import {
+  TIMELINE_FILTER_TRAIN_HEIGHT,
   TIMELINE_RAIL_FILL,
+  TIMELINE_TEXT_TRAIN_HEIGHT,
   TIMELINE_TRAIN_BORDER_SIZE,
   TIMELINE_TRAIN_CONNECTION_TIME_PX,
+  TIMELINE_TRAIN_HEIGHT,
   TIMELINE_TRAIN_SEAM_EPSILON,
   TIMELINE_TRAIN_SEAM_WIDTH,
 } from '@clippa/constants'
@@ -16,7 +20,19 @@ import { collectAdjacentBoundaries, collectTrainJoinStates } from './utils/seam'
 /**
  * rail height
  */
-export const RAIL_HEIGHT = 45
+export const RAIL_HEIGHT = TIMELINE_TRAIN_HEIGHT
+const COMPACT_RAIL_PADDING = 4
+
+export function getRailHeightByStyle(railStyle: TrainRailStyle): number {
+  if (railStyle === 'text')
+    return TIMELINE_TEXT_TRAIN_HEIGHT + COMPACT_RAIL_PADDING
+
+  if (railStyle === 'filter')
+    return TIMELINE_FILTER_TRAIN_HEIGHT + COMPACT_RAIL_PADDING
+
+  return RAIL_HEIGHT
+}
+
 export interface RailOption {
   /**
    * 宽度
@@ -27,6 +43,7 @@ export interface RailOption {
   y: number
   duration: number
   zIndex: number
+  railStyle?: TrainRailStyle
   trainsOption: TrainOption[]
 }
 
@@ -56,6 +73,8 @@ export class Rail extends EventBus<RailEvents> {
   container: Container
   width: number
   y: number
+  height: number
+  railStyle: TrainRailStyle
 
   /**
    * trains, is sorted
@@ -223,6 +242,35 @@ export class Rail extends EventBus<RailEvents> {
     }
   }
 
+  private _getRailTrainStyle(): Train['railStyle'] | null {
+    if (this.trains.length === 0)
+      return this.railStyle
+
+    return this.trains[0].railStyle
+  }
+
+  canAcceptTrain(train: Train): boolean {
+    const currentStyle = this._getRailTrainStyle()
+    if (!currentStyle)
+      return true
+
+    return currentStyle === train.railStyle
+  }
+
+  setRailStyle(railStyle: TrainRailStyle): boolean {
+    if (this.railStyle === railStyle)
+      return false
+
+    if (this.trains.length > 0)
+      return false
+
+    this.railStyle = railStyle
+    this.height = getRailHeightByStyle(railStyle)
+    this._drawBg()
+    this._drawAdjacentSeams()
+    return true
+  }
+
   private _refreshVisualLayoutAndAdjacentVisuals(): void {
     this._syncVisualLayoutFromRawTimings()
     this._refreshAdjacentVisuals()
@@ -244,6 +292,8 @@ export class Rail extends EventBus<RailEvents> {
     this.y = option.y
     this.duration = option.duration
     this.zIndex = option.zIndex
+    this.railStyle = option.railStyle ?? 'default'
+    this.height = getRailHeightByStyle(this.railStyle)
 
     this.container = new Container({ y: this.y, label: 'rail' })
 
@@ -498,7 +548,7 @@ export class Rail extends EventBus<RailEvents> {
           boundary - TIMELINE_TRAIN_SEAM_WIDTH / 2,
           -TIMELINE_TRAIN_BORDER_SIZE,
           TIMELINE_TRAIN_SEAM_WIDTH,
-          RAIL_HEIGHT + TIMELINE_TRAIN_BORDER_SIZE * 2,
+          this.height + TIMELINE_TRAIN_BORDER_SIZE * 2,
         )
         .fill(TIMELINE_RAIL_FILL)
     }
@@ -528,7 +578,7 @@ export class Rail extends EventBus<RailEvents> {
   private _drawBg(): void {
     const bg = new Graphics()
 
-    bg.roundRect(0, 0, this.width, RAIL_HEIGHT, 8)
+    bg.roundRect(0, 0, this.width, this.height, 8)
     bg.fill(TIMELINE_RAIL_FILL)
 
     if (this._bg) {
@@ -563,6 +613,9 @@ export class Rail extends EventBus<RailEvents> {
    * 如果这个train在列表中不存在, 那么会渲染这个train并且绑定事件
    */
   insertTrain(train: Train): void {
+    if (!this.canAcceptTrain(train))
+      return
+
     const index = this.trains.findIndex(item => item === train)
     if (index !== -1) {
       // 从原位上抽离出来
@@ -575,6 +628,8 @@ export class Rail extends EventBus<RailEvents> {
       this._bindTrainMoveEvents(train)
       this._bindResizeEvents(train)
     }
+
+    train.syncRailY()
 
     // 寻找插入的位置
     const nextIndex = this.trains.findIndex(item =>

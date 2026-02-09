@@ -1,5 +1,5 @@
 import type { Rail } from '../rail'
-import type { TrainDragStatus, TrainEvents, TrainOption } from './types'
+import type { TrainDragStatus, TrainEvents, TrainOption, TrainRailStyle } from './types'
 import {
   DEBUG,
   TIMELINE_RESIZE_HANDLER_FILL,
@@ -13,8 +13,8 @@ import {
   TIMELINE_WIDGET_HOVER_FILL,
 } from '@clippa/constants'
 import { drag, EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
-import { Container, Graphics, HTMLText } from 'pixi.js'
-import { RAIL_HEIGHT } from '../rail'
+import { Container, Graphics, HTMLText, Rectangle } from 'pixi.js'
+import { getRailHeightByStyle } from '../rail'
 import { State } from '../state'
 
 type TrainCornerRadius = {
@@ -62,6 +62,10 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    */
   parent: Rail | null = null
   /**
+   * rail visual style
+   */
+  railStyle: TrainRailStyle
+  /**
    * start time(ms)
    */
   start: number
@@ -98,9 +102,10 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     this.width = getPxByMs(option.duration, this.state.pxPerMs)
     this.start = option.start
     this.duration = option.duration
+    this.railStyle = option.railStyle ?? 'default'
     this.height = option.height ?? TIMELINE_TRAIN_HEIGHT
     this._resizeHandlerHeight = this.height / 1.7
-    this.y = (RAIL_HEIGHT - this.height) / 2
+    this.y = this._getCenterYInRail()
 
     this.container = new Container({ x: this.x, y: this.y, label: 'train' })
     this.container.eventMode = 'static'
@@ -226,6 +231,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     resizer.cursor = 'ew-resize'
 
     const resizerMain = new Graphics()
+    resizerMain.eventMode = 'none'
     this._drawRoundedRectByCorner(
       resizerMain,
       0,
@@ -242,6 +248,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     const handlerRadius = handlerWidth / 2
 
     const resizerHandler = new Graphics()
+    resizerHandler.eventMode = 'none'
     resizerHandler.roundRect(0, 0, handlerWidth, handlerHeight, handlerRadius)
       .fill(TIMELINE_RESIZE_HANDLER_FILL)
 
@@ -257,9 +264,12 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     */
     const maskX = location === 'left' ? w / 2 : 0
     const mask = new Graphics({ label: 'mask' })
+    mask.eventMode = 'none'
     mask.rect(maskX, 0, w / 2, h).fill('transparent')
     resizer.addChild(mask)
     resizerMain.setMask({ mask, inverse: true })
+    const hitAreaX = location === 'left' ? 0 : w / 2
+    resizer.hitArea = new Rectangle(hitAreaX, 0, w / 2, h)
 
     this._widget.addChild(resizer)
     return [resizer, resizerMain]
@@ -392,6 +402,20 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    * 这里不要y的原因是, y在常态下固定为2
    */
   private _recordWhenDrag: { x: number, parent: Rail } | null = null
+  private _getRailHeight(): number {
+    return this.parent?.height ?? getRailHeightByStyle(this.railStyle)
+  }
+
+  private _getCenterYInRail(): number {
+    return (this._getRailHeight() - this.height) / 2
+  }
+
+  syncRailY(): void {
+    const centerY = this._getCenterYInRail()
+    this.y = centerY
+    this.container.y = centerY
+  }
+
   private _resolveStartByVisualX(visualX: number): number {
     if (!this.parent)
       return getMsByPx(visualX, this.state.pxPerMs)
@@ -431,7 +455,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         }
         else {
           // 否则y为固定值
-          this.container.y = (RAIL_HEIGHT - this.height) / 2
+          this.container.y = this._getCenterYInRail()
         }
 
         this.x = site.xValue
@@ -451,7 +475,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         else if (this.dragStatus === 'free') {
           // 如果是游离态, 恢复train为拖拽前的状态
           this._recordWhenDrag!.parent.insertTrain(this)
-          this.updatePos(this._recordWhenDrag!.x, (RAIL_HEIGHT - this.height) / 2)
+          this.updatePos(this._recordWhenDrag!.x, this._getCenterYInRail())
 
           this.start = this._resolveStartByVisualX(this.x)
         }
@@ -470,7 +494,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         }
 
         // 拖拽结束后将y值还原
-        this.y = (RAIL_HEIGHT - this.height) / 2
+        this.y = this._getCenterYInRail()
         this.updatePos(undefined, this.y)
 
         this.updateState('normal')
@@ -493,14 +517,13 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
         this.emit('beforeLeftResize', site, this)
 
+        if (!site.disdrawable) {
+          this.container.x = site.xValue
+          this.updateWidth(site.wValue)
+        }
+
         this.width = site.wValue
         this.x = site.xValue
-
-        if (!site.disdrawable) {
-          this.container.x = this.x
-
-          this.updateWidth(this.width)
-        }
       },
       up: () => {
         this.width = this._slot.width
@@ -596,7 +619,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    * if `withEffect` is true, the duration will be updated accordingly
    */
   updateWidth(width: number): void {
-    if (width === this.width)
+    if (width === this._slot.width)
       return
 
     this.width = width

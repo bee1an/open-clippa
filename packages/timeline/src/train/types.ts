@@ -1,10 +1,13 @@
 import type { Train } from './train'
 
+export type TrainRailStyle = 'default' | 'text' | 'filter'
+
 export interface TrainOption {
   id: string
   start: number
   duration: number
   height?: number
+  railStyle?: TrainRailStyle
 }
 
 export type ExtendTrainOption<T> = TrainOption & T

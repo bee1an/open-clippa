@@ -53,11 +53,35 @@ export const TIMELINE_TRAIN_SLOT_FILL = '#111111'
 /**
  * text train background fill
  */
-export const TIMELINE_TEXT_TRAIN_FILL = '#2d2f36'
+export const TIMELINE_TEXT_TRAIN_FILL = '#2a3244'
 /**
  * text train foreground fill
  */
-export const TIMELINE_TEXT_TRAIN_TEXT_FILL = '#f3f3f5'
+export const TIMELINE_TEXT_TRAIN_TEXT_FILL = '#f3f6ff'
+/**
+ * text train accent fill
+ */
+export const TIMELINE_TEXT_TRAIN_ACCENT_FILL = '#7a9bff'
+/**
+ * text train compact height
+ */
+export const TIMELINE_TEXT_TRAIN_HEIGHT = 30
+/**
+ * filter train background fill
+ */
+export const TIMELINE_FILTER_TRAIN_FILL = '#1f3a32'
+/**
+ * filter train foreground fill
+ */
+export const TIMELINE_FILTER_TRAIN_TEXT_FILL = '#dcfcef'
+/**
+ * filter train accent fill
+ */
+export const TIMELINE_FILTER_TRAIN_ACCENT_FILL = '#33c28b'
+/**
+ * filter train compact height
+ */
+export const TIMELINE_FILTER_TRAIN_HEIGHT = 26
 /**
  * rail background fill
  */
