@@ -6,14 +6,14 @@ import type {
 } from '@clippa/filter'
 import { cloneFilterConfig, DEFAULT_FILTER_CONFIG, FilterManager, isDefaultFilterConfig } from '@clippa/filter'
 import { defineStore } from 'pinia'
-import { computed, markRaw, ref } from 'vue'
+import { computed, markRaw, shallowRef } from 'vue'
 
 export type { FilterConfig, FilterLayer }
 export { cloneFilterConfig, DEFAULT_FILTER_CONFIG, isDefaultFilterConfig }
 
 export const useFilterStore = defineStore('filter', () => {
   const manager = markRaw(new FilterManager())
-  const layers = ref<FilterLayer[]>([])
+  const layers = shallowRef<FilterLayer[]>([])
   const activeLayerId = ref<string | null>(null)
 
   const layersSignature = computed(() => {

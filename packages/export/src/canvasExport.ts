@@ -62,7 +62,6 @@ export class CanvasExport {
   private _nextFrame: () => (Promise<void> | void)
   private _totalFrames: number
   private _frameRate: number
-  private _duration: number
   private _codec: 'avc' | 'vp9' | 'av1' | 'hevc'
   private _bitrate: number
   private _onProgress?: (progress: ExportProgress) => void
@@ -74,7 +73,6 @@ export class CanvasExport {
     this._nextFrame = options.nextFrame
     this._totalFrames = Math.floor((options.duration / 1000) * options.frameRate)
     this._frameRate = options.frameRate
-    this._duration = options.duration
 
     // 设置编解码器和比特率
     this._codec = options.codec || 'avc'

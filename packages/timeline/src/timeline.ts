@@ -153,18 +153,6 @@ export class Timeline extends EventBus<TimlineEvents> {
   }
 
   /**
-   * Updates the global `pxPerMs` state
-   *
-   * If the value is the same as the current `pxPerMs`, it does nothing
-   */
-  private _updatePxPerMs(pxPerMs: number): void {
-    if (pxPerMs === this.state.pxPerMs)
-      return
-
-    this.state.updatePxPerMs(pxPerMs)
-  }
-
-  /**
    * Update the size of the children components based on the current screen size
    */
   private _updateChildrenSize(): void {

@@ -1,4 +1,3 @@
-import type { GSAPTimeline } from 'gsap'
 import type {
   EnterExitAnimationConfig,
   LoopAnimationConfig,
@@ -16,9 +15,11 @@ import {
   NEUTRAL_RELATIVE_TRANSFORM_STATE,
 } from './types'
 
+type AnimationTimeline = gsap.core.Timeline
+
 export interface RelativeAnimationSegment {
   state: RelativeTransformState
-  timeline: GSAPTimeline
+  timeline: AnimationTimeline
   durationMs: number
 }
 
@@ -26,7 +27,7 @@ function createTimelineState(): RelativeTransformState {
   return createRelativeTransformState({})
 }
 
-function createBaseTimeline(): GSAPTimeline {
+function createBaseTimeline(): AnimationTimeline {
   return gsap.timeline({ paused: true })
 }
 

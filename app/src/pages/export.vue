@@ -17,6 +17,22 @@ const coverInputRef = ref<HTMLInputElement | null>(null)
 const isPreparingDownload = ref(false)
 
 const hasExport = computed(() => Boolean(exportedVideo.value))
+const titleModel = computed({
+  get: () => exportedVideo.value?.info.title ?? '',
+  set: (value: string) => {
+    if (!exportedVideo.value)
+      return
+    exportedVideo.value.info.title = value
+  },
+})
+const descriptionModel = computed({
+  get: () => exportedVideo.value?.info.description ?? '',
+  set: (value: string) => {
+    if (!exportedVideo.value)
+      return
+    exportedVideo.value.info.description = value
+  },
+})
 
 const fileSizeText = computed(() => {
   if (!exportedVideo.value)
@@ -312,7 +328,7 @@ function handleClearCover() {
           <label class="text-xs text-foreground-muted" for="export-title">Title</label>
           <input
             id="export-title"
-            v-model="exportedVideo.info.title"
+            v-model="titleModel"
             class="h-9 px-3 rounded-md bg-background border border-border text-sm focus-ring"
             type="text"
             placeholder="Title"
@@ -321,7 +337,7 @@ function handleClearCover() {
           <label class="text-xs text-foreground-muted" for="export-description">Description</label>
           <textarea
             id="export-description"
-            v-model="exportedVideo.info.description"
+            v-model="descriptionModel"
             class="min-h-20 px-3 py-2 rounded-md bg-background border border-border text-sm focus-ring"
             rows="3"
             placeholder="Description"

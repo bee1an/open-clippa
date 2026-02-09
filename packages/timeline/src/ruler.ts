@@ -90,28 +90,6 @@ export class Ruler extends EventBus<RulerEvents> {
     this._bg.fill(TIMELINE_RULER_FILL)
   }
 
-  private _bgByDuration?: Graphics
-  // TODO
-  /**
-   * @deprecated
-   *
-   * 后面可以重构为对应选中的train
-   */
-  private _drawBgByDuration(): void {
-    const bg = new Graphics()
-    bg.roundRect(0, 0, this.width, TIMELINE_RULER_HEIGHT, 8)
-    bg.fill(TIMELINE_RULER_FILL)
-
-    if (this._bgByDuration) {
-      this.container.replaceChild(this._bgByDuration, bg)
-    }
-    else {
-      this.container.addChild(bg)
-    }
-
-    this._bgByDuration = bg
-  }
-
   private _textPool: Text[] = []
 
   private _drawTextTime(x: number, content: string): Text {

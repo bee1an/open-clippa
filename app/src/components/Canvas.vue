@@ -257,7 +257,6 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
     DEFAULT_TEST_VIDEO_CLIP_TARGET_MS,
     Math.max(500, Math.floor(sourceDuration / 2)),
   )
-  // const secondSourceStart = Math.min(sourceDuration - clipDuration, clipDuration)
 
   const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = [
     {
@@ -273,19 +272,19 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
       height: height || CANVAS_HEIGHT,
       zIndex: 0,
     },
-    // {
-    //   id: DEFAULT_TEST_VIDEO_IDS[1],
-    //   src: DEFAULT_TEST_VIDEO_SRC,
-    //   start: clipDuration,
-    //   duration: clipDuration,
-    //   sourceStart: secondSourceStart,
-    //   sourceDuration,
-    //   x: 0,
-    //   y: 0,
-    //   width: width || CANVAS_WIDTH,
-    //   height: height || CANVAS_HEIGHT,
-    //   zIndex: 0,
-    // },
+    {
+      id: DEFAULT_TEST_VIDEO_IDS[1],
+      src: DEFAULT_TEST_VIDEO_SRC,
+      start: clipDuration,
+      duration: clipDuration,
+      sourceStart: 0,
+      sourceDuration,
+      x: 0,
+      y: 0,
+      width: width || CANVAS_WIDTH,
+      height: height || CANVAS_HEIGHT,
+      zIndex: 0,
+    },
   ]
 
   for (const clipConfig of clipConfigs) {

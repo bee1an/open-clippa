@@ -157,47 +157,6 @@ export function useResize(
     }
   }
 
-  // 安全的边界和尺寸限制检查 (not currently used in this component)
-  const _safeGetConstraints = (): {
-    minWidth: number
-    minHeight: number
-    maxWidth: number
-    maxHeight: number
-    boundary: {
-      minX?: number
-      minY?: number
-      maxX?: number
-      maxY?: number
-    } | null
-  } => {
-    try {
-      return {
-        minWidth: Math.max(1, minWidth ?? 20),
-        minHeight: Math.max(1, minHeight ?? 20),
-        maxWidth: Math.max(minWidth ?? 20, maxWidth ?? Number.MAX_SAFE_INTEGER),
-        maxHeight: Math.max(minHeight ?? 20, maxHeight ?? Number.MAX_SAFE_INTEGER),
-        boundary: boundary
-          ? {
-              minX: Math.max(0, boundary.minX ?? 0),
-              minY: Math.max(0, boundary.minY ?? 0),
-              maxX: Math.min(Number.MAX_SAFE_INTEGER, boundary.maxX ?? Number.MAX_SAFE_INTEGER),
-              maxY: Math.min(Number.MAX_SAFE_INTEGER, boundary.maxY ?? Number.MAX_SAFE_INTEGER),
-            }
-          : null,
-      }
-    }
-    catch (_error) {
-      console.warn('[useResize] Invalid constraints configuration:', _error)
-      return {
-        minWidth: 20,
-        minHeight: 20,
-        maxWidth: Number.MAX_SAFE_INTEGER,
-        maxHeight: Number.MAX_SAFE_INTEGER,
-        boundary: null,
-      }
-    }
-  }
-
   // 开始调整大小（带错误处理）
   const startResize = (direction: ResizeDirection, event: MouseEvent | TouchEvent): void => {
     try {

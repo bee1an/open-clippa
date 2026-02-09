@@ -17,6 +17,13 @@ import { Container, Graphics, HTMLText } from 'pixi.js'
 import { RAIL_HEIGHT } from '../rail'
 import { State } from '../state'
 
+type TrainCornerRadius = {
+  topLeft: number
+  topRight: number
+  bottomRight: number
+  bottomLeft: number
+}
+
 export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   /**
    * id
@@ -70,6 +77,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    * resizer handler height
    */
   private _resizeHandlerHeight: number
+  private _joinLeft: boolean = false
+  private _joinRight: boolean = false
 
   get active(): boolean {
     const state = State.getInstance()
@@ -80,8 +89,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     super()
     this.state = State.getInstance()
     this.state.on('updatedPxPerMs', (pxPerMs) => {
-      this.updatePos(getPxByMs(option.start, pxPerMs))
-      this.updateWidth(getPxByMs(option.duration, pxPerMs))
+      this.updatePos(getPxByMs(this.start, pxPerMs))
+      this.updateWidth(getPxByMs(this.duration, pxPerMs))
     })
 
     this.id = option.id
@@ -106,6 +115,58 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   protected _slot!: Container
   private _slotBg!: Graphics
   private _slotMask!: Graphics
+  protected _getTrainCornerRadius(): TrainCornerRadius {
+    const radius = TIMELINE_TRAIN_RADIUS
+
+    return {
+      topLeft: this._joinLeft ? 0 : radius,
+      topRight: this._joinRight ? 0 : radius,
+      bottomRight: this._joinRight ? 0 : radius,
+      bottomLeft: this._joinLeft ? 0 : radius,
+    }
+  }
+
+  protected _drawRoundedRectByCorner(
+    target: Graphics,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: TrainCornerRadius,
+  ): void {
+    target.roundShape(
+      [
+        { x, y, radius: radius.topLeft },
+        { x: x + width, y, radius: radius.topRight },
+        { x: x + width, y: y + height, radius: radius.bottomRight },
+        { x, y: y + height, radius: radius.bottomLeft },
+      ],
+      0,
+    )
+  }
+
+  private _getResizerCornerRadius(location: 'left' | 'right'): TrainCornerRadius {
+    const radius = TIMELINE_TRAIN_RADIUS
+
+    if (location === 'left') {
+      const leftRadius = this._joinLeft ? 0 : radius
+      return {
+        topLeft: leftRadius,
+        topRight: 0,
+        bottomRight: 0,
+        bottomLeft: leftRadius,
+      }
+    }
+
+    const rightRadius = this._joinRight ? 0 : radius
+    return {
+      topLeft: 0,
+      topRight: rightRadius,
+      bottomRight: rightRadius,
+      bottomLeft: 0,
+    }
+  }
+
   /**
    * draw main container
    */
@@ -116,16 +177,17 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     const w = width
     const h = this.height
     const fill = TIMELINE_TRAIN_SLOT_FILL
+    const cornerRadius = this._getTrainCornerRadius()
 
     if (this._slot) {
       this._slotBg
         .clear()
-        .roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
-        .fill(fill)
+      this._drawRoundedRectByCorner(this._slotBg, 0, 0, w, h, cornerRadius)
+      this._slotBg.fill(fill)
 
       this._slotMask.clear()
-        .roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
-        .fill('transparent')
+      this._drawRoundedRectByCorner(this._slotMask, 0, 0, w, h, cornerRadius)
+      this._slotMask.fill('transparent')
       return
     }
 
@@ -137,14 +199,14 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     // 创建背景
     this._slotBg = new Graphics()
     this._slot.addChild(this._slotBg)
-    this._slotBg.roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
-      .fill(fill)
+    this._drawRoundedRectByCorner(this._slotBg, 0, 0, w, h, cornerRadius)
+    this._slotBg.fill(fill)
 
     // 创建mask
     this._slotMask = new Graphics()
     this._slot.addChild(this._slotMask)
-    this._slotMask.roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
-      .fill('transparent')
+    this._drawRoundedRectByCorner(this._slotMask, 0, 0, w, h, cornerRadius)
+    this._slotMask.fill('transparent')
 
     // 设置mask
     this._slot.mask = this._slotMask
@@ -164,8 +226,15 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     resizer.cursor = 'ew-resize'
 
     const resizerMain = new Graphics()
-    resizerMain.roundRect(0, 0, w, h, TIMELINE_TRAIN_RADIUS)
-      .fill(this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL)
+    this._drawRoundedRectByCorner(
+      resizerMain,
+      0,
+      0,
+      w,
+      h,
+      this._getResizerCornerRadius(location),
+    )
+    resizerMain.fill(this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL)
     resizer.addChild(resizerMain)
 
     const handlerWidth = TIMELINE_RESIZE_HANDLER_WIDTH
@@ -206,7 +275,6 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   private _drawResizer(): void {
     const fillStyle = this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL
     const triggerWidth = TIMELINE_RESIZE_TRIGGER_WIDTH
-    const radius = TIMELINE_TRAIN_RADIUS
 
     if (!this._leftResizer) {
       [this._leftResizer, this._leftResizerMain] = this._drawResizerHelper(0, 0, triggerWidth, this.height)
@@ -215,8 +283,15 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     else {
       this._leftResizerMain
         .clear()
-        .roundRect(0, 0, triggerWidth, this.height, radius)
-        .fill(fillStyle)
+      this._drawRoundedRectByCorner(
+        this._leftResizerMain,
+        0,
+        0,
+        triggerWidth,
+        this.height,
+        this._getResizerCornerRadius('left'),
+      )
+      this._leftResizerMain.fill(fillStyle)
     }
 
     if (!this._rightResizer) {
@@ -233,8 +308,15 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     else {
       this._rightResizerMain
         .clear()
-        .roundRect(0, 0, triggerWidth, this.height, radius)
-        .fill(fillStyle)
+      this._drawRoundedRectByCorner(
+        this._rightResizerMain,
+        0,
+        0,
+        triggerWidth,
+        this.height,
+        this._getResizerCornerRadius('right'),
+      )
+      this._rightResizerMain.fill(fillStyle)
     }
   }
 
@@ -246,33 +328,35 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    */
   private _drawBorder(): void {
     const { width, height } = this._slot
+    const cornerRadius = this._getTrainCornerRadius()
 
     const update = (): void => {
       this._borderMain
-        .roundRect(
-          -TIMELINE_TRAIN_BORDER_SIZE,
-          -TIMELINE_TRAIN_BORDER_SIZE,
-          width + TIMELINE_TRAIN_BORDER_SIZE * 2,
-          height + TIMELINE_TRAIN_BORDER_SIZE * 2,
-          TIMELINE_TRAIN_RADIUS,
-        )
-        .fill(this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL)
+        .clear()
+      this._drawRoundedRectByCorner(
+        this._borderMain,
+        -TIMELINE_TRAIN_BORDER_SIZE,
+        -TIMELINE_TRAIN_BORDER_SIZE,
+        width + TIMELINE_TRAIN_BORDER_SIZE * 2,
+        height + TIMELINE_TRAIN_BORDER_SIZE * 2,
+        cornerRadius,
+      )
+      this._borderMain.fill(this.active ? TIMELINE_WIDGET_ACTIVE_FILL : TIMELINE_WIDGET_HOVER_FILL)
 
       this._borderMask
-        .roundRect(
-          0,
-          0,
-          width,
-          height,
-          TIMELINE_TRAIN_RADIUS,
-        )
-        .fill('transparent ')
+        .clear()
+      this._drawRoundedRectByCorner(
+        this._borderMask,
+        0,
+        0,
+        width,
+        height,
+        cornerRadius,
+      )
+      this._borderMask.fill('transparent ')
     }
 
     if (this._borderContainer) {
-      this._borderMain.clear()
-      this._borderMask.clear()
-
       update()
 
       return
@@ -308,6 +392,13 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    * 这里不要y的原因是, y在常态下固定为2
    */
   private _recordWhenDrag: { x: number, parent: Rail } | null = null
+  private _resolveStartByVisualX(visualX: number): number {
+    if (!this.parent)
+      return getMsByPx(visualX, this.state.pxPerMs)
+
+    return this.parent.getRawMsByVisualPx(this, visualX)
+  }
+
   /**
    * bind drag event
    */
@@ -355,23 +446,23 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         if (this.dragStatus === 'static') {
           this.updatePos(this.container.x, undefined)
 
-          this.start = getMsByPx(this.x, this.state.pxPerMs)
+          this.start = this._resolveStartByVisualX(this.x)
         }
         else if (this.dragStatus === 'free') {
           // 如果是游离态, 恢复train为拖拽前的状态
           this._recordWhenDrag!.parent.insertTrain(this)
           this.updatePos(this._recordWhenDrag!.x, (RAIL_HEIGHT - this.height) / 2)
 
-          this.start = getMsByPx(this.x, this.state.pxPerMs)
+          this.start = this._resolveStartByVisualX(this.x)
         }
         else {
           if (this.x !== this.container.x) {
             this.updatePos(this.container.x, undefined)
 
-            this.start = getMsByPx(this.x, this.state.pxPerMs)
+            this.start = this._resolveStartByVisualX(this.x)
           }
           else {
-            const newStart = getMsByPx(this.x, this.state.pxPerMs)
+            const newStart = this._resolveStartByVisualX(this.x)
             if (newStart !== this.start) {
               this.start = newStart
             }
@@ -412,11 +503,12 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         }
       },
       up: () => {
-        this.width = this.container.width
+        this.width = this._slot.width
         this.x = this.container.x
 
-        this.start = getMsByPx(this.x, this.state.pxPerMs)
+        this.start = this._resolveStartByVisualX(this.x)
         this.duration = getMsByPx(this.width, this.state.pxPerMs)
+        this.emit('leftResizeEnd', this)
       },
     })
   }
@@ -446,7 +538,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
       },
 
       up: () => {
-        this.width = this.container.width
+        this.width = this._slot.width
         this.duration = getMsByPx(this.width, this.state.pxPerMs)
 
         this.emit('rightResizeEnd', this)
@@ -504,7 +596,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    * if `withEffect` is true, the duration will be updated accordingly
    */
   updateWidth(width: number): void {
-    if (width === this.container.width)
+    if (width === this.width)
       return
 
     this.width = width
@@ -515,6 +607,21 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
     this._rightResizer.x = width - TIMELINE_RESIZE_TRIGGER_WIDTH
   }
+
+  updateJoinState(joinLeft: boolean, joinRight: boolean): void {
+    if (this._joinLeft === joinLeft && this._joinRight === joinRight)
+      return
+
+    this._joinLeft = joinLeft
+    this._joinRight = joinRight
+
+    this._drawSlot()
+    this._drawBorder()
+    this._drawResizer()
+    this._onJoinStateUpdated()
+  }
+
+  protected _onJoinStateUpdated(): void {}
 
   /**
    * Updates the position of train

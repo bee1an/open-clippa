@@ -23,7 +23,7 @@ export interface PerformerClickEvent {
   timestamp: number
 }
 
-export interface PerformerBounds {
+export interface VideoBounds {
   x: number
   y: number
   width: number
@@ -33,7 +33,7 @@ export interface PerformerBounds {
 
 export type PerformerEvents = {
   pointerdown: [PerformerClickEvent]
-  positionUpdate: [PerformerBounds]
+  positionUpdate: [VideoBounds]
 }
 
 export interface VideoOption extends PerformerOption {
@@ -435,7 +435,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       && localY >= 0 && localY <= bounds.height
   }
 
-  getBounds(): Required<PerformerBounds> {
+  getBounds(): Required<VideoBounds> {
     if (!this._sprite) {
       return {
         x: 0,

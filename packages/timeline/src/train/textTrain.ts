@@ -2,7 +2,6 @@ import type { ExtendTrainEvents, ExtendTrainOption } from './types'
 import {
   TIMELINE_TEXT_TRAIN_FILL,
   TIMELINE_TEXT_TRAIN_TEXT_FILL,
-  TIMELINE_TRAIN_RADIUS,
 } from '@clippa/constants'
 import { Graphics, Text } from 'pixi.js'
 import { Train } from './train'
@@ -46,6 +45,10 @@ export class TextTrain extends Train<TextTrainEvents> {
     this._layoutLabel()
   }
 
+  protected _onJoinStateUpdated(): void {
+    this._drawBg()
+  }
+
   private _draw(): void {
     this._drawBg()
     this._drawLabel()
@@ -60,8 +63,15 @@ export class TextTrain extends Train<TextTrainEvents> {
     }
 
     this._bg.clear()
-      .roundRect(0, 0, this.width, this.height, TIMELINE_TRAIN_RADIUS)
-      .fill(this.fill)
+    this._drawRoundedRectByCorner(
+      this._bg,
+      0,
+      0,
+      this.width,
+      this.height,
+      this._getTrainCornerRadius(),
+    )
+    this._bg.fill(this.fill)
   }
 
   private _drawLabel(): void {

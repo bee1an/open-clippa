@@ -15,6 +15,18 @@ export const TIMELINE_TRAIN_RADIUS = 8
  */
 export const TIMELINE_TRAIN_BORDER_SIZE = 2
 /**
+ * visual gap in px that represents border-time at an attached train connection
+ */
+export const TIMELINE_TRAIN_CONNECTION_TIME_PX = TIMELINE_TRAIN_BORDER_SIZE * 2
+/**
+ * seam width between adjacent trains
+ */
+export const TIMELINE_TRAIN_SEAM_WIDTH = 1
+/**
+ * epsilon when checking whether adjacent trains are visually attached
+ */
+export const TIMELINE_TRAIN_SEAM_EPSILON = 0.5
+/**
  * left and right resizer width, practical width is half
  */
 export const TIMELINE_RESIZE_TRIGGER_WIDTH = 30

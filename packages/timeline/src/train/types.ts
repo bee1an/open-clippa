@@ -36,6 +36,10 @@ export type TrainEvents = {
    * 左侧调整器的值变化前
    */
   beforeLeftResize: [{ xValue: number, wValue: number, disdrawable: boolean }, target: Train]
+  /**
+   * 左侧调整器pointerup
+   */
+  leftResizeEnd: [target: Train]
 
   /**
    * 右侧调整器pointerdown

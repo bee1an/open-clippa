@@ -1,10 +1,17 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
-import { TIMELINE_RAIL_FILL } from '@clippa/constants'
-import { EventBus, getMsByPx, isIntersection } from '@clippa/utils'
+import {
+  TIMELINE_RAIL_FILL,
+  TIMELINE_TRAIN_BORDER_SIZE,
+  TIMELINE_TRAIN_CONNECTION_TIME_PX,
+  TIMELINE_TRAIN_SEAM_EPSILON,
+  TIMELINE_TRAIN_SEAM_WIDTH,
+} from '@clippa/constants'
+import { EventBus, getMsByPx, getPxByMs, isIntersection } from '@clippa/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
 import { Train } from './train'
+import { collectAdjacentBoundaries, collectTrainJoinStates } from './utils/seam'
 
 /**
  * rail height
@@ -57,6 +64,179 @@ export class Rail extends EventBus<RailEvents> {
   duration: number
   zIndex: number
   state: State = State.getInstance()
+  private _seamLayer: Graphics
+  private _dragDockState = new Map<Train, { target: Train, side: 'left' | 'right', escapeDistance: number }>()
+  private _handlePxPerMsUpdated = (): void => {
+    this._refreshVisualLayoutAndAdjacentVisuals()
+  }
+
+  private _getConnectionGapPx(): number {
+    return TIMELINE_TRAIN_CONNECTION_TIME_PX
+  }
+
+  private _getDockSnapEnterPx(): number {
+    return Math.max(6, this._getConnectionGapPx() * 1.5)
+  }
+
+  private _getDockSnapExitPx(): number {
+    return this._getDockSnapEnterPx() + 4
+  }
+
+  private _getDockX(train: Train, target: Train, side: 'left' | 'right'): number {
+    const connectionGap = this._getConnectionGapPx()
+
+    if (side === 'left')
+      return Math.max(0, target.x - train.width - connectionGap)
+
+    return target.x + target.width + connectionGap
+  }
+
+  private _getDockAwayStep(proposedX: number, dockX: number, side: 'left' | 'right'): number {
+    if (side === 'left')
+      return Math.max(0, dockX - proposedX)
+
+    return Math.max(0, proposedX - dockX)
+  }
+
+  private _getDockTowardsStep(proposedX: number, dockX: number, side: 'left' | 'right'): number {
+    if (side === 'left')
+      return Math.max(0, proposedX - dockX)
+
+    return Math.max(0, dockX - proposedX)
+  }
+
+  private _applyDock(
+    train: Train,
+    event: { xValue: number },
+    target: Train,
+    side: 'left' | 'right',
+    options: { resetEscape?: boolean } = {},
+  ): void {
+    const dockX = this._getDockX(train, target, side)
+    const currentDockState = this._dragDockState.get(train)
+    const keepEscape = currentDockState
+      && currentDockState.target === target
+      && currentDockState.side === side
+      && !options.resetEscape
+
+    this._dragDockState.set(train, {
+      target,
+      side,
+      escapeDistance: keepEscape ? currentDockState.escapeDistance : 0,
+    })
+    train.updateState('static')
+    event.xValue = dockX
+
+    if (train.container.x !== dockX)
+      train.container.x = dockX
+  }
+
+  private _pickNearestDockCandidate(
+    train: Train,
+    proposedX: number,
+    targets: readonly Train[],
+  ): { target: Train, side: 'left' | 'right', dockX: number, distance: number } | null {
+    let nearest: { target: Train, side: 'left' | 'right', dockX: number, distance: number } | null = null
+
+    for (const target of targets) {
+      if (target === train)
+        continue
+
+      const leftDockX = this._getDockX(train, target, 'left')
+      const rightDockX = this._getDockX(train, target, 'right')
+      const leftDistance = Math.abs(proposedX - leftDockX)
+      const rightDistance = Math.abs(proposedX - rightDockX)
+      const side: 'left' | 'right' = leftDistance <= rightDistance ? 'left' : 'right'
+      const dockX = side === 'left' ? leftDockX : rightDockX
+      const distance = Math.abs(proposedX - dockX)
+
+      if (!nearest || distance < nearest.distance) {
+        nearest = { target, side, dockX, distance }
+      }
+    }
+
+    return nearest
+  }
+
+  getRawMsByVisualPx(_train: Train, visualPx: number): number {
+    const dockState = this._dragDockState.get(_train)
+    if (dockState) {
+      if (dockState.side === 'left')
+        return Math.max(0, dockState.target.start - _train.duration)
+
+      return dockState.target.start + dockState.target.duration
+    }
+
+    const clampedVisualPx = Math.max(0, visualPx)
+    const connectionGap = this._getConnectionGapPx()
+    const seamTrains = this.trains
+      .map(item => ({
+        x: item.container.x,
+        width: item.width,
+      }))
+      .sort((a, b) => a.x - b.x)
+
+    const boundaries = collectAdjacentBoundaries(
+      seamTrains,
+      TIMELINE_TRAIN_SEAM_EPSILON,
+      connectionGap,
+    )
+    const seamOffsetPx = boundaries.reduce((offset, boundary) => {
+      if (clampedVisualPx + TIMELINE_TRAIN_SEAM_EPSILON < boundary)
+        return offset
+
+      return offset + connectionGap
+    }, 0)
+
+    return getMsByPx(
+      Math.max(0, clampedVisualPx - seamOffsetPx),
+      this.state.pxPerMs,
+    )
+  }
+
+  private _syncVisualLayoutFromRawTimings(): void {
+    if (this.trains.length === 0)
+      return
+
+    this.sortTrains()
+    let seamOffsetPx = 0
+
+    for (let i = 0; i < this.trains.length; i++) {
+      const train = this.trains[i]
+      const visualX = getPxByMs(train.start, this.state.pxPerMs) + seamOffsetPx
+      const visualWidth = getPxByMs(train.duration, this.state.pxPerMs)
+
+      train.updateWidth(visualWidth)
+      train.updatePos(visualX, undefined)
+
+      if (i === this.trains.length - 1)
+        continue
+
+      const nextTrain = this.trains[i + 1]
+      const rawGapPx = getPxByMs(
+        nextTrain.start - (train.start + train.duration),
+        this.state.pxPerMs,
+      )
+
+      if (Math.abs(rawGapPx) <= TIMELINE_TRAIN_SEAM_EPSILON)
+        seamOffsetPx += this._getConnectionGapPx()
+    }
+  }
+
+  private _refreshVisualLayoutAndAdjacentVisuals(): void {
+    this._syncVisualLayoutFromRawTimings()
+    this._refreshAdjacentVisuals()
+  }
+
+  private _refreshAdjacentVisuals(): void {
+    this._syncTrainJoinState()
+    this._drawAdjacentSeams()
+  }
+
+  private _bindPxPerMsEvents(): void {
+    this.state.off('updatedPxPerMs', this._handlePxPerMsUpdated)
+    this.state.on('updatedPxPerMs', this._handlePxPerMsUpdated)
+  }
 
   constructor(option: RailOption) {
     super()
@@ -68,47 +248,108 @@ export class Rail extends EventBus<RailEvents> {
     this.container = new Container({ y: this.y, label: 'rail' })
 
     this._drawBg()
+    this._seamLayer = this._createSeamLayer()
 
     option.trainsOption.forEach(item => this.insertTrain(new Train(item)))
 
     this._bindEvents()
+    this._bindPxPerMsEvents()
+    this._refreshVisualLayoutAndAdjacentVisuals()
   }
 
   /**
    * 每一次拖拽前对事件进行拦截
    *
-   * 判断是否在当前rail中是否有train与当前拖拽的train相交
-   * 如果相交的状态当前train的x小于相交的train的x, 则将当前train设置为半透明态
-   * 否则将当前train设置为静态态, 并且将当前train的x设置为相交的train的x + 相交的train的width
+   * 拖拽吸附状态机:
+   * 1. 硬碰撞: 不允许进入重叠区
+   * 2. 吸附保持: 已吸附时在释放阈值内维持锁定, 防止抖动
+   * 3. 吸附进入: 接近连接位时吸附
    */
   private _trainBeforeMoveHandle = (event: { xValue: number }, train: Train): void => {
+    const connectionGap = this._getConnectionGapPx()
+    const proposedX = Math.max(0, event.xValue)
+    const movingRight = proposedX > train.x
+    const movingLeft = proposedX < train.x
     const intersectTrains = this.trains.filter((item) => {
       if (item === train)
         return false
 
-      return isIntersection([event.xValue, event.xValue + train.width], [item.x, item.x + item.width])
+      return isIntersection([proposedX, proposedX + train.width + connectionGap], [item.x, item.x + item.width])
     })
+    const cachedDock = this._dragDockState.get(train)
 
-    if (intersectTrains.length === 0) {
+    if (intersectTrains.length > 0) {
+      if (cachedDock && intersectTrains.includes(cachedDock.target)) {
+        this._applyDock(train, event, cachedDock.target, cachedDock.side, { resetEscape: true })
+        return
+      }
+
+      if (movingRight) {
+        const target = intersectTrains.reduce((best, current) =>
+          current.x < best.x ? current : best,
+        )
+        this._applyDock(train, event, target, 'left', { resetEscape: true })
+        return
+      }
+
+      if (movingLeft) {
+        const target = intersectTrains.reduce((best, current) =>
+          current.x > best.x ? current : best,
+        )
+        this._applyDock(train, event, target, 'right', { resetEscape: true })
+        return
+      }
+
+      const nearestCollisionDock = this._pickNearestDockCandidate(train, proposedX, intersectTrains)
+      if (nearestCollisionDock) {
+        this._applyDock(train, event, nearestCollisionDock.target, nearestCollisionDock.side, { resetEscape: true })
+        return
+      }
+    }
+
+    if (cachedDock) {
+      const dockX = this._getDockX(train, cachedDock.target, cachedDock.side)
+      const awayStep = this._getDockAwayStep(proposedX, dockX, cachedDock.side)
+      const towardsStep = this._getDockTowardsStep(proposedX, dockX, cachedDock.side)
+      if (awayStep > 0) {
+        cachedDock.escapeDistance += awayStep
+      }
+      else if (towardsStep > 0) {
+        cachedDock.escapeDistance = Math.max(0, cachedDock.escapeDistance - towardsStep)
+      }
+
+      if (cachedDock.escapeDistance < this._getDockSnapExitPx()) {
+        this._applyDock(train, event, cachedDock.target, cachedDock.side)
+        return
+      }
+
+      const releaseX = cachedDock.side === 'left'
+        ? Math.max(0, dockX - cachedDock.escapeDistance)
+        : dockX + cachedDock.escapeDistance
+
+      this._dragDockState.delete(train)
       train.updateState('normal')
+      event.xValue = releaseX
       return
     }
 
-    const [minialXTrain] = intersectTrains.sort((a, b) => a.x - b.x)
-
-    if (event.xValue <= minialXTrain.x) {
-      train.updateState('translucent')
+    const nearestDock = this._pickNearestDockCandidate(
+      train,
+      proposedX,
+      this.trains,
+    )
+    if (nearestDock && nearestDock.distance <= this._getDockSnapEnterPx()) {
+      this._applyDock(train, event, nearestDock.target, nearestDock.side)
+      return
     }
-    else {
-      train.updateState('static')
 
-      // 将拖拽的train的位置停靠在相交的train的后面
-      if (train.container.x !== minialXTrain.x + minialXTrain.width)
-        train.container.x = minialXTrain.x + minialXTrain.width
-    }
+    this._dragDockState.delete(train)
+    train.updateState('normal')
+    event.xValue = proposedX
   }
 
   private _trainMoveEndHandle = (train: Train): void => {
+    this._dragDockState.delete(train)
     this.insertTrain(train)
 
     this.updateTrainsPos()
@@ -131,21 +372,27 @@ export class Rail extends EventBus<RailEvents> {
     wValue: number
     disdrawable: boolean
   }, train: Train): void => {
+    const connectionGap = this._getConnectionGapPx()
     const [intersectTrain] = this.trains.filter((item) => {
       if (item.x >= train.container.x)
         return false
 
-      return isIntersection([train.x, train.x + train.width], [item.x, item.x + item.width])
+      return isIntersection([train.x - connectionGap, train.x + train.width], [item.x, item.x + item.width])
     })
 
     if (intersectTrain) {
       event.disdrawable = true
 
+      const intersectRight = intersectTrain.x + intersectTrain.width
+      const trainRight = train.x + train.width
+      event.xValue = intersectRight + connectionGap
+      event.wValue = trainRight - event.xValue
+
       train.updateWidth(
-        train.container.x + train.container.width - (intersectTrain.x + intersectTrain.width),
+        event.wValue,
       )
 
-      train.container.x = intersectTrain.x + intersectTrain.width
+      train.container.x = event.xValue
     }
   }
 
@@ -166,6 +413,7 @@ export class Rail extends EventBus<RailEvents> {
     if (!this._rightTrains)
       return
 
+    const connectionGap = this._getConnectionGapPx()
     let i = 0
     while (true) {
       if (i === this._rightTrains.length - 1)
@@ -173,7 +421,7 @@ export class Rail extends EventBus<RailEvents> {
 
       const { container, width } = this._rightTrains[i]
 
-      const rightX = container.x + width
+      const rightX = container.x + width + connectionGap
 
       const { x } = this._rightTrains[i + 1]
 
@@ -195,16 +443,22 @@ export class Rail extends EventBus<RailEvents> {
   private _trainRightResizeEndHandle = (): void => {
     this._rightTrains?.forEach((item) => {
       item.x = item.container.x
-      item.start = getMsByPx(item.x, this.state.pxPerMs)
+      item.start = this.getRawMsByVisualPx(item, item.x)
     })
 
     this._rightTrains = null
 
+    this._refreshVisualLayoutAndAdjacentVisuals()
     this.emit('trainRightResizeEnd')
+  }
+
+  private _trainLeftResizeEndHandle = (): void => {
+    this._refreshVisualLayoutAndAdjacentVisuals()
   }
 
   private _bindResizeEvents(train: Train): void {
     train.on('beforeLeftResize', this._trainBeforeLeftResizeHandle)
+    train.on('leftResizeEnd', this._trainLeftResizeEndHandle)
     train.on('rightResizeStart', this._trainRightResizeStartHandle)
     train.on('beforeRightResize', this._trainBeforeRightResizeHandle)
     train.on('rightResizeEnd', this._trainRightResizeEndHandle)
@@ -212,12 +466,65 @@ export class Rail extends EventBus<RailEvents> {
 
   private _unbindResizeEvents(train: Train): void {
     train.off('beforeLeftResize', this._trainBeforeLeftResizeHandle)
+    train.off('leftResizeEnd', this._trainLeftResizeEndHandle)
     train.off('rightResizeStart', this._trainRightResizeStartHandle)
     train.off('beforeRightResize', this._trainBeforeRightResizeHandle)
     train.off('rightResizeEnd', this._trainRightResizeEndHandle)
   }
 
   private _bg: Graphics | null = null
+  private _createSeamLayer(): Graphics {
+    const seamLayer = new Graphics({ label: 'rail-seam' })
+    seamLayer.eventMode = 'none'
+    seamLayer.visible = true
+    this.container.addChild(seamLayer)
+    return seamLayer
+  }
+
+  private _drawAdjacentSeams(): void {
+    this._seamLayer.clear()
+
+    const boundaries = collectAdjacentBoundaries(
+      this.trains,
+      TIMELINE_TRAIN_SEAM_EPSILON,
+      this._getConnectionGapPx(),
+    )
+    if (boundaries.length === 0)
+      return
+
+    for (const boundary of boundaries) {
+      this._seamLayer
+        .rect(
+          boundary - TIMELINE_TRAIN_SEAM_WIDTH / 2,
+          -TIMELINE_TRAIN_BORDER_SIZE,
+          TIMELINE_TRAIN_SEAM_WIDTH,
+          RAIL_HEIGHT + TIMELINE_TRAIN_BORDER_SIZE * 2,
+        )
+        .fill(TIMELINE_RAIL_FILL)
+    }
+  }
+
+  private _syncTrainJoinState(): void {
+    const joinStates = collectTrainJoinStates(
+      this.trains,
+      TIMELINE_TRAIN_SEAM_EPSILON,
+      this._getConnectionGapPx(),
+    )
+
+    for (let i = 0; i < this.trains.length; i++) {
+      const train = this.trains[i]
+      const joinState = joinStates[i]
+      if (!joinState)
+        continue
+
+      train.updateJoinState(joinState.joinLeft, joinState.joinRight)
+    }
+  }
+
+  private _moveSeamLayerToTop(): void {
+    this.container.addChild(this._seamLayer)
+  }
+
   private _drawBg(): void {
     const bg = new Graphics()
 
@@ -279,6 +586,12 @@ export class Rail extends EventBus<RailEvents> {
     else
       this.trains.push(train)
 
+    this._bindPxPerMsEvents()
+    this._moveSeamLayerToTop()
+    if (this.state.trainDragging)
+      this._refreshAdjacentVisuals()
+    else
+      this._refreshVisualLayoutAndAdjacentVisuals()
     this.emit('insertTrain', train)
   }
 
@@ -290,9 +603,14 @@ export class Rail extends EventBus<RailEvents> {
     this.trains.splice(index, 1)
     this.container.removeChild(train.container)
     train.parent = null
+    this._dragDockState.delete(train)
 
     this._unbindTrainMoveEvents(train)
     this._unbindResizeEvents(train)
+    if (this.state.trainDragging)
+      this._refreshAdjacentVisuals()
+    else
+      this._refreshVisualLayoutAndAdjacentVisuals()
   }
 
   /**
@@ -306,10 +624,11 @@ export class Rail extends EventBus<RailEvents> {
    * 更新train的位置, 如果train相交, 则按照x的位置重新排序他, 然后重新更新位置
    */
   updateTrainsPos(): void {
+    const connectionGap = this._getConnectionGapPx()
     this.trains
       .find((train) => {
         const intersectTrains = this.trains.filter((item) => {
-          return isIntersection([train.x, train.x + train.width], [item.x, item.x + item.width])
+          return isIntersection([train.x, train.x + train.width + connectionGap], [item.x, item.x + item.width])
         })
 
         // 排除当前循环的train
@@ -326,8 +645,11 @@ export class Rail extends EventBus<RailEvents> {
         intersectTrains
           .reverse() // 这里反转一下是为了让与当前元素相交的元素保持原有的顺序
           .forEach((item) => {
-            item.updatePos(item.x + (minialXTrain.x + minialXTrain.width - item.x), undefined)
-            item.start = getMsByPx(item.x, this.state.pxPerMs)
+            item.updatePos(
+              item.x + (minialXTrain.x + minialXTrain.width + connectionGap - item.x),
+              undefined,
+            )
+            item.start = this.getRawMsByVisualPx(item, item.x)
             this.insertTrain(item)
           })
 
@@ -337,6 +659,7 @@ export class Rail extends EventBus<RailEvents> {
       )
 
     this.emit('trainsPosUpdated')
+    this._refreshVisualLayoutAndAdjacentVisuals()
   }
 
   /**

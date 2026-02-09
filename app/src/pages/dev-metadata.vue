@@ -166,7 +166,8 @@ function updateCover(tags: MetadataTags) {
   if (!image)
     return
 
-  const blob = new Blob([image.data], { type: image.mimeType || 'image/jpeg' })
+  const coverBytes = Uint8Array.from(image.data)
+  const blob = new Blob([coverBytes], { type: image.mimeType || 'image/jpeg' })
   coverUrl.value = URL.createObjectURL(blob)
 }
 

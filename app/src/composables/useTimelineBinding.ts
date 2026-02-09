@@ -56,7 +56,9 @@ export function useTimelineBinding(): void {
         return
 
       const oldStart = performer.start
-      const nextStart = getMsByPx(site.xValue, clippa.timeline.state.pxPerMs)
+      const nextStart = train.parent
+        ? train.parent.getRawMsByVisualPx(train, site.xValue)
+        : getMsByPx(site.xValue, clippa.timeline.state.pxPerMs)
       const nextDuration = getMsByPx(site.wValue, clippa.timeline.state.pxPerMs)
 
       performer.start = nextStart
