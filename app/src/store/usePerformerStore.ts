@@ -347,6 +347,10 @@ export const usePerformerStore = defineStore('performer', () => {
         performer.setRotation(updates.rotation)
       }
 
+      if ((updates as any).alpha !== undefined) {
+        performer.setAlpha((updates as any).alpha)
+      }
+
       if (updates.zIndex !== undefined) {
         performer.zIndex = updates.zIndex
       }
