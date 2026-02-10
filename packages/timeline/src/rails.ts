@@ -352,10 +352,12 @@ export class Rails extends EventBus<RailsEvents> {
       const atTrain = this.state.atDragTrain!
 
       if (rail && rail.canAcceptTrain(atTrain) && !rail.trains.includes(atTrain)) {
+        const freeY = atTrain.y
+
         rail.insertTrain(atTrain)
 
         atTrain.updateState('normal')
-        atTrain.updatePos(undefined, atTrain.y - (rail.y + this.railsContainer.y))
+        atTrain.updatePos(undefined, freeY - (rail.y + this.railsContainer.y))
 
         this.railGaps.forEach(gap => gap.setActive(false))
       }

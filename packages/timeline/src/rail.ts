@@ -84,7 +84,7 @@ export class Rail extends EventBus<RailEvents> {
   zIndex: number
   state: State = State.getInstance()
   private _seamLayer: Graphics
-  private _dragDockState = new Map<Train, { target: Train, side: 'left' | 'right', escapeDistance: number }>()
+  private _dragDockState = new Map<Train, { target: Train, side: 'left' | 'right', escapeOffset: number }>()
   private _handlePxPerMsUpdated = (): void => {
     this._refreshVisualLayoutAndAdjacentVisuals()
   }
@@ -110,38 +110,22 @@ export class Rail extends EventBus<RailEvents> {
     return target.x + target.width + connectionGap
   }
 
-  private _getDockAwayStep(proposedX: number, dockX: number, side: 'left' | 'right'): number {
-    if (side === 'left')
-      return Math.max(0, dockX - proposedX)
-
-    return Math.max(0, proposedX - dockX)
-  }
-
-  private _getDockTowardsStep(proposedX: number, dockX: number, side: 'left' | 'right'): number {
-    if (side === 'left')
-      return Math.max(0, proposedX - dockX)
-
-    return Math.max(0, dockX - proposedX)
-  }
-
   private _applyDock(
     train: Train,
     event: { xValue: number },
     target: Train,
     side: 'left' | 'right',
-    options: { resetEscape?: boolean } = {},
   ): void {
     const dockX = this._getDockX(train, target, side)
     const currentDockState = this._dragDockState.get(train)
-    const keepEscape = currentDockState
+    const keepEscapeOffset = currentDockState
       && currentDockState.target === target
       && currentDockState.side === side
-      && !options.resetEscape
 
     this._dragDockState.set(train, {
       target,
       side,
-      escapeDistance: keepEscape ? currentDockState.escapeDistance : 0,
+      escapeOffset: keepEscapeOffset ? currentDockState.escapeOffset : 0,
     })
     train.updateState('static')
     event.xValue = dockX
@@ -311,75 +295,26 @@ export class Rail extends EventBus<RailEvents> {
    * 每一次拖拽前对事件进行拦截
    *
    * 拖拽吸附状态机:
-   * 1. 硬碰撞: 不允许进入重叠区
-   * 2. 吸附保持: 已吸附时在释放阈值内维持锁定, 防止抖动
-   * 3. 吸附进入: 接近连接位时吸附
+   * 1. 吸附保持: 已吸附时在释放阈值内维持锁定, 防止抖动
+   * 2. 吸附进入: 接近连接位时吸附
    */
   private _trainBeforeMoveHandle = (event: { xValue: number }, train: Train): void => {
-    const connectionGap = this._getConnectionGapPx()
     const proposedX = Math.max(0, event.xValue)
-    const movingRight = proposedX > train.x
-    const movingLeft = proposedX < train.x
-    const intersectTrains = this.trains.filter((item) => {
-      if (item === train)
-        return false
-
-      return isIntersection([proposedX, proposedX + train.width + connectionGap], [item.x, item.x + item.width])
-    })
     const cachedDock = this._dragDockState.get(train)
-
-    if (intersectTrains.length > 0) {
-      if (cachedDock && intersectTrains.includes(cachedDock.target)) {
-        this._applyDock(train, event, cachedDock.target, cachedDock.side, { resetEscape: true })
-        return
-      }
-
-      if (movingRight) {
-        const target = intersectTrains.reduce((best, current) =>
-          current.x < best.x ? current : best,
-        )
-        this._applyDock(train, event, target, 'left', { resetEscape: true })
-        return
-      }
-
-      if (movingLeft) {
-        const target = intersectTrains.reduce((best, current) =>
-          current.x > best.x ? current : best,
-        )
-        this._applyDock(train, event, target, 'right', { resetEscape: true })
-        return
-      }
-
-      const nearestCollisionDock = this._pickNearestDockCandidate(train, proposedX, intersectTrains)
-      if (nearestCollisionDock) {
-        this._applyDock(train, event, nearestCollisionDock.target, nearestCollisionDock.side, { resetEscape: true })
-        return
-      }
-    }
 
     if (cachedDock) {
       const dockX = this._getDockX(train, cachedDock.target, cachedDock.side)
-      const awayStep = this._getDockAwayStep(proposedX, dockX, cachedDock.side)
-      const towardsStep = this._getDockTowardsStep(proposedX, dockX, cachedDock.side)
-      if (awayStep > 0) {
-        cachedDock.escapeDistance += awayStep
-      }
-      else if (towardsStep > 0) {
-        cachedDock.escapeDistance = Math.max(0, cachedDock.escapeDistance - towardsStep)
-      }
+      cachedDock.escapeOffset += proposedX - dockX
+      const distance = Math.abs(cachedDock.escapeOffset)
 
-      if (cachedDock.escapeDistance < this._getDockSnapExitPx()) {
+      if (distance < this._getDockSnapExitPx()) {
         this._applyDock(train, event, cachedDock.target, cachedDock.side)
         return
       }
 
-      const releaseX = cachedDock.side === 'left'
-        ? Math.max(0, dockX - cachedDock.escapeDistance)
-        : dockX + cachedDock.escapeDistance
-
       this._dragDockState.delete(train)
       train.updateState('normal')
-      event.xValue = releaseX
+      event.xValue = Math.max(0, dockX + cachedDock.escapeOffset)
       return
     }
 
