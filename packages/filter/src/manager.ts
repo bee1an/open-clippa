@@ -73,7 +73,9 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
     const duration = options.duration ?? DEFAULT_FILTER_DURATION
     const zIndex = options.zIndex ?? 1
 
-    const config = cloneFilterConfig(DEFAULT_FILTER_CONFIG)
+    const config = options.config
+      ? cloneFilterConfig(options.config)
+      : cloneFilterConfig(DEFAULT_FILTER_CONFIG)
     const filter: ColorMatrixFilter = new ColorMatrixFilterImpl()
     applyFilterConfig(filter, config)
 

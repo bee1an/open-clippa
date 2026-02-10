@@ -11,9 +11,27 @@ import {
   useFilterStore,
 } from '@/store/useFilterStore'
 
+interface FilterPreset {
+  label: string
+  value: string
+  icon: string
+  config: FilterConfig
+}
+
+const FILTER_PRESETS: FilterPreset[] = [
+  { label: 'Warm', value: 'warm', icon: 'i-ph-sun-bold', config: { brightness: 1.1, contrast: 1.05, saturation: 1.1, hue: 15 } },
+  { label: 'Cool', value: 'cool', icon: 'i-ph-snowflake-bold', config: { brightness: 0.95, contrast: 1.05, saturation: 0.9, hue: -15 } },
+  { label: 'Vintage', value: 'vintage', icon: 'i-ph-film-strip-bold', config: { brightness: 0.9, contrast: 1.15, saturation: 0.7, hue: 10 } },
+  { label: 'B&W', value: 'bw', icon: 'i-ph-circle-half-bold', config: { brightness: 1.0, contrast: 1.1, saturation: 0, hue: 0 } },
+  { label: 'Vivid', value: 'vivid', icon: 'i-ph-palette-bold', config: { brightness: 1.05, contrast: 1.2, saturation: 1.5, hue: 0 } },
+  { label: 'Faded', value: 'faded', icon: 'i-ph-drop-bold', config: { brightness: 1.1, contrast: 0.85, saturation: 0.6, hue: 0 } },
+  { label: 'Dramatic', value: 'dramatic', icon: 'i-ph-lightning-bold', config: { brightness: 0.9, contrast: 1.4, saturation: 1.1, hue: 0 } },
+  { label: 'Sepia', value: 'sepia', icon: 'i-ph-coffee-bold', config: { brightness: 0.95, contrast: 1.05, saturation: 0.4, hue: 30 } },
+]
+
 const editorStore = useEditorStore()
 const filterStore = useFilterStore()
-const { layers, activeLayerId, activeLayer } = storeToRefs(filterStore)
+const { activeLayer } = storeToRefs(filterStore)
 const { currentTime } = storeToRefs(editorStore)
 
 const config = computed(() => activeLayer.value?.config ?? DEFAULT_FILTER_CONFIG)
@@ -22,25 +40,33 @@ onMounted(() => {
   filterStore.bindTimeline(editorStore.clippa.timeline)
 })
 
-async function handleCreateLayer() {
+async function handleCreateFromPreset(preset: FilterPreset) {
   await editorStore.clippa.ready
 
-  const performers = editorStore.clippa.theater.performers
-  const maxZIndex = performers.reduce((max, performer) => Math.max(max, performer.zIndex), 0)
-  const start = currentTime.value
+  const time = currentTime.value
+
+  // check if there are filter layers covering the current cursor position
+  const overlapping = filterStore.layers.filter(
+    layer => layer.start <= time && time < layer.start + layer.duration,
+  )
+
+  let zIndex: number
+  if (overlapping.length > 0) {
+    // stack above the highest filter at this position
+    zIndex = Math.max(...overlapping.map(l => l.zIndex)) + 1
+  }
+  else {
+    // no filter at cursor — stack above all performers
+    const performers = editorStore.clippa.theater.performers
+    zIndex = performers.reduce((max, p) => Math.max(max, p.zIndex), 0) + 1
+  }
 
   filterStore.createLayer({
-    start,
-    zIndex: maxZIndex + 1,
+    start: time,
+    zIndex,
+    name: preset.label,
+    config: preset.config,
   })
-}
-
-function handleSelectLayer(id: string) {
-  filterStore.selectLayer(id)
-}
-
-function handleRemoveLayer(id: string) {
-  filterStore.removeLayer(id)
 }
 
 function handleResetConfig() {
@@ -72,16 +98,6 @@ function handleHueChange(value: number) {
   handleUpdateConfig('hue', value)
 }
 
-function handleUpdateZIndex(event: Event) {
-  if (!activeLayer.value)
-    return
-  const input = event.target as HTMLInputElement
-  const value = Number.parseInt(input.value, 10)
-  if (Number.isNaN(value))
-    return
-  filterStore.updateLayerZIndex(activeLayer.value.id, value)
-}
-
 const isConfigDefault = computed(() => {
   if (!activeLayer.value)
     return true
@@ -97,69 +113,41 @@ const hintConfig = computed(() => {
   <div h-full flex="~ col" overflow-hidden data-preserve-canvas-selection="true">
     <div p-4 border-b border-border>
       <div text-sm font-medium text-foreground>
-        滤镜层
+        滤镜
       </div>
       <div text-xs text-foreground-muted mt-1>
-        按 zIndex 叠加，影响低于该层的素材
+        选择预设创建滤镜，点击时间轴上的滤镜可编辑参数
       </div>
-      <Button
-        class="mt-3 w-full justify-center"
-        variant="outline"
-        @click="handleCreateLayer"
-      >
-        新增滤镜层
-      </Button>
     </div>
 
     <div flex-1 overflow-y-auto p-4 space-y-4>
-      <div v-if="layers.length === 0" text-sm text-foreground-muted text-center py-6>
-        还没有滤镜层
-      </div>
-
-      <div v-else class="space-y-2">
-        <div
-          v-for="layer in layers"
-          :key="layer.id"
-          class="border border-border/60 rounded-md px-3 py-2 flex items-center justify-between"
-          :class="layer.id === activeLayerId ? 'bg-secondary/40 border-primary/50' : 'bg-background'"
+      <!-- Preset Grid -->
+      <div class="grid grid-cols-2 gap-2">
+        <Button
+          v-for="preset in FILTER_PRESETS"
+          :key="preset.value"
+          variant="outline"
+          size="sm"
+          class="justify-start font-normal"
+          @click="handleCreateFromPreset(preset)"
         >
-          <button
-            class="flex flex-col text-left flex-1"
-            @click="handleSelectLayer(layer.id)"
-          >
-            <span class="text-sm text-foreground truncate">
-              {{ layer.name }}
-            </span>
-            <span class="text-xs text-foreground-muted">
-              zIndex {{ layer.zIndex }} · {{ Math.round(layer.duration / 100) / 10 }}s
-            </span>
-          </button>
-
-          <button
-            class="text-xs text-foreground-muted hover:text-destructive transition-colors"
-            @click="handleRemoveLayer(layer.id)"
-          >
-            删除
-          </button>
-        </div>
+          <div :class="preset.icon" class="mr-2 h-4 w-4 shrink-0" />
+          {{ preset.label }}
+        </Button>
       </div>
 
-      <div v-if="activeLayer" class="space-y-4">
-        <div class="border border-border/60 rounded-md px-3 py-2 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-foreground-muted">zIndex</span>
-            <input
-              type="number"
-              class="w-20 text-xs bg-background border border-border/60 rounded px-2 py-1 text-right"
-              :value="activeLayer.zIndex"
-              min="0"
-              step="1"
-              @change="handleUpdateZIndex"
-            >
-          </div>
+      <!-- Divider + Edit Area -->
+      <template v-if="activeLayer">
+        <div class="border-t border-border" />
 
+        <div class="space-y-4">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-foreground-muted">配置状态</span>
+            <div class="flex flex-col">
+              <span class="text-sm text-foreground font-medium">{{ activeLayer.name }}</span>
+              <span class="text-xs text-foreground-muted">
+                {{ Math.round(activeLayer.duration / 100) / 10 }}s
+              </span>
+            </div>
             <span
               class="text-xs"
               :class="isConfigDefault ? 'text-foreground-muted' : 'text-primary'"
@@ -168,81 +156,77 @@ const hintConfig = computed(() => {
             </span>
           </div>
 
+          <div class="space-y-3">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs text-foreground-muted">
+                <span>亮度</span>
+                <span>{{ hintConfig.brightness.toFixed(2) }}</span>
+              </div>
+              <Slider
+                :model-value="config.brightness"
+                :min="0"
+                :max="2"
+                :step="0.01"
+                class="w-full"
+                @update:model-value="handleBrightnessChange"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs text-foreground-muted">
+                <span>对比度</span>
+                <span>{{ hintConfig.contrast.toFixed(2) }}</span>
+              </div>
+              <Slider
+                :model-value="config.contrast"
+                :min="0"
+                :max="2"
+                :step="0.01"
+                class="w-full"
+                @update:model-value="handleContrastChange"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs text-foreground-muted">
+                <span>饱和度</span>
+                <span>{{ hintConfig.saturation.toFixed(2) }}</span>
+              </div>
+              <Slider
+                :model-value="config.saturation"
+                :min="0"
+                :max="2"
+                :step="0.01"
+                class="w-full"
+                @update:model-value="handleSaturationChange"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs text-foreground-muted">
+                <span>色相</span>
+                <span>{{ hintConfig.hue.toFixed(0) }}</span>
+              </div>
+              <Slider
+                :model-value="config.hue"
+                :min="-180"
+                :max="180"
+                :step="1"
+                class="w-full"
+                @update:model-value="handleHueChange"
+              />
+            </div>
+          </div>
+
           <Button
-            class="w-full justify-center"
-            variant="outline"
-            @click="handleResetConfig"
-          >
-            重置参数
-          </Button>
+              class="w-full justify-center"
+              variant="outline"
+              @click="handleResetConfig"
+            >
+              重置参数
+            </Button>
         </div>
-
-        <div class="space-y-3">
-          <div class="space-y-1">
-            <div class="flex items-center justify-between text-xs text-foreground-muted">
-              <span>亮度</span>
-              <span>{{ hintConfig.brightness.toFixed(2) }}</span>
-            </div>
-            <Slider
-              :model-value="config.brightness"
-              :min="0"
-              :max="2"
-              :step="0.01"
-              class="w-full"
-              @update:model-value="handleBrightnessChange"
-            />
-          </div>
-
-          <div class="space-y-1">
-            <div class="flex items-center justify-between text-xs text-foreground-muted">
-              <span>对比度</span>
-              <span>{{ hintConfig.contrast.toFixed(2) }}</span>
-            </div>
-            <Slider
-              :model-value="config.contrast"
-              :min="0"
-              :max="2"
-              :step="0.01"
-              class="w-full"
-              @update:model-value="handleContrastChange"
-            />
-          </div>
-
-          <div class="space-y-1">
-            <div class="flex items-center justify-between text-xs text-foreground-muted">
-              <span>饱和度</span>
-              <span>{{ hintConfig.saturation.toFixed(2) }}</span>
-            </div>
-            <Slider
-              :model-value="config.saturation"
-              :min="0"
-              :max="2"
-              :step="0.01"
-              class="w-full"
-              @update:model-value="handleSaturationChange"
-            />
-          </div>
-
-          <div class="space-y-1">
-            <div class="flex items-center justify-between text-xs text-foreground-muted">
-              <span>色相</span>
-              <span>{{ hintConfig.hue.toFixed(0) }}</span>
-            </div>
-            <Slider
-              :model-value="config.hue"
-              :min="-180"
-              :max="180"
-              :step="1"
-              class="w-full"
-              @update:model-value="handleHueChange"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div v-else class="text-sm text-foreground-muted text-center py-6">
-        选择一个滤镜层以编辑参数
-      </div>
+      </template>
     </div>
   </div>
 </template>

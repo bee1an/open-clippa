@@ -6,14 +6,7 @@ import { usePerformerStore } from '@/store/usePerformerStore'
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 
-const textPresets = [
-  { label: 'Title', fontSize: 48, fontWeight: 'bold' as const },
-  { label: 'Subtitle', fontSize: 32, fontWeight: 'normal' as const },
-  { label: 'Body', fontSize: 24, fontWeight: 'normal' as const },
-  { label: 'Caption', fontSize: 18, fontWeight: 'normal' as const },
-]
-
-async function addText(preset: typeof textPresets[number]) {
+async function addText() {
   await editorStore.clippa.ready
 
   const maxZIndex = editorStore.clippa.timeline.rails?.maxZIndex ?? 0
@@ -29,8 +22,8 @@ async function addText(preset: typeof textPresets[number]) {
     x: 100,
     y: 100,
     style: {
-      fontSize: preset.fontSize,
-      fontWeight: preset.fontWeight,
+      fontSize: 32,
+      fontWeight: 'normal',
     },
   })
 
@@ -48,16 +41,14 @@ async function addText(preset: typeof textPresets[number]) {
       Text
     </div>
 
-    <div p-4 flex="~ col" gap-2>
+    <div p-4>
       <Button
-        v-for="preset in textPresets"
-        :key="preset.label"
         variant="outline"
         class="w-full justify-start"
-        @click="addText(preset)"
+        @click="addText"
       >
         <div i-ph-text-t-bold text-lg mr-2 />
-        <span>{{ preset.label }}</span>
+        <span>Text</span>
       </Button>
     </div>
   </div>

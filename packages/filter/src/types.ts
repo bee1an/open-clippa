@@ -26,6 +26,8 @@ export interface FilterLayerCreateOptions {
   duration?: number
   zIndex?: number
   name?: string
+  preset?: string
+  config?: FilterConfig
 }
 
 export interface FilterLayerTimingUpdate {
