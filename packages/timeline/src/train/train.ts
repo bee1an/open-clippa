@@ -1,3 +1,4 @@
+import type { FederatedPointerEvent } from 'pixi.js'
 import type { Rail } from '../rail'
 import type { TrainDragStatus, TrainEvents, TrainOption, TrainRailStyle } from './types'
 import {
@@ -425,6 +426,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    * 这里不要y的原因是, y在常态下固定为2
    */
   private _recordWhenDrag: { x: number, parent: Rail } | null = null
+  private _dragPointerOffset: { x: number, y: number } | null = null
   private _getRailHeight(): number {
     return this.parent?.height ?? getRailHeightByStyle(this.railStyle)
   }
@@ -439,6 +441,31 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     this.container.y = centerY
   }
 
+  updateDragFallback(parent: Rail, x: number): void {
+    this._recordWhenDrag = { parent, x }
+  }
+
+  getDragPointerOffsetY(): number | null {
+    return this._dragPointerOffset?.y ?? null
+  }
+
+  private _resolveDragPointerOffset(event: PointerEvent): { x: number, y: number } {
+    const federatedEvent = event as FederatedPointerEvent
+    if (typeof federatedEvent.getLocalPosition === 'function') {
+      const local = federatedEvent.getLocalPosition(this.container)
+      return {
+        x: local.x,
+        y: local.y,
+      }
+    }
+
+    const bounds = this.container.getBounds()
+    return {
+      x: event.x - bounds.x,
+      y: event.y - bounds.y,
+    }
+  }
+
   private _resolveStartByVisualX(visualX: number): number {
     if (!this.parent)
       return getMsByPx(visualX, this.state.pxPerMs)
@@ -451,7 +478,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    */
   private _bindSlotDrag(traget: Container): void {
     drag(traget, {
-      down: () => {
+      down: (event) => {
         this.state.setTrainDragging(true)
         this.state.setDraggingTrain(this)
 
@@ -459,6 +486,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
           x: this.x,
           parent: this.parent!,
         }
+        this._dragPointerOffset = this._resolveDragPointerOffset(event)
 
         this.emit('moveStart')
       },
@@ -489,6 +517,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
       up: () => {
         this.state.setTrainDragging(false)
         this.state.setDraggingTrain(null)
+        this._dragPointerOffset = null
 
         if (this.dragStatus === 'static') {
           this.updatePos(this.container.x, undefined)

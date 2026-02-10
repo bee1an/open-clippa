@@ -535,6 +535,10 @@ export class Rail extends EventBus<RailEvents> {
         return
 
       const atTrain = this.state.atDragTrain!
+      if (atTrain.parent !== this || !this.trains.includes(atTrain))
+        return
+
+      atTrain.updateDragFallback(this, atTrain.container.x)
 
       this.emit('trainLeave', atTrain, e)
 
@@ -590,6 +594,9 @@ export class Rail extends EventBus<RailEvents> {
    */
   removeTrain(train: Train): void {
     const index = this.trains.findIndex(item => item === train)
+    if (index === -1)
+      return
+
     this.trains.splice(index, 1)
     this.container.removeChild(train.container)
     train.parent = null

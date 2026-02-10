@@ -172,8 +172,16 @@ export class Rails extends EventBus<RailsEvents> {
       },
     )
 
-    rail.on('trainLeave', (train) => {
-      train.updatePos(undefined, rail.y + this.railsContainer.y + train.y)
+    rail.on('trainLeave', (train, event) => {
+      const visualYInRail = train.container.y
+      let nextY = rail.y + this.railsContainer.y + visualYInRail
+      const pointerOffsetY = train.getDragPointerOffsetY()
+      if (pointerOffsetY !== null) {
+        const pointerLocalPos = event.getLocalPosition(this.container)
+        nextY = pointerLocalPos.y - pointerOffsetY
+      }
+
+      train.updatePos(undefined, nextY)
       train.updateState('free')
 
       this.container.addChild(train.container)
@@ -311,7 +319,6 @@ export class Rails extends EventBus<RailsEvents> {
 
   private _bindEvents(): void {
     this.container.eventMode = 'static'
-    let timeId: number
     this.container.on('pointerdown', (e) => {
       /* train 取消选中逻辑 */
       if (!this.state.activeTrain)
@@ -336,11 +343,7 @@ export class Rails extends EventBus<RailsEvents> {
       if (!this.state.trainDragging)
         return
 
-      clearTimeout(timeId)
-
-      timeId = window.setTimeout(() => {
-        this._stayWhenDragging(e)
-      }, 500)
+      this._stayWhenDragging(e)
 
       // 拖拽到rail上
       const { x, y } = e.getLocalPosition(this.railsContainer)
@@ -352,7 +355,7 @@ export class Rails extends EventBus<RailsEvents> {
       const atTrain = this.state.atDragTrain!
 
       if (rail && rail.canAcceptTrain(atTrain) && !rail.trains.includes(atTrain)) {
-        const freeY = atTrain.y
+        const freeY = atTrain.container.y
 
         rail.insertTrain(atTrain)
 
@@ -370,9 +373,11 @@ export class Rails extends EventBus<RailsEvents> {
       if (!this.state.trainDragging)
         return
 
-      clearTimeout(timeId)
-
       const gap = this.railGaps.find(gap => gap.active)
+      this.railGaps.forEach((item) => {
+        if (item !== gap && item.active)
+          item.setActive(false)
+      })
 
       const atTrain = this.state.atDragTrain!
 
@@ -552,15 +557,28 @@ export class Rails extends EventBus<RailsEvents> {
 
   private _stayWhenDragging(e: FederatedPointerEvent): void {
     const { x, y } = e.getLocalPosition(this.railsContainer)
+    const hitPadding = Math.max(6, GAP + 2)
+    let nearestGap: RailGap | null = null
+    let nearestDistance = Number.POSITIVE_INFINITY
 
-    const gap = this.railGaps.find((gap) => {
-      const bounds = gap.container.getLocalBounds()
-      bounds.y = gap.y
+    this.railGaps.forEach((gap) => {
+      if (x < 0 || x > gap.width)
+        return
 
-      return gap.container.getLocalBounds().containsPoint(x, y)
+      const top = gap.y - hitPadding
+      const bottom = gap.y + GAP + hitPadding
+      if (y < top || y > bottom)
+        return
+
+      const centerY = gap.y + GAP / 2
+      const distance = Math.abs(y - centerY)
+      if (distance < nearestDistance) {
+        nearestDistance = distance
+        nearestGap = gap
+      }
     })
 
-    gap?.setActive(true)
+    this.railGaps.forEach(gap => gap.setActive(gap === nearestGap))
   }
 
   /**
