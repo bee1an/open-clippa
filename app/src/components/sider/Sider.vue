@@ -8,7 +8,7 @@ const siderCollapsed = useStorage('siderCollapsed', false)
 
     <div
       v-if="!siderCollapsed"
-      overflow-hidden bg-background-elevated w-220px
+      overflow-hidden bg-background-elevated flex-1
       class="border-l border-border/50"
     >
       <div h-full overflow-y-auto>

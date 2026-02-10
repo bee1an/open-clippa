@@ -29,6 +29,12 @@ const navItems = [
     title: 'Text',
   },
   {
+    path: '/editor/animation',
+    icon: 'i-ph-sparkle-bold',
+    activeIcon: 'i-ph-sparkle-fill',
+    title: 'Animation',
+  },
+  {
     path: '/editor/transition',
     icon: 'i-ph-arrow-bend-up-right-bold',
     activeIcon: 'i-ph-arrow-bend-up-right-fill',

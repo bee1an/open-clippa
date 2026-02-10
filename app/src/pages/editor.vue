@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { CanvasExport, ExportCanceledError } from 'open-clippa'
 import { useRouter } from 'vue-router'
-import AnimationPanel from '@/components/AnimationPanel.vue'
 import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
@@ -14,7 +13,6 @@ import { useExportStore } from '@/store/useExportStore'
 definePage({ redirect: '/editor/media' })
 
 const siderCollapsed = useStorage('siderCollapsed', false)
-const rightSiderCollapsed = useStorage('rightSiderCollapsed', false)
 
 const editorStore = useEditorStore()
 const exportStore = useExportStore()
@@ -195,15 +193,6 @@ async function handleExportCancel() {
           <div :class="!siderCollapsed ? 'i-ph-sidebar-simple-fill' : 'i-ph-sidebar-simple-bold'" text-lg />
         </button>
 
-        <!-- Right Sidebar Toggle -->
-        <button
-          w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
-          title="Toggle Right Sidebar"
-          @click="rightSiderCollapsed = !rightSiderCollapsed"
-        >
-          <div :class="!rightSiderCollapsed ? 'i-ph-sidebar-simple-fill' : 'i-ph-sidebar-simple-bold'" text-lg transform="scale-x-[-1]" />
-        </button>
-
         <div w-px h-4 bg-border mx-2 />
 
         <Button
@@ -221,7 +210,7 @@ async function handleExportCancel() {
     <div flex flex-1 w-full overflow-hidden relative>
       <!-- Left Sider -->
       <aside
-        :style="{ width: siderCollapsed ? '56px' : '280px' }"
+        :style="{ width: siderCollapsed ? '56px' : '320px' }"
         flex-shrink-0 bg-background-elevated border-r border="border/50" transition-all duration-300 ease="[cubic-bezier(0.25,1,0.5,1)]" z-40 flex flex-col relative group
       >
         <Sider />
@@ -235,22 +224,6 @@ async function handleExportCancel() {
         </div>
         <ResizableTimeline />
       </main>
-
-      <!-- Right Sider -->
-      <aside
-        :style="{ width: rightSiderCollapsed ? '0px' : '280px' }"
-        flex-shrink-0
-        bg-background-elevated
-        border-l border="border/50"
-        transition-all duration-300 ease-in-out
-        z-40
-        flex flex-col
-        data-preserve-canvas-selection="true"
-      >
-        <div h-full overflow-hidden w-280px>
-          <AnimationPanel />
-        </div>
-      </aside>
     </div>
 
     <DebugPanel v-if="showDebugPanel" />
