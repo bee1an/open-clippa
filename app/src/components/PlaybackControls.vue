@@ -70,6 +70,18 @@ function handleZoomStep(direction: 1 | -1): void {
   const next = Math.min(100, Math.max(0, zoomSliderValue.value + direction * ZOOM_STEP))
   handleZoomInput(next)
 }
+
+function handleZoomFit(): void {
+  const viewportWidth = clippa.timeline.rails?.scrollBox.viewportWidth ?? 0
+  const totalDuration = clippa.timeline.duration
+  if (!viewportWidth || !totalDuration)
+    return
+
+  const fitPxPerMs = Math.min(MAX_PX_PER_MS, Math.max(MIN_PX_PER_MS, viewportWidth / totalDuration))
+  clippa.timeline.state.updatePxPerMs(fitPxPerMs)
+  clippa.timeline.rails?.scrollBox.scrollToX(0)
+  clippa.timeline.cursor?.updatePosition(clippa.timeline.currentTime)
+}
 </script>
 
 <template>
@@ -162,6 +174,13 @@ function handleZoomStep(direction: 1 | -1): void {
           @click="handleZoomStep(1)"
         >
           <div i-ph-plus-bold text="[10px]" />
+        </button>
+        <button
+          flex items-center justify-center w-4 h-4 rounded text-foreground-muted hover:text-foreground transition-colors
+          title="适应全部"
+          @click="handleZoomFit"
+        >
+          <div i-ph-arrows-horizontal-bold text="[10px]" />
         </button>
       </div>
 

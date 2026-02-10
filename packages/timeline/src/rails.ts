@@ -381,7 +381,7 @@ export class Rails extends EventBus<RailsEvents> {
 
       const atTrain = this.state.atDragTrain!
 
-      if (gap) {
+      if (gap && atTrain.dragStatus === 'free') {
         gap.setActive(false)
 
         const { zIndex } = gap
@@ -556,6 +556,12 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   private _stayWhenDragging(e: FederatedPointerEvent): void {
+    // only free trains can dock into a rail gap
+    if (this.state.atDragTrain?.dragStatus !== 'free') {
+      this.railGaps.forEach(gap => gap.setActive(false))
+      return
+    }
+
     const { x, y } = e.getLocalPosition(this.railsContainer)
     const hitPadding = Math.max(6, GAP + 2)
     let nearestGap: RailGap | null = null
