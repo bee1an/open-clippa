@@ -81,6 +81,9 @@ export class Rails extends EventBus<RailsEvents> {
       this._processWidth()
 
       this.update()
+
+      // 缩放后内容宽度变化，需同步 scrollBox 的内容尺寸
+      this.scrollBox.update()
     })
 
     this.duration = option.duration

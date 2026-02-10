@@ -3,6 +3,7 @@ import type { ResizeDirection, SelectionItem } from '@clippa/selection'
 import { Selection } from '@clippa/selection'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
+import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 // Props
@@ -17,6 +18,8 @@ const props = withDefaults(defineProps<Props>(), {
 const scaleRatio = computed(() => props.scaleRatio)
 
 const performerStore = usePerformerStore()
+const editorStore = useEditorStore()
+const { currentTime } = storeToRefs(editorStore)
 type SelectionExpose = {
   startExternalDrag?: (clientX: number, clientY: number) => void
 }
@@ -98,6 +101,13 @@ const currentSelection = computed(() => {
 // 将 performer bounds 转换为 SelectionItem（已应用缩放率的DOM坐标）
 const selectionItem = computed<SelectionItem | null>(() => {
   if (!currentSelectionInfo.value || !currentSelection.value)
+    return null
+
+  // 当 currentTime 不在选中 performer 的时间范围内时，隐藏选框
+  const performer = currentSelection.value
+  const start = performer.start ?? 0
+  const end = start + (performer.duration ?? 0)
+  if (currentTime.value < start || currentTime.value >= end)
     return null
 
   const bounds = currentSelectionInfo.value.bounds

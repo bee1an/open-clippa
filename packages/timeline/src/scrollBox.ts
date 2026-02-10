@@ -77,6 +77,8 @@ export type ScrollBoxEvents = {
   toggleYBarVisible: [boolean]
 
   scroll: [{ x: number, y: number }]
+
+  zoom: [{ deltaY: number, pointerX: number }]
 }
 
 class ContainerProxy<C extends ContainerChild = ContainerChild> extends Container<C> {
@@ -474,6 +476,13 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     this.container.on('wheel', (e) => {
       e.preventDefault()
 
+      // Ctrl/Cmd + 滚轮 → 缩放
+      if (e.ctrlKey || e.metaKey) {
+        const pointerX = e.getLocalPosition(this.container).x
+        this.emit('zoom', { deltaY: e.deltaY, pointerX })
+        return
+      }
+
       const absX = Math.abs(e.deltaX)
       const absY = Math.abs(e.deltaY)
 
@@ -713,6 +722,23 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
     // 直接滚动一个视口宽度的距离
     this._scrollXByDistance(-this.viewportWidth)
+  }
+
+  /**
+   * 直接设置水平滚动位置（用于缩放锚点校正）
+   *
+   * 绕过 trigger-based 滚动逻辑，直接定位 wrapper 并同步滚动条状态
+   */
+  scrollToX(targetX: number): void {
+    const scrollMore = this.scrollMore?.x ?? 0
+    const maxScroll = Math.max(0, this.width + scrollMore - this.viewportWidth)
+
+    // clamp: targetX 是负值（向左偏移），范围 [-maxScroll, 0]
+    const clampedX = Math.min(0, Math.max(-maxScroll, targetX))
+    this._wrapper.x = clampedX
+
+    this.queueRender()
+    this.emit('scroll', { x: 0, y: 0 })
   }
 
   /**

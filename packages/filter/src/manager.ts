@@ -10,7 +10,7 @@ import type {
   TrainResizePayload,
 } from './types'
 import { TextTrain as TextTrainImpl } from '@clippa/timeline'
-import { EventBus, getMsByPx } from '@clippa/utils'
+import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
 import { ColorMatrixFilter as ColorMatrixFilterImpl } from 'pixi.js'
 import {
   applyFilterConfig,
@@ -170,6 +170,65 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
 
     layer.train.updateActive(true)
     this.emitChange()
+  }
+
+  splitLayerByTrainId(trainId: string, splitTime: number): FilterLayer | null {
+    const timeline = this.timelineRef
+    if (!timeline)
+      return null
+
+    const sourceLayer = this.layers.find(layer => layer.train.id === trainId)
+    if (!sourceLayer)
+      return null
+
+    const start = sourceLayer.start
+    const end = sourceLayer.start + sourceLayer.duration
+    if (splitTime <= start || splitTime >= end)
+      return null
+
+    const leftDuration = splitTime - start
+    const rightDuration = end - splitTime
+    const now = Date.now()
+    const id = `filter-${now}-${Math.random().toString(36).slice(2, 8)}`
+
+    sourceLayer.duration = leftDuration
+    sourceLayer.train.duration = leftDuration
+    sourceLayer.train.updateWidth(getPxByMs(leftDuration, sourceLayer.train.state.pxPerMs))
+    sourceLayer.version += 1
+
+    const train: TextTrain = new TextTrainImpl({
+      id: `filter-train-${id}`,
+      start: splitTime,
+      duration: rightDuration,
+      label: sourceLayer.name,
+      variant: 'filter',
+    })
+    timeline.addTrainByZIndex(train, sourceLayer.zIndex)
+
+    const config = cloneFilterConfig(sourceLayer.config)
+    const filter: ColorMatrixFilter = new ColorMatrixFilterImpl()
+    applyFilterConfig(filter, config)
+
+    const nextLayer: FilterLayer = {
+      id,
+      name: sourceLayer.name,
+      start: splitTime,
+      duration: rightDuration,
+      zIndex: sourceLayer.zIndex,
+      config,
+      filter,
+      train,
+      createdAt: now,
+      version: 0,
+    }
+
+    const sourceLayerIndex = this.layers.findIndex(layer => layer.id === sourceLayer.id)
+    const insertIndex = sourceLayerIndex >= 0 ? sourceLayerIndex + 1 : this.layers.length
+    this.layers.splice(insertIndex, 0, nextLayer)
+    this.bindTrainEvents(nextLayer, train)
+
+    this.emitChange()
+    return nextLayer
   }
 
   removeLayer(id: string): void {

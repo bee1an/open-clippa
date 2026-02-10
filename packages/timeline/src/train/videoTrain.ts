@@ -21,6 +21,7 @@ export class VideoTrain extends Train<VideoTrainEvents> {
   private _sourceStart: number
   private _thumbnailBaseSourceStart: number
   private _thumbnailRenderVersion: number = 0
+  private _zoomRefreshTimer: number = 0
 
   constructor(option: VideoTrainOption) {
     super(Object.assign(option, { height: VIDEO_TRAIN_HEIGHT }))
@@ -33,6 +34,16 @@ export class VideoTrain extends Train<VideoTrainEvents> {
     this._thumbnailLayer = new Container({ label: 'video-train-thumbnails' })
     this._thumbnailLayer.eventMode = 'none'
     this._slot.addChild(this._thumbnailLayer)
+
+    // debounce: wait until zooming stops, then regenerate thumbnails
+    this.state.on('updatedPxPerMs', () => {
+      clearTimeout(this._zoomRefreshTimer)
+      this._zoomRefreshTimer = window.setTimeout(() => {
+        this.refreshThumbnails().catch((e) => {
+          console.warn('Zoom thumbnail refresh failed', e)
+        })
+      }, 150)
+    })
   }
 
   async init(): Promise<void> {

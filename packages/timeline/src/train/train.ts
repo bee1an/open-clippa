@@ -25,6 +25,8 @@ type TrainCornerRadius = {
 }
 
 export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
+  private static readonly _MIN_DURATION_MS = 1
+
   /**
    * id
    */
@@ -224,7 +226,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   /**
    * draw a resizer helper
    */
-  private _drawResizerHelper(...[x, _, w, h, location = 'left']: [x: number, y: number, w: number, h: number, location?: 'left' | 'right']): [Container, Graphics] {
+  private _drawResizerHelper(...[x, _, w, h, location = 'left']: [x: number, y: number, w: number, h: number, location?: 'left' | 'right']): [Container, Graphics, Graphics] {
     const resizer = new Container({ label: `${location}-resizer` })
     resizer.x = x
     resizer.eventMode = 'static'
@@ -272,13 +274,32 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     resizer.hitArea = new Rectangle(hitAreaX, 0, w / 2, h)
 
     this._widget.addChild(resizer)
-    return [resizer, resizerMain]
+    return [resizer, resizerMain, resizerHandler]
   }
 
   private _leftResizer!: Container
   private _leftResizerMain!: Graphics
+  private _leftResizerHandler!: Graphics
   private _rightResizer!: Container
   private _rightResizerMain!: Graphics
+  private _rightResizerHandler!: Graphics
+  private _resizing: boolean = false
+
+  private _canShowResizerVisuals(): boolean {
+    return this.width >= TIMELINE_RESIZE_TRIGGER_WIDTH
+  }
+
+  private _updateResizerVisualVisibility(): void {
+    if (!this._leftResizerMain || !this._rightResizerMain || !this._leftResizerHandler || !this._rightResizerHandler)
+      return
+
+    const visible = !this._resizing && this._canShowResizerVisuals()
+    this._leftResizerMain.visible = visible
+    this._rightResizerMain.visible = visible
+    this._leftResizerHandler.visible = visible
+    this._rightResizerHandler.visible = visible
+  }
+
   /**
    * include left resizer and right resizer
    */
@@ -287,7 +308,7 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     const triggerWidth = TIMELINE_RESIZE_TRIGGER_WIDTH
 
     if (!this._leftResizer) {
-      [this._leftResizer, this._leftResizerMain] = this._drawResizerHelper(0, 0, triggerWidth, this.height)
+      ;[this._leftResizer, this._leftResizerMain, this._leftResizerHandler] = this._drawResizerHelper(0, 0, triggerWidth, this.height)
       this._bindLeftResize(this._leftResizer)
     }
     else {
@@ -305,8 +326,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     }
 
     if (!this._rightResizer) {
-      const rightX = Math.max(this.width - triggerWidth, 0)
-      ;[this._rightResizer, this._rightResizerMain] = this._drawResizerHelper(
+      const rightX = this._resolveRightResizerX(this.width)
+      ;[this._rightResizer, this._rightResizerMain, this._rightResizerHandler] = this._drawResizerHelper(
         rightX,
         0,
         triggerWidth,
@@ -328,6 +349,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
       )
       this._rightResizerMain.fill(fillStyle)
     }
+
+    this._updateResizerVisualVisibility()
   }
 
   private _borderContainer!: Container
@@ -508,6 +531,10 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
    */
   private _bindLeftResize(traget: Container): void {
     drag(traget, {
+      down: () => {
+        this._resizing = true
+        this._updateResizerVisualVisibility()
+      },
       move: (_, { dx }) => {
         const site = {
           wValue: this.width - dx,
@@ -516,6 +543,14 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         }
 
         this.emit('beforeLeftResize', site, this)
+
+        const minWidth = this._getMinDurationWidth()
+        if (site.wValue < minWidth) {
+          const right = site.xValue + site.wValue
+          site.wValue = minWidth
+          site.xValue = right - minWidth
+          site.disdrawable = false
+        }
 
         if (!site.disdrawable) {
           this.container.x = site.xValue
@@ -530,7 +565,12 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         this.x = this.container.x
 
         this.start = this._resolveStartByVisualX(this.x)
-        this.duration = getMsByPx(this.width, this.state.pxPerMs)
+        this.duration = Math.max(
+          Train._MIN_DURATION_MS,
+          getMsByPx(this.width, this.state.pxPerMs),
+        )
+        this._resizing = false
+        this._updateResizerVisualVisibility()
         this.emit('leftResizeEnd', this)
       },
     })
@@ -542,6 +582,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   private _bindRightResize(traget: Container): void {
     drag(traget, {
       down: () => {
+        this._resizing = true
+        this._updateResizerVisualVisibility()
         this.emit('rightResizeStart', this)
       },
       move: (_, { dx }) => {
@@ -551,19 +593,30 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         }
         this.emit('beforeRightResize', site, this)
 
+        const minWidth = this._getMinDurationWidth()
+        if (site.wValue < minWidth) {
+          site.wValue = minWidth
+          site.disdrawable = false
+        }
+
         this.width = site.wValue
 
         if (!site.disdrawable) {
           this._drawSlot()
           this._drawBorder()
-          traget.x = this.width - TIMELINE_RESIZE_TRIGGER_WIDTH
+          traget.x = this._resolveRightResizerX(this.width)
         }
       },
 
       up: () => {
         this.width = this._slot.width
-        this.duration = getMsByPx(this.width, this.state.pxPerMs)
+        this.duration = Math.max(
+          Train._MIN_DURATION_MS,
+          getMsByPx(this.width, this.state.pxPerMs),
+        )
 
+        this._resizing = false
+        this._updateResizerVisualVisibility()
         this.emit('rightResizeEnd', this)
       },
     })
@@ -628,7 +681,8 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
     this._drawBorder()
 
-    this._rightResizer.x = width - TIMELINE_RESIZE_TRIGGER_WIDTH
+    this._rightResizer.x = this._resolveRightResizerX(width)
+    this._updateResizerVisualVisibility()
   }
 
   updateJoinState(joinLeft: boolean, joinRight: boolean): void {
@@ -645,6 +699,14 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
   }
 
   protected _onJoinStateUpdated(): void {}
+
+  private _getMinDurationWidth(): number {
+    return getPxByMs(Train._MIN_DURATION_MS, this.state.pxPerMs)
+  }
+
+  private _resolveRightResizerX(width: number): number {
+    return Math.max(width - TIMELINE_RESIZE_TRIGGER_WIDTH, 0)
+  }
 
   /**
    * Updates the position of train

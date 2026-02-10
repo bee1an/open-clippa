@@ -2,6 +2,7 @@
 import { CanvasExport, ExportCanceledError } from 'open-clippa'
 import { useRouter } from 'vue-router'
 import AnimationPanel from '@/components/AnimationPanel.vue'
+import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
 import { useFilterEngine } from '@/composables/useFilterEngine'
@@ -20,6 +21,7 @@ const exportStore = useExportStore()
 const router = useRouter()
 const isClippaReady = ref(false)
 const exportFrameRate = 30
+const showDebugPanel = import.meta.env.DEV
 
 const exportState = reactive({
   open: false,
@@ -250,6 +252,8 @@ async function handleExportCancel() {
         </div>
       </aside>
     </div>
+
+    <DebugPanel v-if="showDebugPanel" />
 
     <ExportProgressModal
       :model-value="exportState.open"

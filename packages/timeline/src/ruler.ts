@@ -216,6 +216,9 @@ export class Ruler extends EventBus<RulerEvents> {
     let x: number
     const seek = (): void => {
       let seekTime = getMsByPx(x, this.state.pxPerMs)
+      if (seekTime < 0) {
+        seekTime = 0
+      }
       if (seekTime > this.duration) {
         seekTime = this.duration
       }

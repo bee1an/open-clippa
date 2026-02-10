@@ -19,9 +19,41 @@ export function useTimelineBinding(): void {
   const editorStore = useEditorStore()
   const performerStore = usePerformerStore()
   const { clippa } = editorStore
+  const MIN_TRAIN_DURATION_MS = 1
 
   const railDisposers = new Map<Rail, () => void>()
   const trainDisposers = new Map<Train, () => void>()
+  let pendingCanvasTimingSync: number | null = null
+  let syncingCanvasTiming = false
+
+  const flushCanvasTimingSync = async (): Promise<void> => {
+    if (syncingCanvasTiming)
+      return
+
+    syncingCanvasTiming = true
+
+    try {
+      while (pendingCanvasTimingSync !== null) {
+        const time = pendingCanvasTimingSync
+        pendingCanvasTimingSync = null
+        await clippa.director.seek(time)
+      }
+    }
+    catch (error) {
+      console.warn('[timeline-binding] sync canvas timing failed', error)
+    }
+    finally {
+      syncingCanvasTiming = false
+    }
+  }
+
+  const queueCanvasTimingSync = (): void => {
+    if (editorStore.isPlaying)
+      return
+
+    pendingCanvasTimingSync = clippa.timeline.currentTime
+    void flushCanvasTimingSync()
+  }
 
   function syncTrainTiming(train: Train): void {
     const performer = performerStore.getPerformerById(train.id)
@@ -46,6 +78,10 @@ export function useTimelineBinding(): void {
       return train.parent.getRawMsByVisualPx(train, visualX)
 
     return getMsByPx(visualX, clippa.timeline.state.pxPerMs)
+  }
+
+  function resolveMinTrainWidth(pxPerMs: number): number {
+    return getPxByMs(MIN_TRAIN_DURATION_MS, pxPerMs)
   }
 
   function bindTrain(train: Train): void {
@@ -74,6 +110,7 @@ export function useTimelineBinding(): void {
     const handleMoveEnd = (target: Train): void => {
       syncRailTiming(target.parent)
       syncTrainTiming(target)
+      queueCanvasTimingSync()
     }
 
     const handleBeforeLeftResize = (site: { xValue: number, wValue: number, disdrawable: boolean }): void => {
@@ -104,6 +141,21 @@ export function useTimelineBinding(): void {
           nextDuration = oldDuration - clampedDelta
         }
 
+      }
+
+      // 按最小时长约束最小宽度
+      const minW = resolveMinTrainWidth(pxPerMs)
+      if (site.wValue < minW) {
+        const overflow = minW - site.wValue
+        site.xValue -= overflow
+        site.wValue = minW
+        // rail 可能已将 disdrawable 置为 true，这里强制走 train 自身重绘
+        site.disdrawable = false
+        nextStart = resolveStartByVisualX(train, site.xValue)
+        nextDuration = getMsByPx(site.wValue, pxPerMs)
+      }
+
+      if (hasSourceTiming(performer)) {
         const maxSourceStart = Math.max(0, performer.sourceDuration)
         const clampedSourceStart = performer.sourceStart + (nextStart - oldStart)
         performer.sourceStart = Math.min(
@@ -115,9 +167,14 @@ export function useTimelineBinding(): void {
           train.updateSourceStart(performer.sourceStart)
       }
 
-      site.wValue = Math.max(0, site.wValue)
       performer.start = nextStart
-      performer.duration = Math.max(0, nextDuration)
+      performer.duration = Math.max(MIN_TRAIN_DURATION_MS, nextDuration)
+    }
+
+    const handleBeforeRightResize = (site: { wValue: number, disdrawable: boolean }): void => {
+      // 按最小时长约束最小宽度
+      const minW = resolveMinTrainWidth(clippa.timeline.state.pxPerMs)
+      site.wValue = Math.max(minW, site.wValue)
     }
 
     const handleLeftResizeEnd = (target: Train): void => {
@@ -125,6 +182,7 @@ export function useTimelineBinding(): void {
       syncTrainTiming(target)
       syncVideoTrainSource()
       refreshVideoTrainThumbnails()
+      queueCanvasTimingSync()
     }
 
     const handleRightResizeEnd = (target: Train): void => {
@@ -132,17 +190,20 @@ export function useTimelineBinding(): void {
       syncTrainTiming(target)
       syncVideoTrainSource()
       refreshVideoTrainThumbnails()
+      queueCanvasTimingSync()
     }
 
     train.on('moveEnd', handleMoveEnd)
     train.on('beforeLeftResize', handleBeforeLeftResize)
     train.on('leftResizeEnd', handleLeftResizeEnd)
+    train.on('beforeRightResize', handleBeforeRightResize)
     train.on('rightResizeEnd', handleRightResizeEnd)
 
     trainDisposers.set(train, () => {
       train.off('moveEnd', handleMoveEnd)
       train.off('beforeLeftResize', handleBeforeLeftResize)
       train.off('leftResizeEnd', handleLeftResizeEnd)
+      train.off('beforeRightResize', handleBeforeRightResize)
       train.off('rightResizeEnd', handleRightResizeEnd)
     })
   }
@@ -173,7 +234,9 @@ export function useTimelineBinding(): void {
   }
 
   const handleHire = (): void => {
-    bindTimelineRails()
+    // clippa.hire() 中 theater.hire(p) 先于 timeline.addTrainByZIndex() 执行，
+    // 此时新 rail/train 尚未创建，需延迟到当前微任务完成后再绑定
+    queueMicrotask(() => bindTimelineRails())
   }
 
   onMounted(async () => {

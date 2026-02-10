@@ -1,4 +1,5 @@
 import type { Filter, Texture } from 'pixi.js'
+import type { Rail } from 'open-clippa'
 import type { TransitionCandidate, TransitionSpec } from '@/utils/transition'
 import { Image, Video } from 'open-clippa'
 import { storeToRefs } from 'pinia'
@@ -39,6 +40,21 @@ interface HiddenPair {
   to: RenderablePerformer
 }
 
+function isRenderableTexture(texture: Texture | undefined): texture is Texture {
+  if (!texture)
+    return false
+
+  const target = texture as Texture & { destroyed?: boolean, source?: { destroyed?: boolean, alphaMode?: unknown } | null }
+  if (target.destroyed)
+    return false
+
+  const source = target.source
+  if (!source || source.destroyed)
+    return false
+
+  return source.alphaMode !== null && source.alphaMode !== undefined
+}
+
 export function useTransitionEngine(options: TransitionEngineOptions = {}): void {
   if (!TRANSITION_FEATURE_AVAILABLE)
     return
@@ -62,6 +78,33 @@ export function useTransitionEngine(options: TransitionEngineOptions = {}): void
   let transitionFilter: Filter | null = null
   let hiddenPair: HiddenPair | null = null
   const transitionFilterCache = new Map<string, Filter>()
+  const railDisposers = new Map<Rail, () => void>()
+
+  const handleRailChanged = (): void => {
+    requestRender()
+  }
+
+  function bindRail(rail: Rail): void {
+    if (railDisposers.has(rail))
+      return
+
+    rail.on('insertTrain', handleRailChanged)
+    rail.on('trainMoveEnd', handleRailChanged)
+    rail.on('trainRightResizeEnd', handleRailChanged)
+    rail.on('trainsPosUpdated', handleRailChanged)
+
+    railDisposers.set(rail, () => {
+      rail.off('insertTrain', handleRailChanged)
+      rail.off('trainMoveEnd', handleRailChanged)
+      rail.off('trainRightResizeEnd', handleRailChanged)
+      rail.off('trainsPosUpdated', handleRailChanged)
+    })
+  }
+
+  function bindRails(): void {
+    const rails = clippa.timeline.rails?.rails ?? []
+    rails.forEach(bindRail)
+  }
 
   function isRenderablePerformer(performer: unknown): performer is RenderablePerformer {
     return performer instanceof Video || performer instanceof Image
@@ -269,8 +312,11 @@ export function useTransitionEngine(options: TransitionEngineOptions = {}): void
     if (!uniforms)
       return false
 
-    uniforms.uFrom = (fromTexture as any).source ?? fromTexture
-    uniforms.uTo = (toTexture as any).source ?? toTexture
+    if (!isRenderableTexture(fromTexture) || !isRenderableTexture(toTexture))
+      return false
+
+    uniforms.uFrom = fromTexture.source
+    uniforms.uTo = toTexture.source
     uniforms.uProgress = progress
     uniforms.uRatio = getStageRatio()
     return true
@@ -304,7 +350,7 @@ export function useTransitionEngine(options: TransitionEngineOptions = {}): void
 
     const fromTexture = context.from.sprite?.texture
     const toTexture = context.to.sprite?.texture
-    if (!fromTexture || !toTexture) {
+    if (!isRenderableTexture(fromTexture) || !isRenderableTexture(toTexture)) {
       restoreHiddenPair()
       hideTransitionLayer()
       return
@@ -381,6 +427,9 @@ export function useTransitionEngine(options: TransitionEngineOptions = {}): void
       return
 
     ready = true
+    bindRails()
+    clippa.timeline.on('durationChanged', bindRails)
+    clippa.theater.on('hire', bindRails)
     ensureTransitionLayer()
     requestRender()
   })
@@ -406,6 +455,11 @@ export function useTransitionEngine(options: TransitionEngineOptions = {}): void
       (filter as any).destroy?.()
     })
     transitionFilterCache.clear()
+
+    clippa.timeline.off('durationChanged', bindRails)
+    clippa.theater.off('hire', bindRails)
+    railDisposers.forEach(dispose => dispose())
+    railDisposers.clear()
   })
 
   watch(

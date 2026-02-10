@@ -21,6 +21,7 @@ export class Director extends EventBus<DirectorEvents> {
    * 是否播放中
    */
   private _playing: boolean = false
+  private _clockProvider: (() => number) | null = null
 
   /**
    * 当前播放时间
@@ -58,6 +59,16 @@ export class Director extends EventBus<DirectorEvents> {
     this.emit('durationChange', value)
   }
 
+  setClockProvider(provider: (() => number) | null): void {
+    this._clockProvider = provider
+  }
+
+  private _seekPerformerToCurrentTime(performer: Performer): void {
+    void performer.seek(this.currentTime - performer.start).catch((error) => {
+      console.warn('[director] seek performer to current time failed', error)
+    })
+  }
+
   constructor(option: DirectorOption) {
     super()
     this.guidance(option.stage)
@@ -75,7 +86,11 @@ export class Director extends EventBus<DirectorEvents> {
         this.duration = performer.start + performer.duration
       }
 
-      this.checkPerformerInShowTime(performer) && this.stage.add(performer)
+      if (!this.checkPerformerInShowTime(performer))
+        return
+
+      this.stage.add(performer)
+      this._seekPerformerToCurrentTime(performer)
     })
   }
 
@@ -87,7 +102,13 @@ export class Director extends EventBus<DirectorEvents> {
 
     this.stage.on(
       'delayedAdd',
-      (p: Performer): any => this.checkPerformerInShowTime(p) && this.stage.add(p),
+      (p: Performer): any => {
+        if (!this.checkPerformerInShowTime(p))
+          return
+
+        this.stage.add(p)
+        this._seekPerformerToCurrentTime(p)
+      },
     )
   }
 
@@ -95,7 +116,14 @@ export class Director extends EventBus<DirectorEvents> {
    * 检查表演者是否在当前时间段
    */
   checkPerformerInShowTime(performer: Performer): boolean {
-    return this.currentTime >= performer.start && this.currentTime < performer.start + performer.duration
+    const end = performer.start + performer.duration
+    const atProjectEnd = this.duration > 0 && this.currentTime === this.duration
+
+    if (atProjectEnd) {
+      return this.currentTime >= performer.start && this.currentTime <= end
+    }
+
+    return this.currentTime >= performer.start && this.currentTime < end
   }
 
   private _requestAnimationFrameId?: number
@@ -110,17 +138,21 @@ export class Director extends EventBus<DirectorEvents> {
 
     this._requestAnimationFrameId = requestAnimationFrame(() => {
       const nextTime = Date.now()
+      const elapsed = nextTime - time
+      const externalTime = this._clockProvider?.()
+      const nextCurrentTime = typeof externalTime === 'number' && Number.isFinite(externalTime)
+        ? externalTime
+        : this.currentTime + elapsed
+      const clampedCurrentTime = Math.max(0, Math.min(this.duration, nextCurrentTime))
 
-      const crt = this.currentTime + (nextTime - time)
+      this.currentTime = clampedCurrentTime
 
-      if (crt > this.duration) {
-        this.currentTime = this.duration
+      if (clampedCurrentTime >= this.duration) {
         this.pause()
+        return
       }
-      else {
-        this.currentTime = crt
-        this._start()
-      }
+
+      this._start()
     })
   }
 
@@ -202,12 +234,12 @@ export class Director extends EventBus<DirectorEvents> {
         if (this.checkPerformerInShowTime(p)) {
           typeof pre[p.zIndex] === 'undefined' && (pre[p.zIndex] = [])
           pre[p.zIndex].push(() => {
-            p.showState !== 'playing' && this.stage.add(p)
+            !this.stage.performers.has(p) && this.stage.add(p)
             cb?.in?.(p)
           })
         }
         else {
-          p.showState === 'playing' && this.stage.remove(p)
+          this.stage.performers.has(p) && this.stage.remove(p)
           // 暂停属于移除出舞台的默认行为
           p.pause(this.currentTime - p.start)
           cb?.out?.(p)

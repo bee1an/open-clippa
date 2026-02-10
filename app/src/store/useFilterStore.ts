@@ -64,6 +64,10 @@ export const useFilterStore = defineStore('filter', () => {
     manager.removeLayer(id)
   }
 
+  function splitLayerByTrainId(trainId: string, splitTime: number): FilterLayer | null {
+    return manager.splitLayerByTrainId(trainId, splitTime)
+  }
+
   return {
     layers,
     activeLayerId,
@@ -76,5 +80,6 @@ export const useFilterStore = defineStore('filter', () => {
     resetLayerConfig,
     updateLayerZIndex,
     removeLayer,
+    splitLayerByTrainId,
   }
 })

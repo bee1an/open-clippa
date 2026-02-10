@@ -56,6 +56,8 @@ export interface VideoOption extends PerformerOption {
 }
 
 export class Video extends EventBus<PerformerEvents> implements Performer {
+  private static readonly _FRAME_SAMPLE_EPSILON_MS = 1
+
   id: string
   start: number
   duration: number
@@ -294,7 +296,14 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
   private _clampSourceTime(time: number): number {
     const max = Math.max(0, this.sourceDuration)
-    return Math.min(max, Math.max(0, time))
+    if (max <= 0)
+      return 0
+
+    const safeMax = max > Video._FRAME_SAMPLE_EPSILON_MS
+      ? max - Video._FRAME_SAMPLE_EPSILON_MS
+      : max
+
+    return Math.min(safeMax, Math.max(0, time))
   }
 
   /**
@@ -338,12 +347,6 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         }
 
         const texture = Texture.from(frameData.frame)
-
-        // 销毁旧纹理
-        if (this._sprite.texture) {
-          this._sprite.texture.destroy(true)
-        }
-
         this._sprite.texture = texture
 
         if (preservedSize.width > 0 && preservedSize.height > 0) {
@@ -372,7 +375,14 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     try {
       const sample = await this._videoSink.getSample(timeInSeconds)
-      return sample || null
+      if (sample)
+        return sample
+
+      if (time <= 0)
+        return null
+
+      const fallbackTime = Math.max(0, time - Video._FRAME_SAMPLE_EPSILON_MS)
+      return await this._videoSink.getSample(fallbackTime / 1000) || null
     }
     catch (error) {
       console.error('Error getting video sample:', error)

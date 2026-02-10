@@ -24,6 +24,7 @@ export class Clippa extends EventBus<ClippaEvents> {
     this.director = new Director({ stage: this.stage, theater: this.theater })
 
     this.timeline = new Timeline()
+    this.director.setClockProvider(() => this.timeline.currentTime)
 
     this.ready = Promise.all([this.stage.ready, this.timeline.ready]) as any
 
@@ -31,10 +32,14 @@ export class Clippa extends EventBus<ClippaEvents> {
       this.director.play()
     })
     this.timeline.on('pause', () => {
+      this.director.currentTime = this.timeline.currentTime
       this.director.pause()
     })
     this.timeline.on('seeked', async (time) => {
       await this.director.seek(time)
+    })
+    this.timeline.on('durationChanged', (duration) => {
+      this.director.duration = duration
     })
   }
 

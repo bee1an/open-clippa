@@ -15,6 +15,10 @@ export type TimlineEvents = {
   durationChanged: [number]
 }
 
+const ZOOM_SENSITIVITY = 0.002
+const MIN_PX_PER_MS = 0.001
+const MAX_PX_PER_MS = 1.0
+
 export class Timeline extends EventBus<TimlineEvents> {
   /**
    * pixi application
@@ -215,6 +219,31 @@ export class Timeline extends EventBus<TimlineEvents> {
     this.rails.on('updateDuration', (duration: number) => {
       this.updateDuration(duration)
     })
+
+    this.rails.scrollBox.on('zoom', ({ deltaY, pointerX }) => {
+      const oldPxPerMs = this.state.pxPerMs
+
+      // pointerX 相对于 scrollBox 容器，减去滚动偏移得到内容坐标
+      const contentX = pointerX - this.rails!.offsetX
+      const pointerMs = getMsByPx(contentX, oldPxPerMs)
+
+      const factor = 1 - deltaY * ZOOM_SENSITIVITY
+      const newPxPerMs = Math.min(MAX_PX_PER_MS, Math.max(MIN_PX_PER_MS, oldPxPerMs * factor))
+
+      if (newPxPerMs === oldPxPerMs)
+        return
+
+      // 触发全局重新布局（Ruler / Rails / Train 自动响应）
+      this.state.updatePxPerMs(newPxPerMs)
+
+      // 锚点校正：让鼠标指向的时间点保持在屏幕同一位置
+      const newPointerPx = getPxByMs(pointerMs, newPxPerMs)
+      const targetOffsetX = -(newPointerPx - pointerX)
+      this.rails!.scrollBox.scrollToX(targetOffsetX)
+
+      // 同步 cursor 位置
+      this.cursor?.updatePosition(this.currentTime)
+    })
   }
 
   /**
@@ -355,11 +384,12 @@ export class Timeline extends EventBus<TimlineEvents> {
   seek(time: number, withEffect = true): void {
     this._stop()
 
-    this.currentTime = time
+    const boundedTime = Math.max(0, Math.min(this.duration, time))
+    this.currentTime = boundedTime
 
-    withEffect && this.cursor?.seek(time)
+    withEffect && this.cursor?.seek(boundedTime)
 
-    this.emit('seeked', time)
+    this.emit('seeked', boundedTime)
   }
 
   addTrainByZIndex(train: Train, zIndex: number): void {
