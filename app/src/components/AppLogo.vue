@@ -20,6 +20,12 @@ const sizeClasses = {
   lg: 'text-lg',
 }
 
+const iconSizeClasses = {
+  sm: 'w-6 h-6',
+  md: 'w-8 h-8',
+  lg: 'w-10 h-10',
+}
+
 function handleClick() {
   if (props.clickable) {
     router.push('/')
@@ -29,15 +35,16 @@ function handleClick() {
 
 <template>
   <div
-    select-none tracking-tight font-sans flex items-center gap-2 transition-opacity duration-200
+    select-none tracking-tight font-sans flex items-end transition-opacity duration-200
     :class="[clickable ? 'cursor-pointer hover:opacity-80' : '']"
     @click="handleClick"
   >
+    <img src="/logo.svg" alt="Logo" class="object-contain" :class="iconSizeClasses[size]">
     <span
-      font-bold text-foreground tracking-tight
+      font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent tracking-tight
       :class="sizeClasses[size]"
     >
-      clippc
+      lippc
     </span>
   </div>
 </template>

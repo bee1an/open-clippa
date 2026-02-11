@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="clippa-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" /> <!-- Electric Blue-ish -->
+      <stop offset="100%" stop-color="#9333ea" /> <!-- Deep Purple-ish -->
+    </linearGradient>
+  </defs>
+  <path
+    d="M 76.8 27.5 A 35 35 0 1 0 76.8 72.5"
+    stroke="url(#clippa-gradient)"
+    stroke-width="20"
+    stroke-linecap="round"
+    fill="none"
+  />
+</svg>
