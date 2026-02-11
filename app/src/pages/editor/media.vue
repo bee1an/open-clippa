@@ -80,7 +80,7 @@ function onDragDrop(event: DragEvent) {
       <label for="media-upload" wfull block cursor-pointer>
         <Button
           variant="outline"
-          class="w-full pointer-events-none"
+          class="w-full pointer-events-none bg-white text-black"
           :class="{
             'border-primary bg-primary/20': isDragging,
           }"
