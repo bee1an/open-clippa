@@ -215,12 +215,18 @@ export function useTimelineBinding(): void {
     const handleInsertTrain = (train: Train): void => {
       bindTrain(train)
     }
+    const handleTrainsPosUpdated = (): void => {
+      syncRailTiming(rail)
+      queueCanvasTimingSync()
+    }
 
     rail.on('insertTrain', handleInsertTrain)
+    rail.on('trainsPosUpdated', handleTrainsPosUpdated)
     rail.trains.forEach(bindTrain)
 
     railDisposers.set(rail, () => {
       rail.off('insertTrain', handleInsertTrain)
+      rail.off('trainsPosUpdated', handleTrainsPosUpdated)
     })
   }
 
@@ -229,8 +235,23 @@ export function useTimelineBinding(): void {
     rails.forEach(bindRail)
   }
 
+  const handleActiveTrainChanged = (train: Train | null): void => {
+    if (!train)
+      return
+
+    const nextTime = Math.max(0, Math.min(clippa.timeline.duration, train.start))
+    if (Math.abs(clippa.timeline.currentTime - nextTime) < 0.001)
+      return
+
+    clippa.timeline.updateCurrentTime(nextTime)
+  }
+
   const handleDurationChanged = (): void => {
     bindTimelineRails()
+  }
+
+  const handleCurrentTimeUpdated = (): void => {
+    queueCanvasTimingSync()
   }
 
   const handleHire = (): void => {
@@ -243,11 +264,15 @@ export function useTimelineBinding(): void {
     await clippa.ready
     bindTimelineRails()
     clippa.timeline.on('durationChanged', handleDurationChanged)
+    clippa.timeline.on('currentTimeUpdated', handleCurrentTimeUpdated)
+    clippa.timeline.state.on('activeTrainChanged', handleActiveTrainChanged)
     clippa.theater.on('hire', handleHire)
   })
 
   onUnmounted(() => {
     clippa.timeline.off('durationChanged', handleDurationChanged)
+    clippa.timeline.off('currentTimeUpdated', handleCurrentTimeUpdated)
+    clippa.timeline.state.off('activeTrainChanged', handleActiveTrainChanged)
     clippa.theater.off('hire', handleHire)
 
     railDisposers.forEach(dispose => dispose())

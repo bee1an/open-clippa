@@ -129,6 +129,11 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    */
   width: number = 0
   /**
+   * 水平方向用于滚动计算的内容宽度。
+   * 与 wrapper 的绘制宽度解耦，避免仅用于填充背景的宽度触发无意义滚动条。
+   */
+  private _xContentWidth: number = 0
+  /**
    * 实例高度
    */
   height: number = 0
@@ -324,19 +329,36 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
   private _scrollbarXBar?: Container
   private _scrollbarXTrigger?: Graphics
+  private _getXContentWidth(): number {
+    return Math.max(0, this._xContentWidth || this.width)
+  }
+
   private _drawScrollXBar(): void {
     if (!this.viewportWidth)
       return
+
+    const contentWidth = this._getXContentWidth()
+    const scrollMore = this.scrollMore?.x ?? 0
+    const effectiveContentWidth = contentWidth + scrollMore
+    const maxScroll = Math.max(0, effectiveContentWidth - this.viewportWidth)
+    const currentScroll = Math.max(0, -this._wrapper.x)
+    const clampedScroll = Math.min(maxScroll, currentScroll)
+    if (Math.abs(clampedScroll - currentScroll) > 0.001) {
+      this._wrapper.x = -clampedScroll
+      this.emit('scroll', { x: 0, y: 0 })
+    }
 
     if (this._scrollbarXBar) {
       this.container.rawRemoveChild(this._scrollbarXBar)
     }
 
     const prevVisible = this.isXBarVisible
+    const showThreshold = this.hysteresisPx
+    const hideThreshold = 0.5
     const nextVisible = !this.hideXBar && (
       prevVisible
-        ? this.width > this.viewportWidth - this.hysteresisPx
-        : this.width > this.viewportWidth + this.hysteresisPx
+        ? effectiveContentWidth > this.viewportWidth + hideThreshold
+        : effectiveContentWidth > this.viewportWidth + showThreshold
     )
     this.isXBarVisible = nextVisible
 
@@ -345,12 +367,14 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     }
 
     if (!this.isXBarVisible) {
+      if (this._wrapper.x !== 0) {
+        this._wrapper.x = 0
+        this.emit('scroll', { x: 0, y: 0 })
+      }
       return
     }
 
-    const scrollMore = this.scrollMore?.x ?? 0
-
-    const stepRatio = this.viewportWidth / (this.width + scrollMore)
+    const stepRatio = this.viewportWidth / effectiveContentWidth
 
     let x: number
     const move = (e: { x: number }): void => {
@@ -358,7 +382,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
 
       // 基于trigger移动的距离转换为实际滚动距离
       const scrollMore = this.scrollMore?.x ?? 0
-      const stepRatio = this.viewportWidth / (this.width + scrollMore)
+      const stepRatio = this.viewportWidth / (this._getXContentWidth() + scrollMore)
       const scrollDx = dx / stepRatio
 
       this._scrollXByDistance(scrollDx)
@@ -366,7 +390,7 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
       x += dx
     }
 
-    const barX = -(this._wrapper.x / this._wrapper.width * this.viewportWidth)
+    const barX = clampedScroll * stepRatio
 
     ;[this._scrollbarXBar, this._scrollbarXTrigger] = this._drawScrollbarHelper({
       rail: [0, this.viewportHeight - this.barHeight, this.viewportWidth, this.barHeight],
@@ -522,8 +546,9 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     if (!this.isXBarVisible)
       return
 
+    const contentWidth = this._getXContentWidth()
     const scrollMore = this.scrollMore?.x ?? 0
-    const stepRatio = this.viewportWidth / (this.width + scrollMore)
+    const stepRatio = this.viewportWidth / (contentWidth + scrollMore)
 
     // 计算trigger需要移动的距离
     const triggerDx = dx * stepRatio
@@ -596,6 +621,15 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
     }
 
     needRerender && this.queueRender()
+  }
+
+  updateXContentWidth(width: number): void {
+    const next = Math.max(0, width)
+    if (Math.abs(next - this._xContentWidth) <= 0.001)
+      return
+
+    this._xContentWidth = next
+    this.queueRender()
   }
 
   nextRender(fn?: (...args: any[]) => any): Promise<void> {
@@ -727,8 +761,9 @@ export class ScrollBox extends EventBus<ScrollBoxEvents> {
    * 绕过 trigger-based 滚动逻辑，直接定位 wrapper 并同步滚动条状态
    */
   scrollToX(targetX: number): void {
+    const contentWidth = this._getXContentWidth()
     const scrollMore = this.scrollMore?.x ?? 0
-    const maxScroll = Math.max(0, this.width + scrollMore - this.viewportWidth)
+    const maxScroll = Math.max(0, contentWidth + scrollMore - this.viewportWidth)
 
     // clamp: targetX 是负值（向左偏移），范围 [-maxScroll, 0]
     const clampedX = Math.min(0, Math.max(-maxScroll, targetX))

@@ -1,8 +1,12 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
-import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD, TIMELINE_RULER_HEIGHT } from '@clippc/constants'
-import { EventBus, getPxByMs } from '@clippc/utils'
+import {
+  TIMELINE_AUTO_PAGE_TURN_THRESHOLD,
+  TIMELINE_RULER_HEIGHT,
+  TIMELINE_TRAIN_SEAM_EPSILON,
+} from '@clippc/constants'
+import { EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
 import { Container } from 'pixi.js'
 import { Rail } from './rail'
 import { GAP, RailGap } from './railGap'
@@ -25,7 +29,18 @@ export type RailsEvents = {
    * it is before update `duration`
    */
   updateDuration: [number]
+  layoutChanged: []
 }
+
+type GlobalGapRange = {
+  start: number
+  end: number
+  duration: number
+}
+
+const TRAILING_OPERATION_PADDING_RATIO = 0.2
+const TRAILING_OPERATION_PADDING_MIN_PX = 96
+const TRAILING_OPERATION_PADDING_MAX_PX = 320
 
 export class Rails extends EventBus<RailsEvents> {
   scrollBox: ScrollBox
@@ -65,6 +80,7 @@ export class Rails extends EventBus<RailsEvents> {
   duration: number
 
   maxZIndex: number = -1
+  private _activeGapRail: Rail | null = null
   get offsetX(): number {
     return this.scrollBox.offsetX
   }
@@ -85,14 +101,20 @@ export class Rails extends EventBus<RailsEvents> {
       // 缩放后内容宽度变化，需同步 scrollBox 的内容尺寸
       this.scrollBox.update()
     })
+    this.state.on('activeTrainChanged', (train) => {
+      if (!train)
+        return
 
+      this._clearGapSelections()
+    })
+
+    this.screenWidth = option.screenWidth
+    this.screenHeight = option.screenHeight
     this.duration = option.duration
     if (typeof option.maxZIndex === 'number') {
       this.maxZIndex = option.maxZIndex
     }
     this._processWidth()
-    this.screenWidth = option.screenWidth
-    this.screenHeight = option.screenHeight
 
     this.scrollBox = new ScrollBox({
       scrollbar: {
@@ -144,7 +166,103 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   private _processWidth(): void {
-    this.width = getPxByMs(this.duration, this.state.pxPerMs)
+    const contentDuration = this._getContentDuration()
+    const contentWidth = getPxByMs(contentDuration, this.state.pxPerMs)
+    const trailingPadding = this._getTrailingOperationPaddingPx(contentDuration)
+    this.width = contentWidth + trailingPadding
+  }
+
+  private _getContentDuration(): number {
+    return this.rails.reduce((maxEnd, rail) => {
+      const railEnd = rail.trains.reduce((inner, train) => {
+        return Math.max(inner, train.start + train.duration)
+      }, 0)
+
+      return Math.max(maxEnd, railEnd)
+    }, 0)
+  }
+
+  private _getTrailingOperationPaddingPx(contentDuration: number): number {
+    if (contentDuration <= 0)
+      return 0
+
+    const byViewport = this.screenWidth * TRAILING_OPERATION_PADDING_RATIO
+    return Math.min(
+      TRAILING_OPERATION_PADDING_MAX_PX,
+      Math.max(TRAILING_OPERATION_PADDING_MIN_PX, byViewport),
+    )
+  }
+
+  private _emitLayoutChanged(): void {
+    this.emit('layoutChanged')
+  }
+
+  private _getGapEpsilonMs(): number {
+    return Math.max(0.0001, getMsByPx(TIMELINE_TRAIN_SEAM_EPSILON, this.state.pxPerMs))
+  }
+
+  private _collectMergedContentRanges(): Array<{ start: number, end: number }> {
+    const epsilon = this._getGapEpsilonMs()
+    const ranges = this.rails.flatMap((rail) => {
+      return rail.trains
+        .map(train => ({
+          start: Math.max(0, train.start),
+          end: Math.max(0, train.start + train.duration),
+        }))
+        .filter(range => range.end - range.start > epsilon)
+    })
+
+    if (ranges.length === 0)
+      return []
+
+    ranges.sort((a, b) => a.start - b.start)
+    const merged: Array<{ start: number, end: number }> = [ranges[0]]
+
+    for (let index = 1; index < ranges.length; index += 1) {
+      const current = ranges[index]
+      const last = merged[merged.length - 1]
+      if (current.start <= last.end + epsilon) {
+        last.end = Math.max(last.end, current.end)
+        continue
+      }
+
+      merged.push({ start: current.start, end: current.end })
+    }
+
+    return merged
+  }
+
+  private _collectGlobalGaps(): GlobalGapRange[] {
+    if (this.duration <= 0)
+      return []
+
+    const epsilon = this._getGapEpsilonMs()
+    const merged = this._collectMergedContentRanges()
+    const gaps: GlobalGapRange[] = []
+    let cursor = 0
+
+    for (const range of merged) {
+      const start = Math.max(0, Math.min(this.duration, range.start))
+      const end = Math.max(0, Math.min(this.duration, range.end))
+      if (start - cursor > epsilon) {
+        gaps.push({
+          start: cursor,
+          end: start,
+          duration: start - cursor,
+        })
+      }
+      cursor = Math.max(cursor, end)
+    }
+
+    if (this.duration - cursor > epsilon) {
+      gaps.push({
+        start: cursor,
+        end: this.duration,
+        duration: this.duration - cursor,
+      })
+    }
+
+    return gaps
   }
 
   private _updateRailContainerY(): void {
@@ -208,20 +326,45 @@ export class Rails extends EventBus<RailsEvents> {
     rail.on('trainMoveEnd', () => {
       autoUpdateDuration()
 
+      this.update()
       this.scrollBox.update()
+      this._emitLayoutChanged()
     })
 
     rail.on('trainRightResizeEnd', () => {
       autoUpdateDuration()
 
+      this.update()
       this.scrollBox.update()
+      this._emitLayoutChanged()
+    })
+
+    rail.on('trainsPosUpdated', () => {
+      autoUpdateDuration()
+      this.update()
+      this.scrollBox.update()
+      this._emitLayoutChanged()
+    })
+
+    rail.on('gapSelectionChanged', (gap) => {
+      if (!gap) {
+        if (this._activeGapRail === rail)
+          this._activeGapRail = null
+        return
+      }
+
+      this._clearGapSelections(rail)
+      this._activeGapRail = rail
+
+      this.state.activeTrain?.updateActive(false)
     })
 
     rail.on('insertTrain', () => {
-      if (this.state.trainDragging)
-        return
+      this.update()
+      if (!this.state.trainDragging)
+        this.scrollBox.update()
 
-      this.scrollBox.update()
+      this._emitLayoutChanged()
     })
 
     this._insertRailByZIndex(rail, zIndex)
@@ -478,6 +621,7 @@ export class Rails extends EventBus<RailsEvents> {
       this.railsContainer.height = this.getRailsTotalHeight()
       this._updateRailContainerY()
       this.scrollBox.update()
+      this._emitLayoutChanged()
       return existingRail
     }
 
@@ -500,6 +644,7 @@ export class Rails extends EventBus<RailsEvents> {
     this.railsContainer.height = railsTotalHeight
 
     this._updateRailContainerY()
+    this._emitLayoutChanged()
 
     return rail
   }
@@ -543,6 +688,8 @@ export class Rails extends EventBus<RailsEvents> {
     this.railGaps = nextRailGaps
 
     this.maxZIndex = this.rails.length > 0 ? this.rails[0].zIndex : -1
+    if (this._activeGapRail === rail)
+      this._activeGapRail = null
     this._reflowRailsAndGaps()
 
     this.scrollBox.update()
@@ -551,12 +698,98 @@ export class Rails extends EventBus<RailsEvents> {
     const railsTotalHeight = this.getRailsTotalHeight()
     this.railsContainer.height = railsTotalHeight
     this._updateRailContainerY()
+    this._emitLayoutChanged()
 
     // 背景绘制已移除，rails组件不负责背景
   }
 
   getRailByZIndex(zIndex: number): Rail | undefined {
     return this.rails[this.maxZIndex - zIndex]
+  }
+
+  listGlobalGaps(): Array<{ start: number, end: number, duration: number }> {
+    return this._collectGlobalGaps()
+  }
+
+  resolveGlobalGapAt(time: number): { start: number, end: number, duration: number } | null {
+    if (!Number.isFinite(time))
+      return null
+
+    return this._collectGlobalGaps().find(gap => time >= gap.start && time < gap.end) ?? null
+  }
+
+  deleteGlobalGapAt(time: number): boolean {
+    const targetGap = this.resolveGlobalGapAt(time)
+    if (!targetGap)
+      return false
+
+    const epsilon = this._getGapEpsilonMs()
+    if (targetGap.duration <= epsilon)
+      return false
+
+    this._clearGapSelections()
+
+    let movedAnyTrain = false
+    for (const rail of this.rails) {
+      let movedInRail = false
+      for (const train of rail.trains) {
+        if (train.start + epsilon < targetGap.end)
+          continue
+
+        train.start = Math.max(0, train.start - targetGap.duration)
+        movedInRail = true
+      }
+
+      if (!movedInRail)
+        continue
+
+      movedAnyTrain = true
+      rail.updateTrainsPos()
+    }
+
+    const isTrailingGap = Math.abs(targetGap.end - this.duration) <= epsilon
+    if (!movedAnyTrain && !isTrailingGap)
+      return false
+
+    if (!movedAnyTrain && isTrailingGap) {
+      const nextDuration = Math.max(0, this.duration - targetGap.duration)
+      if (Math.abs(nextDuration - this.duration) > epsilon)
+        this.emit('updateDuration', nextDuration)
+
+      this.scrollBox.update()
+    }
+
+    this._emitLayoutChanged()
+    return true
+  }
+
+  deleteActiveGap(): boolean {
+    if (this._activeGapRail && this._activeGapRail.deleteSelectedGap()) {
+      this._activeGapRail = null
+      return true
+    }
+
+    for (const rail of this.rails) {
+      if (!rail.deleteSelectedGap())
+        continue
+
+      this._activeGapRail = null
+      return true
+    }
+
+    return false
+  }
+
+  private _clearGapSelections(exceptRail?: Rail): void {
+    this.rails.forEach((rail) => {
+      if (rail === exceptRail)
+        return
+
+      rail.clearGapSelection()
+    })
+
+    if (!exceptRail)
+      this._activeGapRail = null
   }
 
   private _stayWhenDragging(e: FederatedPointerEvent): void {
@@ -698,13 +931,16 @@ export class Rails extends EventBus<RailsEvents> {
     this._processWidth()
 
     this.update()
+    this._emitLayoutChanged()
   }
 
   update(): void {
+    this._processWidth()
+    this.scrollBox.updateXContentWidth(this.width)
     // 背景绘制已移除，rails组件不负责背景
 
     const helper = (instance: Rail | RailGap): void => {
-      instance.updateWidth(Math.max(this.width, this.screenWidth - this.offsetX))
+      instance.updateWidth(Math.max(this.width, this.screenWidth))
     }
 
     this.rails.forEach(helper)

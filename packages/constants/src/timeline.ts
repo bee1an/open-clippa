@@ -133,6 +133,18 @@ export const TIMELINE_TICK_COLOR = '#8d8f99'
  */
 export const TIMELINE_DOT_FILL = '#4c4f5a'
 /**
+ * active train range highlight fill on ruler
+ */
+export const TIMELINE_RULER_ACTIVE_RANGE_FILL = '#60a5fa3a'
+/**
+ * global gap highlight fill on ruler
+ */
+export const TIMELINE_RULER_GLOBAL_GAP_FILL = '#2d334980'
+/**
+ * hovered global gap highlight fill on ruler
+ */
+export const TIMELINE_RULER_GLOBAL_GAP_HOVER_FILL = '#394262b8'
+/**
  * auto page turn threshold - percentage of viewport width from right edge
  */
 export const TIMELINE_AUTO_PAGE_TURN_THRESHOLD = 0.02

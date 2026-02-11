@@ -20,7 +20,7 @@ const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
 const { selectedPerformers, selectionRevision } = storeToRefs(performerStore)
 const { clippa } = editorStore
-clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
+clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, antialias: true })
 
 const sliderValue = ref(0)
 const isSyncingFromTimeline = ref(false)

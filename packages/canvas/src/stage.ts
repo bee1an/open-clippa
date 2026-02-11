@@ -9,6 +9,8 @@ export interface InitialOption {
   height?: number
 
   resolution?: number
+
+  antialias?: boolean
 }
 
 export type StageEvents = {

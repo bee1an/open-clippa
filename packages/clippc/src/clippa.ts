@@ -38,6 +38,9 @@ export class Clippa extends EventBus<ClippaEvents> {
     this.timeline.on('seeked', async (time) => {
       await this.director.seek(time)
     })
+    this.timeline.on('currentTimeUpdated', (time) => {
+      this.director.currentTime = time
+    })
     this.timeline.on('durationChanged', (duration) => {
       this.director.duration = duration
     })

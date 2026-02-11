@@ -354,6 +354,9 @@ export function useKeyboardShortcuts() {
       case 'Delete':
       case 'Backspace':
         e.preventDefault()
+        if (clippa.timeline.rails?.deleteActiveGap())
+          break
+
         deleteActiveTrain()
         break
       case 'Escape':

@@ -189,6 +189,9 @@ export class Timeline extends EventBus<TimlineEvents> {
     this.ruler = new Ruler({
       screenWidth: this.app!.screen.width - TIMELINE_LEFT_PADDING,
       duration: this.duration,
+      listGlobalGaps: () => this.rails?.listGlobalGaps() ?? [],
+      resolveGlobalGapAt: time => this.rails?.resolveGlobalGapAt(time) ?? null,
+      deleteGlobalGapAt: time => this.rails?.deleteGlobalGapAt(time) ?? false,
     })
     this.adjuster.addChild(this.ruler.container)
 
@@ -221,6 +224,10 @@ export class Timeline extends EventBus<TimlineEvents> {
       this.updateDuration(duration)
     })
 
+    this.rails.on('layoutChanged', () => {
+      this.ruler?.render()
+    })
+
     this.rails.scrollBox.on('zoom', ({ deltaY, pointerX }) => {
       const oldPxPerMs = this.state.pxPerMs
 
@@ -245,6 +252,8 @@ export class Timeline extends EventBus<TimlineEvents> {
       // 同步 cursor 位置
       this.cursor?.updatePosition(this.currentTime)
     })
+
+    this.ruler?.render()
   }
 
   /**

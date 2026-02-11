@@ -25,6 +25,7 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
   private timelineRef: Timeline | null = null
   private hasBoundTimeline = false
   private layerSequence = 1
+  private railDisposers = new Map<Rail, () => void>()
 
   getSnapshot(): FilterManagerSnapshot {
     return {
@@ -57,6 +58,11 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
       this.activeLayerId = target ? target.id : null
       this.emitChange()
     })
+
+    timeline.on('durationChanged', () => {
+      this.bindTimelineRails()
+    })
+    this.bindTimelineRails()
   }
 
   createLayer(options: FilterLayerCreateOptions = {}): FilterLayer | null {
@@ -104,6 +110,7 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
 
     this.layers.push(layer)
     this.bindTrainEvents(layer, train)
+    this.bindTimelineRails()
     this.selectLayer(layer.id)
     this.emitChange()
     return layer
@@ -168,6 +175,7 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
     }
 
     targetRail.insertTrain(layer.train)
+    this.bindTimelineRails()
     this.removeRailIfEmpty(sourceRail)
 
     layer.train.updateActive(true)
@@ -327,5 +335,49 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
 
   private emitChange(): void {
     this.emit('change', this.getSnapshot())
+  }
+
+  private bindTimelineRails(): void {
+    const rails = this.timelineRef?.rails?.rails ?? []
+    rails.forEach((rail) => {
+      if (this.railDisposers.has(rail))
+        return
+
+      const handleTrainsPosUpdated = (): void => {
+        this.syncLayerTimingFromTrain()
+      }
+      rail.on('trainsPosUpdated', handleTrainsPosUpdated)
+
+      this.railDisposers.set(rail, () => {
+        rail.off('trainsPosUpdated', handleTrainsPosUpdated)
+      })
+    })
+  }
+
+  private syncLayerTimingFromTrain(): void {
+    let changed = false
+
+    this.layers.forEach((layer) => {
+      const nextStart = layer.train.start
+      const nextDuration = layer.train.duration
+      const nextZIndex = layer.train.parent?.zIndex ?? layer.zIndex
+
+      if (
+        layer.start === nextStart
+        && layer.duration === nextDuration
+        && layer.zIndex === nextZIndex
+      ) {
+        return
+      }
+
+      layer.start = nextStart
+      layer.duration = nextDuration
+      layer.zIndex = nextZIndex
+      layer.version += 1
+      changed = true
+    })
+
+    if (changed)
+      this.emitChange()
   }
 }

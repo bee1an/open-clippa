@@ -67,7 +67,29 @@ export type RailEvents = {
    * insert train
    */
   insertTrain: [Train]
+
+  /**
+   * selected gap changed
+   */
+  gapSelectionChanged: [ClosableGap | null]
 }
+
+type ClosableGap = {
+  leftTrain: Train | null
+  rightTrain: Train
+  leftX: number
+  rightX: number
+  gapMs: number
+}
+
+const GAP_DELETE_ICON_SIZE = 16
+const GAP_DELETE_ICON_RADIUS = 4
+const GAP_DELETE_ICON_HIT_PADDING = 4
+const GAP_DELETE_ICON_FILL = 0xF2F2F2
+const GAP_DELETE_ICON_FOREGROUND = 0x171717
+const GAP_GRID_COLOR = 0xFFFFFF
+const GAP_GRID_SPACING = 9
+const GAP_GRID_LINE_WIDTH = 1
 
 export class Rail extends EventBus<RailEvents> {
   container: Container
@@ -84,6 +106,9 @@ export class Rail extends EventBus<RailEvents> {
   zIndex: number
   state: State = State.getInstance()
   private _seamLayer: Graphics
+  private _gapInteractionLayer: Graphics
+  private _hoveredGap: ClosableGap | null = null
+  private _selectedGap: ClosableGap | null = null
   private _dragDockState = new Map<Train, { target: Train, side: 'left' | 'right', escapeOffset: number }>()
   private _handlePxPerMsUpdated = (): void => {
     this._refreshVisualLayoutAndAdjacentVisuals()
@@ -263,6 +288,7 @@ export class Rail extends EventBus<RailEvents> {
   private _refreshAdjacentVisuals(): void {
     this._syncTrainJoinState()
     this._drawAdjacentSeams()
+    this._refreshGapInteractionAfterLayout()
   }
 
   private _bindPxPerMsEvents(): void {
@@ -283,6 +309,7 @@ export class Rail extends EventBus<RailEvents> {
 
     this._drawBg()
     this._seamLayer = this._createSeamLayer()
+    this._gapInteractionLayer = this._createGapInteractionLayer()
 
     option.trainsOption.forEach(item => this.insertTrain(new Train(item)))
 
@@ -466,6 +493,285 @@ export class Rail extends EventBus<RailEvents> {
     return seamLayer
   }
 
+  private _createGapInteractionLayer(): Graphics {
+    const gapInteractionLayer = new Graphics({ label: 'rail-gap-interaction' })
+    gapInteractionLayer.eventMode = 'none'
+    gapInteractionLayer.visible = true
+    this.container.addChild(gapInteractionLayer)
+    return gapInteractionLayer
+  }
+
+  private _isSameGap(a: ClosableGap | null, b: ClosableGap | null): boolean {
+    if (!a || !b)
+      return a === b
+
+    return a.leftTrain === b.leftTrain && a.rightTrain === b.rightTrain
+  }
+
+  private _collectClosableGaps(): ClosableGap[] {
+    if (this.trains.length === 0)
+      return []
+
+    const sorted = [...this.trains].sort((a, b) => a.start - b.start)
+    const result: ClosableGap[] = []
+    const firstTrain = sorted[0]
+
+    const leadingGapMs = firstTrain.start
+    if (leadingGapMs > TIMELINE_TRAIN_SEAM_EPSILON) {
+      const leftX = 0
+      const rightX = firstTrain.container.x
+      if (rightX - leftX > TIMELINE_TRAIN_SEAM_EPSILON) {
+        result.push({
+          leftTrain: null,
+          rightTrain: firstTrain,
+          leftX,
+          rightX,
+          gapMs: leadingGapMs,
+        })
+      }
+    }
+
+    if (sorted.length < 2)
+      return result
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const leftTrain = sorted[i]
+      const rightTrain = sorted[i + 1]
+      const gapMs = rightTrain.start - (leftTrain.start + leftTrain.duration)
+      if (gapMs <= TIMELINE_TRAIN_SEAM_EPSILON)
+        continue
+
+      const leftX = leftTrain.container.x + leftTrain.width
+      const rightX = rightTrain.container.x
+      if (rightX - leftX <= TIMELINE_TRAIN_SEAM_EPSILON)
+        continue
+
+      result.push({
+        leftTrain,
+        rightTrain,
+        leftX,
+        rightX,
+        gapMs,
+      })
+    }
+
+    return result
+  }
+
+  private _findGapByTrains(leftTrain: Train | null, rightTrain: Train): ClosableGap | null {
+    return this._collectClosableGaps().find(gap => gap.leftTrain === leftTrain && gap.rightTrain === rightTrain) ?? null
+  }
+
+  private _resolveGapByPoint(x: number, y: number): ClosableGap | null {
+    if (y < 0 || y > this.height)
+      return null
+
+    const gaps = this._collectClosableGaps()
+    for (const gap of gaps) {
+      if (x >= gap.leftX && x <= gap.rightX)
+        return gap
+    }
+
+    return null
+  }
+
+  private _resolveIconGap(): ClosableGap | null {
+    return this._hoveredGap ?? this._selectedGap
+  }
+
+  private _getIconCenter(gap: ClosableGap): { x: number, y: number } {
+    return {
+      x: (gap.leftX + gap.rightX) / 2,
+      y: this.height / 2,
+    }
+  }
+
+  private _isPointInDeleteIcon(gap: ClosableGap, x: number, y: number): boolean {
+    const center = this._getIconCenter(gap)
+    const half = GAP_DELETE_ICON_SIZE / 2 + GAP_DELETE_ICON_HIT_PADDING
+
+    return x >= center.x - half
+      && x <= center.x + half
+      && y >= center.y - half
+      && y <= center.y + half
+  }
+
+  private _drawDeleteIcon(gap: ClosableGap): void {
+    const center = this._getIconCenter(gap)
+    const iconLeft = center.x - GAP_DELETE_ICON_SIZE / 2
+    const iconTop = center.y - GAP_DELETE_ICON_SIZE / 2
+    const binWidth = 8
+    const binHeight = 7
+    const binLeft = center.x - binWidth / 2
+    const binTop = center.y - 1
+
+    this._gapInteractionLayer
+      .roundRect(iconLeft, iconTop, GAP_DELETE_ICON_SIZE, GAP_DELETE_ICON_SIZE, GAP_DELETE_ICON_RADIUS)
+      .fill({ color: GAP_DELETE_ICON_FILL, alpha: 0.96 })
+      .roundRect(binLeft, binTop, binWidth, binHeight, 1)
+      .fill({ color: GAP_DELETE_ICON_FOREGROUND, alpha: 0.98 })
+      .roundRect(center.x - 5, binTop - 2.5, 10, 2, 1)
+      .fill({ color: GAP_DELETE_ICON_FOREGROUND, alpha: 0.98 })
+      .roundRect(center.x - 1.5, binTop - 4, 3, 1.5, 0.75)
+      .fill({ color: GAP_DELETE_ICON_FOREGROUND, alpha: 0.98 })
+  }
+
+  private _drawGapGrid(leftX: number, rightX: number, gridAlpha: number): void {
+    const width = rightX - leftX
+    if (width <= TIMELINE_TRAIN_SEAM_EPSILON)
+      return
+
+    const resolveDiagonalSegment = (c: number): [number, number, number, number] | null => {
+      const points: Array<{ x: number, y: number }> = []
+      const pushPoint = (x: number, y: number): void => {
+        const exists = points.some(point =>
+          Math.abs(point.x - x) <= 0.001 && Math.abs(point.y - y) <= 0.001,
+        )
+        if (!exists)
+          points.push({ x, y })
+      }
+
+      const topX = c
+      if (topX >= leftX && topX <= rightX)
+        pushPoint(topX, 0)
+
+      const bottomX = c + this.height
+      if (bottomX >= leftX && bottomX <= rightX)
+        pushPoint(bottomX, this.height)
+
+      const leftY = leftX - c
+      if (leftY >= 0 && leftY <= this.height)
+        pushPoint(leftX, leftY)
+
+      const rightY = rightX - c
+      if (rightY >= 0 && rightY <= this.height)
+        pushPoint(rightX, rightY)
+
+      if (points.length < 2)
+        return null
+
+      return [points[0].x, points[0].y, points[1].x, points[1].y]
+    }
+
+    for (let c = leftX - this.height; c <= rightX; c += GAP_GRID_SPACING) {
+      const segment = resolveDiagonalSegment(c)
+      if (!segment)
+        continue
+
+      const [x1, y1, x2, y2] = segment
+      this._gapInteractionLayer
+        .moveTo(x1, y1)
+        .lineTo(x2, y2)
+        .stroke({ color: GAP_GRID_COLOR, alpha: gridAlpha, width: GAP_GRID_LINE_WIDTH })
+    }
+
+    const topY = GAP_GRID_LINE_WIDTH / 2
+    const bottomY = this.height - GAP_GRID_LINE_WIDTH / 2
+    const leftBorderX = leftX + GAP_GRID_LINE_WIDTH / 2
+    const rightBorderX = rightX - GAP_GRID_LINE_WIDTH / 2
+    const borderAlpha = Math.min(1, gridAlpha + 0.12)
+    this._gapInteractionLayer
+      .moveTo(leftX, topY)
+      .lineTo(rightX, topY)
+      .stroke({ color: GAP_GRID_COLOR, alpha: borderAlpha, width: GAP_GRID_LINE_WIDTH })
+      .moveTo(leftX, bottomY)
+      .lineTo(rightX, bottomY)
+      .stroke({ color: GAP_GRID_COLOR, alpha: borderAlpha, width: GAP_GRID_LINE_WIDTH })
+      .moveTo(leftBorderX, 0)
+      .lineTo(leftBorderX, this.height)
+      .stroke({ color: GAP_GRID_COLOR, alpha: borderAlpha, width: GAP_GRID_LINE_WIDTH })
+      .moveTo(rightBorderX, 0)
+      .lineTo(rightBorderX, this.height)
+      .stroke({ color: GAP_GRID_COLOR, alpha: borderAlpha, width: GAP_GRID_LINE_WIDTH })
+  }
+
+  private _renderGapInteraction(): void {
+    this._gapInteractionLayer.clear()
+
+    if (this._selectedGap) {
+      this._drawGapGrid(this._selectedGap.leftX, this._selectedGap.rightX, 0.86)
+    }
+
+    if (this._hoveredGap && !this._isSameGap(this._hoveredGap, this._selectedGap)) {
+      this._drawGapGrid(this._hoveredGap.leftX, this._hoveredGap.rightX, 0.62)
+    }
+
+    const iconGap = this._resolveIconGap()
+    if (iconGap)
+      this._drawDeleteIcon(iconGap)
+  }
+
+  private _setSelectedGap(gap: ClosableGap | null): void {
+    if (this._isSameGap(this._selectedGap, gap))
+      return
+
+    this._selectedGap = gap
+    this.emit('gapSelectionChanged', this._selectedGap)
+  }
+
+  private _refreshGapInteractionAfterLayout(): void {
+    this._hoveredGap = null
+
+    const normalizedSelected = this._selectedGap
+      ? this._findGapByTrains(this._selectedGap.leftTrain, this._selectedGap.rightTrain)
+      : null
+    const selectedChanged = !this._isSameGap(this._selectedGap, normalizedSelected)
+    this._selectedGap = normalizedSelected
+
+    if (selectedChanged)
+      this.emit('gapSelectionChanged', this._selectedGap)
+
+    this._renderGapInteraction()
+    this.container.cursor = 'default'
+  }
+
+  private _updateHoveredGap(x: number, y: number): void {
+    const nextGap = this._resolveGapByPoint(x, y)
+    if (this._isSameGap(this._hoveredGap, nextGap))
+      return
+
+    this._hoveredGap = nextGap
+    this._renderGapInteraction()
+    this.container.cursor = nextGap ? 'pointer' : 'default'
+  }
+
+  private _closeGap(gap: ClosableGap): boolean {
+    const targetGap = this._findGapByTrains(gap.leftTrain, gap.rightTrain)
+    if (!targetGap || targetGap.gapMs <= TIMELINE_TRAIN_SEAM_EPSILON)
+      return false
+
+    const sorted = [...this.trains].sort((a, b) => a.start - b.start)
+    const pivotIndex = sorted.findIndex(train => train === targetGap.rightTrain)
+    if (pivotIndex === -1)
+      return false
+
+    for (let index = pivotIndex; index < sorted.length; index += 1) {
+      const train = sorted[index]
+      train.start = Math.max(0, train.start - targetGap.gapMs)
+    }
+
+    this.updateTrainsPos()
+    return true
+  }
+
+  clearGapSelection(): void {
+    this._setSelectedGap(null)
+    this._renderGapInteraction()
+  }
+
+  deleteSelectedGap(): boolean {
+    if (!this._selectedGap)
+      return false
+
+    const deleted = this._closeGap(this._selectedGap)
+    if (!deleted)
+      return false
+
+    this._setSelectedGap(null)
+    this._renderGapInteraction()
+    return true
+  }
+
   private _drawAdjacentSeams(): void {
     this._seamLayer.clear()
 
@@ -506,8 +812,9 @@ export class Rail extends EventBus<RailEvents> {
     }
   }
 
-  private _moveSeamLayerToTop(): void {
+  private _moveVisualLayerToTop(): void {
     this.container.addChild(this._seamLayer)
+    this.container.addChild(this._gapInteractionLayer)
   }
 
   private _drawBg(): void {
@@ -529,7 +836,59 @@ export class Rail extends EventBus<RailEvents> {
   private _bindEvents(): void {
     this.container.eventMode = 'static'
 
+    this.container.on('pointermove', (e) => {
+      if (this.state.trainDragging) {
+        this._hoveredGap = null
+        this._renderGapInteraction()
+        this.container.cursor = 'default'
+        return
+      }
+
+      const point = e.getLocalPosition(this.container)
+      this._updateHoveredGap(point.x, point.y)
+    })
+
+    this.container.on('pointerdown', (e) => {
+      if (this.state.trainDragging)
+        return
+
+      const point = e.getLocalPosition(this.container)
+      this._updateHoveredGap(point.x, point.y)
+
+      const iconGap = this._resolveIconGap()
+      if (iconGap && this._isPointInDeleteIcon(iconGap, point.x, point.y)) {
+        const deleted = this._closeGap(iconGap)
+        if (deleted) {
+          this._setSelectedGap(null)
+          this._hoveredGap = null
+          this._renderGapInteraction()
+          this.container.cursor = 'default'
+        }
+        e.stopPropagation()
+        return
+      }
+
+      const gap = this._resolveGapByPoint(point.x, point.y)
+      if (gap) {
+        this._setSelectedGap(gap)
+        this._hoveredGap = gap
+        this._renderGapInteraction()
+        this.container.cursor = 'pointer'
+        e.stopPropagation()
+        return
+      }
+
+      if (this._selectedGap) {
+        this._setSelectedGap(null)
+        this._renderGapInteraction()
+      }
+    })
+
     this.container.on('pointerleave', (e) => {
+      this._hoveredGap = null
+      this._renderGapInteraction()
+      this.container.cursor = 'default'
+
       // 如果是train正在拖拽状态, 那么需要将这个train从当前rail中移除
       if (!this.state.trainDragging)
         return
@@ -581,7 +940,7 @@ export class Rail extends EventBus<RailEvents> {
       this.trains.push(train)
 
     this._bindPxPerMsEvents()
-    this._moveSeamLayerToTop()
+    this._moveVisualLayerToTop()
     if (this.state.trainDragging)
       this._refreshAdjacentVisuals()
     else
