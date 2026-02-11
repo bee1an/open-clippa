@@ -1,3 +1,3 @@
-# @clippa/codec
+# @clippc/codec
 
 Clippa codec component

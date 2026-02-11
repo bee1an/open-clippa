@@ -3,8 +3,8 @@ import type {
   FilterLayer,
   FilterLayerCreateOptions,
   FilterManagerSnapshot,
-} from '@clippa/filter'
-import { cloneFilterConfig, DEFAULT_FILTER_CONFIG, FilterManager, isDefaultFilterConfig } from '@clippa/filter'
+} from '@clippc/filter'
+import { cloneFilterConfig, DEFAULT_FILTER_CONFIG, FilterManager, isDefaultFilterConfig } from '@clippc/filter'
 import { defineStore } from 'pinia'
 import { computed, markRaw, shallowRef } from 'vue'
 

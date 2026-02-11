@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Image } from '@clippa/performer'
+import { Image } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
 
 interface Props {

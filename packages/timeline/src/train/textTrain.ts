@@ -8,7 +8,7 @@ import {
   TIMELINE_TEXT_TRAIN_FILL,
   TIMELINE_TEXT_TRAIN_HEIGHT,
   TIMELINE_TEXT_TRAIN_TEXT_FILL,
-} from '@clippa/constants'
+} from '@clippc/constants'
 import { Graphics, Text } from 'pixi.js'
 import { Train } from './train'
 

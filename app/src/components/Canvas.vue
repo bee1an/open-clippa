@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Train } from 'open-clippa'
+import type { Train } from 'clippc'
 import type { VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'

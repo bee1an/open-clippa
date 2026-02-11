@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TextStyleOption } from '@clippa/performer'
+import type { TextStyleOption } from '@clippc/performer'
 import { Slider } from '@/components/ui/slider'
 import { Select } from '@/components/ui/select'
 

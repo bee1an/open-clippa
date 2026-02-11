@@ -1,6 +1,6 @@
 import type { MaybeArray } from 'type-aide'
 import type { Performer } from './performer'
-import { TextTrain, VideoTrain } from '@clippa/timeline'
+import { TextTrain, VideoTrain } from '@clippc/timeline'
 import { Director, Stage, Theater } from './canvas'
 import { Text } from './performer'
 import { Timeline } from './timeline'

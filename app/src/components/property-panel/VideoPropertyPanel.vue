@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Video } from '@clippa/performer'
+import { Video } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
 
 interface Props {

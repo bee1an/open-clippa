@@ -1,8 +1,8 @@
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
-import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD, TIMELINE_RULER_HEIGHT } from '@clippa/constants'
-import { EventBus, getPxByMs } from '@clippa/utils'
+import { TIMELINE_AUTO_PAGE_TURN_THRESHOLD, TIMELINE_RULER_HEIGHT } from '@clippc/constants'
+import { EventBus, getPxByMs } from '@clippc/utils'
 import { Container } from 'pixi.js'
 import { Rail } from './rail'
 import { GAP, RailGap } from './railGap'
@@ -263,11 +263,13 @@ export class Rails extends EventBus<RailsEvents> {
   }
 
   private _insertGapByZIndex(gap: RailGap, zIndex: number): void {
-    this.railGaps.splice((this.maxZIndex - zIndex) + 1, 0, gap)
+    const pos = Math.min((this.maxZIndex - zIndex) + 1, this.railGaps.length)
+    this.railGaps.splice(pos, 0, gap)
   }
 
   private _insertRailByZIndex(rail: Rail, zIndex: number): void {
-    this.rails.splice(this.maxZIndex - zIndex, 0, rail)
+    const pos = Math.min(this.maxZIndex - zIndex, this.rails.length)
+    this.rails.splice(pos, 0, rail)
   }
 
   private _tryAutoScrollWhenTrainDragging(): void {
@@ -421,14 +423,16 @@ export class Rails extends EventBus<RailsEvents> {
         railGap.updateZIndex(railGap.zIndex + 1)
     })
 
-    this.maxZIndex = Math.max(this.rails[0]?.zIndex ?? 0, zIndex)
+    // maxZIndex must be updated BEFORE _createRail / _createRailGap,
+    // because _insertRailByZIndex / _insertGapByZIndex depend on it
+    // to compute correct splice positions.
+    this.maxZIndex++
 
     const rail = this._createRail(zIndex, railStyle)
     this._createRailGap(zIndex)
 
     this.scrollBox.update()
 
-    // 背景绘制已移除，rails组件不负责背景
     return rail
   }
 

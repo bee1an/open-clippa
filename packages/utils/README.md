@@ -1,3 +1,3 @@
-# @clippa/utils
+# @clippc/utils
 
 Clippa utils

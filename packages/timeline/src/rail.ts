@@ -10,8 +10,8 @@ import {
   TIMELINE_TRAIN_HEIGHT,
   TIMELINE_TRAIN_SEAM_EPSILON,
   TIMELINE_TRAIN_SEAM_WIDTH,
-} from '@clippa/constants'
-import { EventBus, getMsByPx, getPxByMs, isIntersection } from '@clippa/utils'
+} from '@clippc/constants'
+import { EventBus, getMsByPx, getPxByMs, isIntersection } from '@clippc/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
 import { Train } from './train'
@@ -279,7 +279,7 @@ export class Rail extends EventBus<RailEvents> {
     this.railStyle = option.railStyle ?? 'default'
     this.height = getRailHeightByStyle(this.railStyle)
 
-    this.container = new Container({ y: this.y, label: 'rail' })
+    this.container = new Container({ y: this.y, label: 'rail', sortableChildren: true })
 
     this._drawBg()
     this._seamLayer = this._createSeamLayer()
@@ -611,6 +611,29 @@ export class Rail extends EventBus<RailEvents> {
   }
 
   /**
+   * 移除train并合拢后续train的时间间隙（ripple delete）
+   */
+  removeTrainAndCloseGap(train: Train): void {
+    const index = this.trains.findIndex(item => item === train)
+    if (index === -1)
+      return
+
+    const removedStart = train.start
+    const removedDuration = train.duration
+
+    this.removeTrain(train)
+
+    // 将所有在被删除 train 之后的 train 前移，填充空隙
+    for (const t of this.trains) {
+      if (t.start > removedStart) {
+        t.start = Math.max(0, t.start - removedDuration)
+      }
+    }
+
+    this._refreshVisualLayoutAndAdjacentVisuals()
+  }
+
+  /**
    * 根据x的位置进行排序
    */
   sortTrains(): void {
@@ -685,7 +708,5 @@ export class Rail extends EventBus<RailEvents> {
       return
 
     this.zIndex = zIndex
-
-    // TODO
   }
 }

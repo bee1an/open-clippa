@@ -1,5 +1,5 @@
-import type { PerformerBounds, TextStyleOption } from '@clippa/performer'
-import { Image, Text, Video } from '@clippa/performer'
+import type { PerformerBounds, TextStyleOption } from '@clippc/performer'
+import { Image, Text, Video } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ResizeDirection, SelectionItem } from '@clippa/selection'
-import { Selection } from '@clippa/selection'
+import type { ResizeDirection, SelectionItem } from '@clippc/selection'
+import { Selection } from '@clippc/selection'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useEditorStore } from '@/store'

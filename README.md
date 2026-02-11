@@ -1,13 +1,3 @@
-# open-clippa
+# clippc
 
-Open source clippa library
-
-## TODO
-
-- [ ] facade clippa
-
-- [ ] timeline
-
-- [ ] canvas
-
-- [ ] decode & encode
+Open source clippc library

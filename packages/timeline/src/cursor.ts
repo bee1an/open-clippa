@@ -1,5 +1,5 @@
-import { TIMELINE_CURSOR_FILL } from '@clippa/constants'
-import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
+import { TIMELINE_CURSOR_FILL } from '@clippc/constants'
+import { EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
 
@@ -11,6 +11,7 @@ export interface CursorOption {
 
 export type CursorEvents = {
   seek: [number]
+  updateCurrentTime: [number]
 }
 
 export class Cursor extends EventBus<CursorEvents> {
@@ -107,7 +108,7 @@ export class Cursor extends EventBus<CursorEvents> {
 
       this.currentTime = getMsByPx(this.container.x, this.pxPerMs)
 
-      this.emit('seek', this.currentTime)
+      this.emit('updateCurrentTime', this.currentTime)
     }
 
     const up = (): void => {

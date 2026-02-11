@@ -1,4 +1,4 @@
-# @clippa/performer
+# @clippc/performer
 
 Clippa performer component
 

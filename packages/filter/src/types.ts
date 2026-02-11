@@ -1,4 +1,4 @@
-import type { TextTrain, Train } from '@clippa/timeline'
+import type { TextTrain, Train } from '@clippc/timeline'
 import type { ColorMatrixFilter } from 'pixi.js'
 
 export interface FilterConfig {

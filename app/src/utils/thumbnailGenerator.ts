@@ -1,5 +1,5 @@
 import type { VideoFile } from '@/store/useMediaStore'
-import { FrameExtractor } from '@clippa/codec'
+import { FrameExtractor } from '@clippc/codec'
 
 /**
  * 使用 codec 子包生成视频缩略图

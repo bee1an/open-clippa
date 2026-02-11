@@ -1,10 +1,10 @@
-import type { Performer } from '@clippa/performer'
+import type { Performer } from '@clippc/performer'
 import type { Stage } from '../stage'
 import type { Theater } from '../theater'
 import type { DirectorEvents } from './events'
 import type { DirectorOption } from './option'
-import { ShowState } from '@clippa/performer'
-import { EventBus } from '@clippa/utils'
+import { ShowState } from '@clippc/performer'
+import { EventBus } from '@clippc/utils'
 
 export class Director extends EventBus<DirectorEvents> {
   /**

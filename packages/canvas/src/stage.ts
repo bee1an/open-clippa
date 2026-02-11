@@ -1,6 +1,6 @@
-import type { Performer } from '@clippa/performer'
+import type { Performer } from '@clippc/performer'
 import type { MaybeArray } from 'type-aide'
-import { EventBus } from '@clippa/utils'
+import { EventBus } from '@clippc/utils'
 import { Application } from 'pixi.js'
 
 export interface InitialOption {

@@ -1,6 +1,6 @@
-import type { Rail, Train } from 'open-clippa'
+import type { Rail, Train } from 'clippc'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
-import { getMsByPx, getPxByMs, VideoTrain } from 'open-clippa'
+import { getMsByPx, getPxByMs, VideoTrain } from 'clippc'
 import { onMounted, onUnmounted } from 'vue'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'

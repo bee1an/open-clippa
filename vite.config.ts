@@ -13,7 +13,7 @@ export default defineConfig({
   root: './app',
   resolve: {
     alias: {
-      '@clippa/': `${path.resolve(__dirname, 'packages')}/`,
+      '@clippc/': `${path.resolve(__dirname, 'packages')}/`,
       '@/': `${path.resolve(__dirname, 'app/src')}/`,
     },
   },

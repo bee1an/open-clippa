@@ -1,4 +1,4 @@
-import type { Timeline } from 'open-clippa'
+import type { Timeline } from 'clippc'
 
 export const DEFAULT_TRANSITION_DURATION = 500
 export const TRANSITION_JOIN_TOLERANCE_MS = 1

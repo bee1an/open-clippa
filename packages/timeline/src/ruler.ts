@@ -6,8 +6,8 @@ import {
   TIMELINE_RULER_HEIGHT,
   TIMELINE_TICK_COLOR,
   TIMELINE_TICK_FONT_SIZE,
-} from '@clippa/constants'
-import { drag, EventBus, getMsByPx, getPxByMs, ms2TimeStr } from '@clippa/utils'
+} from '@clippc/constants'
+import { drag, EventBus, getMsByPx, getPxByMs, ms2TimeStr } from '@clippc/utils'
 import { Container, Graphics, Text } from 'pixi.js'
 import { State } from './state'
 
@@ -18,6 +18,7 @@ export interface RulerOption {
 
 export type RulerEvents = {
   seek: [number]
+  updateCurrentTime: [number]
 
   render: []
 }
@@ -34,8 +35,6 @@ for (let index = 0; index < 3; index++) {
     ticks.push(tick * 10 ** index)
   })
 }
-
-export const MINIMUM_DURATION = 0 // TODO
 
 export class Ruler extends EventBus<RulerEvents> {
   container: Container
@@ -222,7 +221,7 @@ export class Ruler extends EventBus<RulerEvents> {
       if (seekTime > this.duration) {
         seekTime = this.duration
       }
-      this.emit('seek', seekTime)
+      this.emit('updateCurrentTime', seekTime)
     }
     drag(this.container, {
       down: (e) => {

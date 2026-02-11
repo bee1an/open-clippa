@@ -3,14 +3,14 @@ import type {
   PerformerAnimationSpec,
   PerformerBounds,
   TextStyleOption,
-} from '@clippa/performer'
+} from '@clippc/performer'
 import {
   Image,
   mergeAnimationSpec,
   normalizeAnimationSpec,
   Text,
   Video,
-} from '@clippa/performer'
+} from '@clippc/performer'
 import { defineStore } from 'pinia'
 import { useEditorStore } from '@/store/useEditorStore'
 

@@ -178,7 +178,7 @@ importers:
 
   app:
     dependencies:
-      '@clippa/filter':
+      '@clippc/filter':
         specifier: workspace:*
         version: link:../packages/filter
       '@iconify/json':
@@ -239,6 +239,8 @@ importers:
 
   packages/canvas: {}
 
+  packages/clippc: {}
+
   packages/codec: {}
 
   packages/constants: {}
@@ -250,8 +252,6 @@ importers:
       pixi.js:
         specifier: 'catalog:'
         version: 8.14.0
-
-  packages/open-clippa: {}
 
   packages/performer:
     dependencies:

@@ -1,4 +1,4 @@
-# @clippa/canvas
+# @clippc/canvas
 
 Clippa canvas component
 

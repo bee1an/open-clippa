@@ -1,4 +1,4 @@
-import { TIMELINE_GAP_ACTIVE_FILL } from '@clippa/constants'
+import { TIMELINE_GAP_ACTIVE_FILL } from '@clippc/constants'
 import { Container, Graphics } from 'pixi.js'
 
 export const GAP = 4

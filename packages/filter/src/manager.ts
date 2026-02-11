@@ -1,4 +1,4 @@
-import type { Rail, TextTrain, Timeline, Train } from '@clippa/timeline'
+import type { Rail, TextTrain, Timeline, Train } from '@clippc/timeline'
 import type { ColorMatrixFilter } from 'pixi.js'
 import type {
   FilterConfig,
@@ -9,8 +9,8 @@ import type {
   FilterManagerSnapshot,
   TrainResizePayload,
 } from './types'
-import { TextTrain as TextTrainImpl } from '@clippa/timeline'
-import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
+import { TextTrain as TextTrainImpl } from '@clippc/timeline'
+import { EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
 import { ColorMatrixFilter as ColorMatrixFilterImpl } from 'pixi.js'
 import {
   applyFilterConfig,

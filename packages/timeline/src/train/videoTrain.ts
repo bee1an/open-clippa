@@ -1,7 +1,7 @@
 import type { ExtendTrainEvents, ExtendTrainOption } from './types'
-import { DEBUG_NO_FRAME, TIMELINE_TRAIN_HEIGHT } from '@clippa/constants'
-import { getPxByMs } from '@clippa/utils'
-import { FrameExtractor } from 'open-clippa'
+import { DEBUG_NO_FRAME, TIMELINE_TRAIN_HEIGHT } from '@clippc/constants'
+import { getPxByMs } from '@clippc/utils'
+import { FrameExtractor } from 'clippc'
 import { Container, Sprite, Texture } from 'pixi.js'
 import { Train } from './train'
 

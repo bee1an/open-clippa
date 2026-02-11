@@ -1,4 +1,4 @@
-import type { Performer } from '@clippa/performer'
+import type { Performer } from '@clippc/performer'
 
 export type TheaterEvents = {
   /**

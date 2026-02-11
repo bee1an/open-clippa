@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import type { MetadataTags } from 'mediabunny'
 import { ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Mp4OutputFormat, Output } from 'mediabunny'
-import { ms2TimeStr } from 'open-clippa'
+import { ms2TimeStr } from 'clippc'
 import { Button } from '@/components/ui/button'
 import { useExportStore, type ExportedVideo } from '@/store/useExportStore'
 

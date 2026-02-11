@@ -1,4 +1,4 @@
-import { Clippa } from 'open-clippa'
+import { Clippa } from 'clippc'
 import { defineStore } from 'pinia'
 
 export const useEditorStore = defineStore('editor', () => {

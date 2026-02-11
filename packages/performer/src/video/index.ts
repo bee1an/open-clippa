@@ -5,7 +5,7 @@ import type {
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
 import type { PerformerAnimationSpec, TransformState } from '../animation'
 import type { Performer, PerformerOption } from '../performer'
-import { EventBus, transformSrc } from '@clippa/utils'
+import { EventBus, transformSrc } from '@clippc/utils'
 import {
   ALL_FORMATS,
   Input,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CanvasExport, ExportCanceledError } from 'open-clippa'
+import { CanvasExport, ExportCanceledError } from 'clippc'
 import { useRouter } from 'vue-router'
 import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'

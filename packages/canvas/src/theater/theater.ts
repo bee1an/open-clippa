@@ -1,6 +1,6 @@
-import type { Performer } from '@clippa/performer'
+import type { Performer } from '@clippc/performer'
 import type { TheaterEvents } from './events'
-import { EventBus } from '@clippa/utils'
+import { EventBus } from '@clippc/utils'
 
 export class Theater extends EventBus<TheaterEvents> {
   /**

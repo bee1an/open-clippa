@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PerformerBounds } from '@clippa/performer'
+import type { PerformerBounds } from '@clippc/performer'
 import { Slider } from '@/components/ui/slider'
 
 interface Props {

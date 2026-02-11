@@ -37,7 +37,7 @@ function handleClick() {
       font-bold text-foreground tracking-tight
       :class="sizeClasses[size]"
     >
-      clippa
+      clippc
     </span>
   </div>
 </template>

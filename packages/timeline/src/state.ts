@@ -1,5 +1,5 @@
 import type { Train } from './train'
-import { EventBus } from '@clippa/utils'
+import { EventBus } from '@clippc/utils'
 
 export type StateEvents = {
   updatedPxPerMs: [number]

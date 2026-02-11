@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { EnterExitPresetType, LoopPresetType } from '@clippa/performer'
+import type { EnterExitPresetType, LoopPresetType } from '@clippc/performer'
 import {
   DEFAULT_ENTER_EXIT_DURATION_MS,
   DEFAULT_LOOP_DURATION_MS,
-} from '@clippa/performer'
+} from '@clippc/performer'
 import { storeToRefs } from 'pinia'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'radix-vue'
 import { computed } from 'vue'

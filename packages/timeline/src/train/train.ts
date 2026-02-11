@@ -12,8 +12,8 @@ import {
   TIMELINE_TRAIN_SLOT_FILL,
   TIMELINE_WIDGET_ACTIVE_FILL,
   TIMELINE_WIDGET_HOVER_FILL,
-} from '@clippa/constants'
-import { drag, EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
+} from '@clippc/constants'
+import { drag, EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
 import { Container, Graphics, HTMLText, Rectangle } from 'pixi.js'
 import { getRailHeightByStyle } from '../rail'
 import { State } from '../state'
@@ -260,11 +260,6 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
     resizerHandler.position.set(handlerX, handlerY)
     resizer.addChild(resizerHandler)
 
-    // TODO
-    /*
-      会造成一个bug, mask区域可以触发事件, resizer的可视区域反而不能触发事件
-      应该是inverse导致了计算错误
-    */
     const maskX = location === 'left' ? w / 2 : 0
     const mask = new Graphics({ label: 'mask' })
     mask.eventMode = 'none'
@@ -678,18 +673,23 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
     if (active) {
       // 取消上一个选中
-      state.activeTrain?.updateActive (false)
+      state.activeTrain?.updateActive(false)
 
       state.setActiveTrain(this)
       this._widget.visible = true
+      this.container.zIndex = 10
     }
     else if (state.activeTrain === this) {
       state.setActiveTrain(null)
     }
 
-    if (!active && !this._pointerIn) {
-      // 取消选中时, 当前鼠标并不在train内部则隐藏widget
-      this._widget.visible = false
+    if (!active) {
+      this.container.zIndex = 0
+
+      if (!this._pointerIn) {
+        // 取消选中时, 当前鼠标并不在train内部则隐藏widget
+        this._widget.visible = false
+      }
     }
 
     this._drawWidget()

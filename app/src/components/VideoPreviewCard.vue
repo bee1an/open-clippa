@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { VideoFile } from '@/store'
-import { ms2TimeStr } from 'open-clippa'
+import { ms2TimeStr } from 'clippc'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { loadVideoMetadata } from '@/utils/media'

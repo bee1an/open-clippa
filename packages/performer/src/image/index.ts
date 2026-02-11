@@ -1,7 +1,7 @@
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
 import type { PerformerAnimationSpec, TransformState } from '../animation'
 import type { Performer, PerformerOption } from '../performer'
-import { EventBus, transformSrc } from '@clippa/utils'
+import { EventBus, transformSrc } from '@clippc/utils'
 import { Sprite, Texture } from 'pixi.js'
 import { AnimationController, DEFAULT_TRANSFORM_STATE } from '../animation'
 import { PlayState, ShowState } from '../performer'

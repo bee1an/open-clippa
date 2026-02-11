@@ -1,6 +1,6 @@
 import type { Train } from './train'
-import { TIMELINE_APP_BACKGROUND_FILL, TIMELINE_LEFT_PADDING } from '@clippa/constants'
-import { EventBus, getMsByPx, getPxByMs } from '@clippa/utils'
+import { TIMELINE_APP_BACKGROUND_FILL, TIMELINE_LEFT_PADDING } from '@clippc/constants'
+import { EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
 import { Application, Container } from 'pixi.js'
 import { Cursor } from './cursor'
 import { Rails } from './rails'
@@ -12,6 +12,7 @@ export type TimlineEvents = {
   play: []
   pause: []
   seeked: [time: number]
+  currentTimeUpdated: [time: number]
   durationChanged: [number]
 }
 
@@ -182,7 +183,7 @@ export class Timeline extends EventBus<TimlineEvents> {
   /**
    * Creates a Ruler component and adds it to the adjuster container
    *
-   * when the `seek` event trigger then emit cursor seek handler
+   * when the `updateCurrentTime` event trigger then update current time without pausing
    */
   private _createRuler(): void {
     this.ruler = new Ruler({
@@ -191,8 +192,8 @@ export class Timeline extends EventBus<TimlineEvents> {
     })
     this.adjuster.addChild(this.ruler.container)
 
-    this.ruler.on('seek', (seekTime: number) => {
-      this.seek(seekTime)
+    this.ruler.on('updateCurrentTime', (time: number) => {
+      this.updateCurrentTime(time)
     })
   }
 
@@ -257,10 +258,10 @@ export class Timeline extends EventBus<TimlineEvents> {
     })
     this.adjuster.addChild(this.cursor.container)
 
-    this.cursor.on('seek', (seekTime: number) => {
+    this.cursor.on('updateCurrentTime', (time: number) => {
       this.cursor!.isDragging && this._moveCursorWithScroll()
 
-      this.seek(seekTime, false)
+      this.updateCurrentTime(time)
     })
   }
 
@@ -379,6 +380,19 @@ export class Timeline extends EventBus<TimlineEvents> {
     requestAnimationFrame(() => {
       this.cursor?.seek(this.currentTime + getMsByPx(scrollDirection, this.state.pxPerMs))
     })
+  }
+
+  /**
+   * Update current time without pausing playback.
+   * Used by drag interactions (cursor drag, ruler click/drag).
+   */
+  updateCurrentTime(time: number): void {
+    const boundedTime = Math.max(0, Math.min(this.duration, time))
+    this.currentTime = boundedTime
+
+    this.cursor?.updatePosition(boundedTime)
+
+    this.emit('currentTimeUpdated', boundedTime)
   }
 
   seek(time: number, withEffect = true): void {
