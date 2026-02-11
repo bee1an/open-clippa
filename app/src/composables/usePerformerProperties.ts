@@ -126,10 +126,33 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     bump()
   }
 
+  /**
+   * Update rotation around the visual center.
+   * Performer rotates around top-left by default, so we compensate
+   * the position to keep the center point stable.
+   */
   function updateRotation(angle: number) {
     const id = performerId.value
-    if (!id) return
-    performerStore.updatePerformer(id, { rotation: angle })
+    const b = bounds.value
+    if (!id || !b) return
+
+    const oldRotation = b.rotation ?? 0
+    const hw = b.width / 2
+    const hh = b.height / 2
+
+    // center under old rotation
+    const oldOffset = rotateVector(hw, hh, oldRotation)
+    const cx = b.x + oldOffset.x
+    const cy = b.y + oldOffset.y
+
+    // new top-left so center stays the same
+    const newOffset = rotateVector(hw, hh, angle)
+
+    performerStore.updatePerformer(id, {
+      x: cx - newOffset.x,
+      y: cy - newOffset.y,
+      rotation: angle,
+    })
     bump()
   }
 

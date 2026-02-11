@@ -7,6 +7,10 @@ import ImagePropertyPanel from './ImagePropertyPanel.vue'
 import TextPropertyPanel from './TextPropertyPanel.vue'
 import VideoPropertyPanel from './VideoPropertyPanel.vue'
 
+const emit = defineEmits<{
+  'navigate:animation': []
+}>()
+
 const performerStore = usePerformerStore()
 const { selectedPerformers } = storeToRefs(performerStore)
 
@@ -62,6 +66,20 @@ const typeComponents = {
         @update:content="updateTextContent"
         @update:style="updateTextStyle"
       />
+
+      <div class="h-px bg-border/50" />
+
+      <!-- Animation entry -->
+      <button
+        class="w-full flex items-center justify-between rounded-md border border-border/70 px-3 py-2.5 text-xs text-foreground-muted transition-colors hover:bg-secondary/40 hover:text-foreground"
+        @click="emit('navigate:animation')"
+      >
+        <span flex items-center gap-2>
+          <div class="i-ph-sparkle-bold" text-sm />
+          Animation
+        </span>
+        <div class="i-ph-caret-right-bold" text-xs opacity-50 />
+      </button>
 
       <div class="h-px bg-border/50" />
 

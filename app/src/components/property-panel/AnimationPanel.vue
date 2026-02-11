@@ -4,11 +4,15 @@ import {
   DEFAULT_ENTER_EXIT_DURATION_MS,
   DEFAULT_LOOP_DURATION_MS,
 } from '@clippa/performer'
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'radix-vue'
 import { storeToRefs } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'radix-vue'
+import { computed } from 'vue'
 import { Slider } from '@/components/ui/slider'
 import { usePerformerStore } from '@/store/usePerformerStore'
+
+const emit = defineEmits<{
+  back: []
+}>()
 
 const performerStore = usePerformerStore()
 const { selectedPerformers } = storeToRefs(performerStore)
@@ -53,19 +57,11 @@ const channels: ChannelConfig[] = [
 ]
 
 const selectedPerformerId = computed(() => selectedPerformers.value[0]?.id ?? null)
-const hasSelectedPerformer = computed(() => Boolean(selectedPerformerId.value))
 
 const animationSpec = computed(() => {
   if (!selectedPerformerId.value)
     return null
   return performerStore.getAnimation(selectedPerformerId.value)
-})
-
-const selectionWarning = ref('')
-
-watch(selectedPerformerId, (nextId) => {
-  if (nextId)
-    selectionWarning.value = ''
 })
 
 function getPreset(channel: AnimationChannel): string {
@@ -82,18 +78,10 @@ function clampDuration(value: number, fallback: number): number {
   return Math.max(50, Math.round(value))
 }
 
-function getSelectedId(): string | null {
+function togglePreset(channel: AnimationChannel, value: string, fallbackDuration: number): void {
   const id = selectedPerformerId.value
   if (!id)
-    selectionWarning.value = '当前未选中元素'
-  return id
-}
-
-function togglePreset(channel: AnimationChannel, value: string, fallbackDuration: number): void {
-  const id = getSelectedId()
-  if (!id)
     return
-  selectionWarning.value = ''
 
   // re-clicking the active preset deselects it
   if (getPreset(channel) === value) {
@@ -110,10 +98,9 @@ function togglePreset(channel: AnimationChannel, value: string, fallbackDuration
 }
 
 function handleDurationChange(channel: AnimationChannel, value: number, fallbackDuration: number): void {
-  const id = getSelectedId()
+  const id = selectedPerformerId.value
   if (!id || getPreset(channel) === 'none')
     return
-  selectionWarning.value = ''
 
   performerStore.updateAnimation(id, {
     [channel]: {
@@ -125,38 +112,17 @@ function handleDurationChange(channel: AnimationChannel, value: number, fallback
 
 <template>
   <div h-full flex="~ col" overflow-hidden data-preserve-canvas-selection="true">
-    <div p-4 pb-0 text-foreground font-medium>
-      Animation
+    <div p-4 pb-0 flex items-center gap-2>
+      <button
+        class="flex items-center justify-center rounded-md p-1 text-foreground-muted transition-colors hover:bg-secondary/40 hover:text-foreground"
+        @click="emit('back')"
+      >
+        <div class="i-ph-caret-left-bold" text-sm />
+      </button>
+      <span text-foreground font-medium>Animation</span>
     </div>
 
     <div flex-1 overflow-y-auto p-4 space-y-3>
-      <!-- Target Info -->
-      <div space-y-2>
-        <div flex items-center justify-between gap-3>
-          <span text-xs uppercase tracking-widest text-foreground-subtle>Target</span>
-          <span
-            class="max-w-44 truncate rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-xs font-medium"
-            :class="hasSelectedPerformer ? 'text-foreground' : 'text-warning'"
-          >
-            {{ selectedPerformerId ?? 'none' }}
-          </span>
-        </div>
-
-        <p text-xs text-foreground-muted>
-          {{ hasSelectedPerformer ? 'Edit animation of the selected performer.' : 'Select a performer first, then pick animation presets.' }}
-        </p>
-
-        <div
-          v-if="selectionWarning"
-          class="flex items-center gap-2 rounded-md border border-destructive/35 bg-destructive/10 px-2.5 py-2 text-xs text-destructive"
-        >
-          <div class="i-ph-warning-circle-bold" text-sm />
-          <span>{{ selectionWarning }}</span>
-        </div>
-      </div>
-
-      <div class="h-px bg-border/50" />
-
       <!-- Animation Channels (Tabs) -->
       <TabsRoot default-value="enter">
         <TabsList class="flex rounded-lg bg-secondary/50 p-0.5">

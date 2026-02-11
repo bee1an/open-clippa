@@ -98,9 +98,12 @@ export class Text extends EventBus<TextEvents> implements Performer {
   load(option?: TextOption): Promise<void> {
     const { height, width, x, y, content, style } = option || {}
 
+    if (style)
+      this._styleOption = style
+
     // Text is synchronous, no async loading needed
     if (!this._sprite) {
-      const textStyle = this._createTextStyle(style || this._styleOption)
+      const textStyle = this._createTextStyle(this._styleOption)
       this._sprite = new PixiText({
         text: content || this._content,
         style: textStyle,
@@ -134,7 +137,7 @@ export class Text extends EventBus<TextEvents> implements Performer {
       fontFamily: option.fontFamily || 'Arial',
       fontSize: option.fontSize || 26,
       fontWeight: option.fontWeight as any,
-      fontStyle: option.fontStyle,
+      fontStyle: option.fontStyle ?? 'normal',
       fill: option.fill ?? '#fff',
       stroke: option.stroke,
       align: option.align,

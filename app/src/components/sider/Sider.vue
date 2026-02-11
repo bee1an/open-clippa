@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import AnimationPanel from '@/components/property-panel/AnimationPanel.vue'
+import PropertyPanel from '@/components/property-panel/PropertyPanel.vue'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 const siderCollapsed = useStorage('siderCollapsed', false)
-const router = useRouter()
 const route = useRoute()
 
 const performerStore = usePerformerStore()
@@ -11,35 +12,44 @@ const { selectedPerformers } = storeToRefs(performerStore)
 
 const hasSelection = computed(() => selectedPerformers.value.length > 0)
 
-// remember the route before navigating to properties
-let previousRoute: string | null = null
+type SiderPanel = 'properties' | 'animation'
+const siderPanel = ref<SiderPanel>('properties')
 
 watch(hasSelection, (selected) => {
   if (selected) {
-    // auto-expand sider
     if (siderCollapsed.value) {
       siderCollapsed.value = false
     }
-    // navigate to properties route, remember previous
-    if (route.path !== '/editor/properties') {
-      previousRoute = route.path
-      router.replace('/editor/properties')
-    }
+    siderPanel.value = 'properties'
   }
   else {
-    // restore previous route on deselection
-    const target = previousRoute ?? '/editor/media'
-    previousRoute = null
-    if (route.path === '/editor/properties') {
-      router.replace(target)
-    }
+    siderPanel.value = 'properties'
   }
 })
+
+function handleNavigate(path: string) {
+  // if properties panel is showing, first click just dismisses it
+  if (hasSelection.value) {
+    performerStore.clearSelection()
+    return
+  }
+
+  if (!siderCollapsed.value && route.path === path) {
+    siderCollapsed.value = true
+    return
+  }
+
+  if (siderCollapsed.value) {
+    siderCollapsed.value = false
+  }
+}
 </script>
 
 <template>
   <div w-full h-full flex bg-background-elevated>
-    <Nav :expanded="!siderCollapsed" @toggle="siderCollapsed = !siderCollapsed" />
+    <Nav
+      @navigate="handleNavigate"
+    />
 
     <div
       v-if="!siderCollapsed"
@@ -47,7 +57,17 @@ watch(hasSelection, (selected) => {
       class="border-l border-border/50"
     >
       <div h-full overflow-y-auto>
-        <RouterView />
+        <template v-if="hasSelection">
+          <AnimationPanel
+            v-if="siderPanel === 'animation'"
+            @back="siderPanel = 'properties'"
+          />
+          <PropertyPanel
+            v-else
+            @navigate:animation="siderPanel = 'animation'"
+          />
+        </template>
+        <RouterView v-else />
       </div>
     </div>
   </div>
