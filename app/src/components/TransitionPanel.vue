@@ -1,39 +1,41 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
-import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useTransitionStore } from '@/store/useTransitionStore'
-import {
-  DEFAULT_GL_TRANSITION_TYPE,
-  getGlTransitionDefaultParams,
-  GL_TRANSITION_PRESETS,
-} from '@/utils/glTransitions'
+import { GL_TRANSITION_PRESETS } from '@/utils/glTransitions'
 import {
   computeTransitionMaxMs,
+  DEFAULT_TRANSITION_DURATION,
   TRANSITION_FEATURE_AVAILABLE,
 } from '@/utils/transition'
 
 const transitionStore = useTransitionStore()
 const transitionFeatureAvailable = TRANSITION_FEATURE_AVAILABLE
-const { activeTransition } = storeToRefs(transitionStore)
 const {
-  candidates,
   activeCandidate,
   getTransitionClip,
-  selectOrCreateTransition,
+  applyTransitionType,
 } = useTransitionCandidates()
+
 const transitionTypeOptions = GL_TRANSITION_PRESETS.map(preset => ({
   value: preset.type,
   label: preset.name,
 }))
 
-const activeTransitionClipPair = computed(() => {
-  if (!activeTransition.value)
+const activeTransition = computed(() => {
+  if (!activeCandidate.value)
     return null
 
-  const from = getTransitionClip(activeTransition.value.fromId)
-  const to = getTransitionClip(activeTransition.value.toId)
+  return transitionStore.getTransitionByPair(activeCandidate.value.fromId, activeCandidate.value.toId)
+})
+
+const activeTransitionClipPair = computed(() => {
+  if (!activeCandidate.value)
+    return null
+
+  const from = getTransitionClip(activeCandidate.value.fromId)
+  const to = getTransitionClip(activeCandidate.value.toId)
   if (!from || !to)
     return null
 
@@ -41,19 +43,27 @@ const activeTransitionClipPair = computed(() => {
 })
 
 const activeLimit = computed(() => {
-  if (!activeTransition.value || !activeTransitionClipPair.value)
+  if (!activeTransitionClipPair.value)
     return null
 
   return computeTransitionMaxMs(
     activeTransitionClipPair.value.from,
     activeTransitionClipPair.value.to,
-    activeTransition.value.durationMs,
+    activeTransition.value?.durationMs ?? DEFAULT_TRANSITION_DURATION,
   )
 })
 
-function formatCutTime(ms: number): string {
-  return `${(ms / 1000).toFixed(2)}s`
-}
+const activeTransitionType = computed(() => activeTransition.value?.type ?? null)
+
+const displayDuration = computed(() => {
+  if (activeTransition.value)
+    return activeTransition.value.durationMs
+
+  if (!activeLimit.value)
+    return DEFAULT_TRANSITION_DURATION
+
+  return Math.min(DEFAULT_TRANSITION_DURATION, activeLimit.value.uiMax)
+})
 
 function normalizeDuration(nextValue: number): number {
   if (!activeTransition.value || !activeLimit.value)
@@ -63,7 +73,6 @@ function normalizeDuration(nextValue: number): number {
   const { maxMs, uiMax } = activeLimit.value
 
   let next = Math.max(0, Math.min(uiMax, nextValue))
-
   if (current > maxMs) {
     if (next > current)
       next = current
@@ -75,41 +84,24 @@ function normalizeDuration(nextValue: number): number {
   return Math.round(next)
 }
 
-function updateDuration(nextValue: number): void {
+function handleEffectClick(type: string): void {
+  if (!activeCandidate.value)
+    return
+
+  applyTransitionType(activeCandidate.value, type)
+}
+
+function handleDurationChange(value: number): void {
   if (!activeTransition.value)
     return
 
-  const next = normalizeDuration(nextValue)
+  const next = normalizeDuration(value)
   if (next === activeTransition.value.durationMs)
     return
 
   transitionStore.updateTransition(activeTransition.value.id, {
     durationMs: next,
   })
-}
-
-function handleSliderInput(event: Event): void {
-  const input = event.target as HTMLInputElement
-  const value = Number.parseInt(input.value, 10)
-  if (Number.isNaN(value))
-    return
-
-  updateDuration(value)
-}
-
-function handleSliderKeydown(event: KeyboardEvent): void {
-  if (!activeTransition.value)
-    return
-
-  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
-    return
-
-  event.preventDefault()
-
-  const step = event.shiftKey ? 10 : 50
-  const direction = event.key === 'ArrowRight' ? 1 : -1
-  const next = activeTransition.value.durationMs + direction * step
-  updateDuration(next)
 }
 
 function removeActiveTransition(): void {
@@ -119,34 +111,26 @@ function removeActiveTransition(): void {
   transitionStore.removeTransition(activeTransition.value.id)
 }
 
-function handleTypeChange(event: Event): void {
-  if (!activeTransition.value)
-    return
-
-  const target = event.target as HTMLSelectElement
-  const type = target.value || DEFAULT_GL_TRANSITION_TYPE
-
-  transitionStore.updateTransition(activeTransition.value.id, {
-    type,
-    params: getGlTransitionDefaultParams(type),
-  })
+function clearActiveSelection(): void {
+  transitionStore.clearActiveSelection()
 }
 </script>
 
 <template>
-  <div h-full flex="~ col" overflow-hidden>
+  <div h-full flex="~ col" overflow-hidden data-preserve-canvas-selection="true">
     <div p-4 border-b border-border>
       <div text-sm font-medium text-foreground>
         Transition
       </div>
       <div text-xs text-foreground-muted mt-1>
-        {{ transitionFeatureAvailable ? 'Select a cut to create or edit a transition' : 'Transition is currently unavailable' }}
+        {{ transitionFeatureAvailable ? 'Edit transition effect and duration' : 'Transition is currently unavailable' }}
       </div>
     </div>
 
     <div
       v-if="!transitionFeatureAvailable"
       flex-1 min-h-0 p-4 flex items-center justify-center
+      data-preserve-canvas-selection="true"
     >
       <div class="text-xs text-foreground-muted border border-border/60 rounded-md px-3 py-2 bg-background">
         Transition feature is temporarily unavailable
@@ -155,91 +139,86 @@ function handleTypeChange(event: Event): void {
 
     <div
       v-else
-      flex-1 min-h-0 grid grid-cols-1 gap-0 overflow-hidden
+      flex-1 min-h-0 overflow-y-auto p-4 space-y-4
+      data-preserve-canvas-selection="true"
     >
-      <div p-4 border-b border-border overflow-y-auto max-h="[45%]">
-        <div v-if="candidates.length === 0" text-xs text-foreground-muted>
-          No adjacent video/image cuts found
-        </div>
-
-        <div v-else class="space-y-2">
-          <button
-            v-for="candidate in candidates"
-            :key="candidate.id"
-            class="w-full text-left border rounded-md px-3 py-2 transition-colors"
-            :class="{
-              'bg-secondary/50 border-primary/50': activeCandidate?.id === candidate.id,
-              'bg-background border-border/60 hover:border-border': activeCandidate?.id !== candidate.id,
-            }"
-            @click="selectOrCreateTransition(candidate)"
-          >
-            <div class="text-xs text-foreground-muted">
-              {{ formatCutTime(candidate.cutTime) }}
-            </div>
-            <div class="text-sm text-foreground truncate">
-              {{ candidate.fromId }} → {{ candidate.toId }}
-            </div>
-            <div class="text-[11px] text-foreground-muted mt-1">
-              {{ candidate.transitionId ? 'Transition ready' : 'Create transition' }}
-            </div>
-          </button>
-        </div>
+      <div
+        v-if="!activeCandidate"
+        class="text-xs text-foreground-muted border border-border/60 rounded-md px-3 py-2 bg-background"
+      >
+        Click a transition icon in timeline to start editing
       </div>
 
-      <div p-4 overflow-y-auto flex-1>
-        <div v-if="!activeTransition || !activeLimit" text-xs text-foreground-muted>
-          Select a transition candidate to edit duration
+      <div
+        v-else
+        class="space-y-3"
+      >
+        <div class="space-y-2">
+          <div class="text-xs text-foreground-muted">
+            Select an effect type. Transition will be created on first selection.
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button
+              v-for="option in transitionTypeOptions"
+              :key="option.value"
+              type="button"
+              class="rounded-md border px-2.5 py-2 text-xs text-left transition-colors"
+              :class="activeTransitionType === option.value
+                ? 'border-foreground/50 bg-foreground/8 text-foreground font-medium'
+                : 'border-border/70 bg-background text-foreground-muted hover:bg-secondary/40 hover:text-foreground'"
+              data-preserve-canvas-selection="true"
+              @click="handleEffectClick(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
         </div>
 
-        <div v-else class="space-y-4">
-          <div class="text-sm text-foreground">
-            {{ activeTransition.fromId }} → {{ activeTransition.toId }}
-          </div>
+        <div class="h-px bg-border/50" />
 
-          <div class="space-y-2">
-            <div class="flex items-center justify-between text-xs text-foreground-muted">
-              <span>Effect</span>
-            </div>
-            <select
-              class="w-full text-xs bg-background border border-border/60 rounded px-2 py-2"
-              :value="activeTransition.type"
-              @change="handleTypeChange"
-            >
-              <option
-                v-for="option in transitionTypeOptions"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </option>
-            </select>
+        <div class="space-y-3">
+          <div v-if="!activeTransition || !activeLimit" class="text-xs text-foreground-muted border border-border/60 rounded-md px-3 py-2 bg-background">
+            Select an effect first, then adjust duration
           </div>
-
-          <div class="space-y-2">
+          <template v-else>
             <div class="flex items-center justify-between text-xs text-foreground-muted">
               <span>Duration</span>
-              <span>{{ activeTransition.durationMs }}ms</span>
+              <span>{{ displayDuration }}ms</span>
             </div>
-
-            <input
-              type="range"
-              min="0"
-              step="50"
+            <Slider
+              :model-value="displayDuration"
+              :min="0"
               :max="activeLimit.uiMax"
-              :value="activeTransition.durationMs"
-              class="w-full"
-              @input="handleSliderInput"
-              @keydown="handleSliderKeydown"
-            >
-          </div>
+              :step="50"
+              size="sm"
+              @update:model-value="(value: number) => handleDurationChange(value)"
+            />
+            <div class="text-[11px] text-foreground-muted">
+              Max allowed by source trim: {{ activeLimit.maxMs }}ms
+            </div>
+          </template>
+        </div>
 
-          <Button
-            variant="outline"
-            class="w-full justify-center"
+        <div class="h-px bg-border/50" />
+
+        <div class="space-y-2">
+          <button
+            type="button"
+            class="w-full rounded-md border border-border/70 px-3 py-2 text-xs text-left transition-colors hover:bg-secondary/40 hover:text-foreground"
+            data-preserve-canvas-selection="true"
+            @click="clearActiveSelection"
+          >
+            Clear active transition selection
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-md border border-destructive/40 px-3 py-2 text-xs text-left transition-colors hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-preserve-canvas-selection="true"
+            :disabled="!activeTransition"
             @click="removeActiveTransition"
           >
             Delete transition
-          </Button>
+          </button>
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@ import type { ComputedRef } from 'vue'
 import type { TransitionCandidate, TransitionClip } from '@/utils/transition'
 import { Image, Video } from 'clippc'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { useTransitionStore } from '@/store/useTransitionStore'
@@ -26,7 +26,6 @@ interface UseTransitionCandidatesResult {
   candidates: ComputedRef<DisplayTransitionCandidate[]>
   activeCandidate: ComputedRef<DisplayTransitionCandidate | null>
   getTransitionClip: (performerId: string) => TransitionClip | null
-  selectOrCreateTransition: (candidate: DisplayTransitionCandidate) => void
   applyTransitionType: (candidate: DisplayTransitionCandidate, transitionType: string) => void
 }
 
@@ -35,9 +34,10 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
   const performerStore = usePerformerStore()
   const transitionStore = useTransitionStore()
   const { clippa } = editorStore
-  const { transitions, activeTransition } = storeToRefs(transitionStore)
+  const { transitions, activeTransition, activePairKey } = storeToRefs(transitionStore)
 
   const timelineVersion = ref(0)
+  const timelineReady = ref(false)
   const railDisposers = new Map<Rail, () => void>()
   const trainDisposers = new Map<Train, () => void>()
 
@@ -158,30 +158,16 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
     if (!TRANSITION_FEATURE_AVAILABLE)
       return null
 
+    if (activePairKey.value) {
+      return candidates.value.find(candidate => candidate.pairKey === activePairKey.value) ?? null
+    }
+
     if (!activeTransition.value)
       return null
 
     const pairKey = buildTransitionPairKey(activeTransition.value.fromId, activeTransition.value.toId)
     return candidates.value.find(candidate => candidate.pairKey === pairKey) ?? null
   })
-
-  function selectOrCreateTransition(candidate: DisplayTransitionCandidate): void {
-    if (!TRANSITION_FEATURE_AVAILABLE)
-      return
-
-    const existing = transitionStore.getTransitionByPair(candidate.fromId, candidate.toId)
-    if (existing) {
-      transitionStore.selectTransition(existing.id)
-      return
-    }
-
-    transitionStore.createTransition({
-      fromId: candidate.fromId,
-      toId: candidate.toId,
-      type: DEFAULT_GL_TRANSITION_TYPE,
-      params: getGlTransitionDefaultParams(DEFAULT_GL_TRANSITION_TYPE),
-    })
-  }
 
   function applyTransitionType(candidate: DisplayTransitionCandidate, transitionType: string): void {
     if (!TRANSITION_FEATURE_AVAILABLE)
@@ -209,6 +195,26 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
   const handleDurationChanged = (): void => bindTimelineRails()
   const handleHire = (): void => bindTimelineRails()
 
+  watch(
+    () => ({
+      candidateKeys: candidates.value.map(item => item.pairKey),
+      currentActivePairKey: activePairKey.value,
+      currentTimelineReady: timelineReady.value,
+    }),
+    ({ candidateKeys, currentActivePairKey, currentTimelineReady }) => {
+      if (!currentTimelineReady)
+        return
+
+      if (!currentActivePairKey)
+        return
+
+      if (!candidateKeys.includes(currentActivePairKey)) {
+        transitionStore.clearActiveSelection()
+      }
+    },
+    { immediate: true },
+  )
+
   let disposed = false
   onMounted(async () => {
     await clippa.ready
@@ -218,12 +224,14 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
       return
 
     bindTimelineRails()
+    timelineReady.value = true
     clippa.timeline.on('durationChanged', handleDurationChanged)
     clippa.theater.on('hire', handleHire)
   })
 
   onUnmounted(() => {
     disposed = true
+    timelineReady.value = false
     clippa.timeline.off('durationChanged', handleDurationChanged)
     clippa.theater.off('hire', handleHire)
 
@@ -238,7 +246,6 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
     candidates,
     activeCandidate,
     getTransitionClip,
-    selectOrCreateTransition,
     applyTransitionType,
   }
 }

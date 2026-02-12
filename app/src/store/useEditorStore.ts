@@ -1,6 +1,8 @@
 import { Clippa } from 'clippc'
 import { defineStore } from 'pinia'
 
+type TransitionFrameSyncer = () => Promise<void> | void
+
 export const useEditorStore = defineStore('editor', () => {
   const clippa = markRaw(new Clippa())
 
@@ -26,11 +28,26 @@ export const useEditorStore = defineStore('editor', () => {
   // 选中视频
   const selectedVideo = ref<any>(null)
 
+  let transitionFrameSyncer: TransitionFrameSyncer | null = null
+
+  function registerTransitionFrameSyncer(syncer: TransitionFrameSyncer | null): void {
+    transitionFrameSyncer = syncer
+  }
+
+  async function syncTransitionFrame(): Promise<void> {
+    if (!transitionFrameSyncer)
+      return
+
+    await transitionFrameSyncer()
+  }
+
   return {
     clippa,
     currentTime,
     duration,
     isPlaying,
     selectedVideo,
+    registerTransitionFrameSyncer,
+    syncTransitionFrame,
   }
 })

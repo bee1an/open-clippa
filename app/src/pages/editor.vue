@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CanvasExport, ExportCanceledError } from 'clippc'
+import { nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
@@ -108,6 +109,8 @@ async function exportHandler() {
     frameRate: exportFrameRate,
     nextFrame: async ({ timestampMs }) => {
       await editorStore.clippa.director.seek(timestampMs)
+      await nextTick()
+      await editorStore.syncTransitionFrame()
       app.renderer.render(app.stage)
     },
     onProgress: ({ currentFrame, totalFrames }) => {

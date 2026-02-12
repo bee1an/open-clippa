@@ -2,7 +2,7 @@ import type { Timeline } from 'clippc'
 
 export const DEFAULT_TRANSITION_DURATION = 500
 export const TRANSITION_JOIN_TOLERANCE_MS = 1
-export const TRANSITION_FEATURE_AVAILABLE = false
+export const TRANSITION_FEATURE_AVAILABLE = import.meta.env.VITE_ENABLE_TRANSITION !== 'false'
 
 export interface TransitionSpec {
   id: string

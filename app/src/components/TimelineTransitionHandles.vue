@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import type { DisplayTransitionCandidate } from '@/composables/useTransitionCandidates'
-import type { TransitionSpec } from '@/store/useTransitionStore'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useEditorStore } from '@/store'
+import { usePerformerStore } from '@/store/usePerformerStore'
 import { useTransitionStore } from '@/store/useTransitionStore'
-import {
-  DEFAULT_GL_TRANSITION_TYPE,
-  GL_TRANSITION_PRESETS,
-} from '@/utils/glTransitions'
-import { buildTransitionPairKey, TRANSITION_FEATURE_AVAILABLE } from '@/utils/transition'
+import { TRANSITION_FEATURE_AVAILABLE } from '@/utils/transition'
 
 interface TransitionHandleLayout {
   candidate: DisplayTransitionCandidate
@@ -19,35 +16,23 @@ interface TransitionHandleLayout {
 }
 
 const editorStore = useEditorStore()
+const performerStore = usePerformerStore()
 const transitionStore = useTransitionStore()
+const router = useRouter()
+const siderCollapsed = useStorage('siderCollapsed', false)
 const { clippa } = editorStore
-const { transitions } = storeToRefs(transitionStore)
+const { activePairKey } = storeToRefs(transitionStore)
 const {
   candidates,
-  applyTransitionType,
 } = useTransitionCandidates()
 const transitionFeatureAvailable = TRANSITION_FEATURE_AVAILABLE
 
-const transitionTypeOptions = GL_TRANSITION_PRESETS.map(preset => ({
-  value: preset.type,
-  label: preset.name,
-}))
-
 const layoutVersion = ref(0)
-const menuRef = ref<HTMLElement | null>(null)
-const menuState = ref<{ pairKey: string, x: number, y: number } | null>(null)
+const hoveredPairKey = ref<string | null>(null)
 
 function bumpLayoutVersion(): void {
   layoutVersion.value += 1
 }
-
-const transitionsByPair = computed(() => {
-  const map = new Map<string, TransitionSpec>()
-  transitions.value.forEach((transition) => {
-    map.set(buildTransitionPairKey(transition.fromId, transition.toId), transition)
-  })
-  return map
-})
 
 const handles = computed<TransitionHandleLayout[]>(() => {
   if (!transitionFeatureAvailable)
@@ -77,83 +62,45 @@ const handles = computed<TransitionHandleLayout[]>(() => {
   return result
 })
 
-const activeMenuCandidate = computed<DisplayTransitionCandidate | null>(() => {
-  if (!transitionFeatureAvailable)
-    return null
-
-  if (!menuState.value)
-    return null
-
-  return candidates.value.find(item => item.pairKey === menuState.value!.pairKey) ?? null
-})
-
-const activeMenuTransition = computed<TransitionSpec | null>(() => {
-  if (!activeMenuCandidate.value)
-    return null
-
-  return transitionsByPair.value.get(activeMenuCandidate.value.pairKey) ?? null
-})
-
-const activeMenuTransitionType = computed(() => {
-  return activeMenuTransition.value?.type ?? DEFAULT_GL_TRANSITION_TYPE
-})
-
-const activeMenuStyle = computed(() => {
-  if (!menuState.value)
-    return {}
-
-  const appWidth = clippa.timeline.app?.screen.width ?? 0
-  const menuWidth = 220
-  const left = appWidth
-    ? Math.max(8, Math.min(menuState.value.x - menuWidth / 2, appWidth - menuWidth - 8))
-    : menuState.value.x - menuWidth / 2
-
-  return {
-    left: `${left}px`,
-    top: `${menuState.value.y + 22}px`,
-    width: `${menuWidth}px`,
-  }
-})
-
-function closeMenu(): void {
-  menuState.value = null
+function setHoveredPair(pairKey: string | null): void {
+  hoveredPairKey.value = pairKey
 }
 
-function openMenu(handle: TransitionHandleLayout): void {
+function isHandleVisible(handle: TransitionHandleLayout): boolean {
+  return hoveredPairKey.value === handle.candidate.pairKey
+    || activePairKey.value === handle.candidate.pairKey
+}
+
+function clearTimelineSelection(): void {
+  performerStore.clearSelection()
+  performerStore.clearPendingSelectionDrag()
+  clippa.timeline.state.activeTrain?.updateActive(false)
+}
+
+async function handleIconClick(handle: TransitionHandleLayout): Promise<void> {
   if (!transitionFeatureAvailable)
     return
 
-  menuState.value = {
-    pairKey: handle.candidate.pairKey,
-    x: handle.x,
-    y: handle.y,
+  clearTimelineSelection()
+
+  const toggledOff = activePairKey.value === handle.candidate.pairKey
+  if (toggledOff) {
+    transitionStore.clearActiveSelection()
+    hoveredPairKey.value = null
+    return
   }
+
+  transitionStore.selectPair(handle.candidate.fromId, handle.candidate.toId)
+
+  siderCollapsed.value = false
+  await router.push('/editor/transition')
 }
 
-function handleOptionClick(type: string): void {
-  if (!activeMenuCandidate.value)
-    return
+function resolveHandleClass(handle: TransitionHandleLayout): string {
+  if (activePairKey.value === handle.candidate.pairKey)
+    return 'bg-primary text-background border-primary'
 
-  applyTransitionType(activeMenuCandidate.value, type)
-  closeMenu()
-}
-
-function resolveTransitionForCandidate(candidate: DisplayTransitionCandidate): TransitionSpec | null {
-  return transitionsByPair.value.get(candidate.pairKey) ?? null
-}
-
-function handleDocumentPointerDown(event: PointerEvent): void {
-  if (!menuState.value)
-    return
-
-  const target = event.target as Node | null
-  if (!target)
-    return
-
-  if (menuRef.value?.contains(target))
-    return
-
-  closeMenu()
+  return 'bg-background text-foreground border-border hover:border-primary/80'
 }
 
 const candidateSignature = computed(() => {
@@ -164,12 +111,12 @@ const candidateSignature = computed(() => {
 
 watch(candidateSignature, () => {
   bumpLayoutVersion()
-  if (!menuState.value)
+  if (!hoveredPairKey.value)
     return
 
-  const stillExists = candidates.value.some(item => item.pairKey === menuState.value?.pairKey)
+  const stillExists = candidates.value.some(item => item.pairKey === hoveredPairKey.value)
   if (!stillExists)
-    closeMenu()
+    hoveredPairKey.value = null
 })
 
 const handleTimelineScroll = (): void => bumpLayoutVersion()
@@ -182,8 +129,6 @@ let disposed = false
 onMounted(async () => {
   if (!transitionFeatureAvailable)
     return
-
-  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
 
   await clippa.ready
   if (disposed)
@@ -203,13 +148,12 @@ onUnmounted(() => {
     return
 
   disposed = true
-  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
   clippa.timeline.rails?.off('scroll', handleTimelineScroll)
   clippa.timeline.off('durationChanged', handleDurationChanged)
   clippa.timeline.state.off('updatedPxPerMs', handlePxPerMsUpdated)
   clippa.theater.off('hire', handleHire)
   window.removeEventListener('resize', handleWindowResize)
-  closeMenu()
+  hoveredPairKey.value = null
 })
 </script>
 
@@ -219,52 +163,32 @@ onUnmounted(() => {
     absolute inset-0 z-20 overflow-hidden pointer-events-none
     data-preserve-canvas-selection="true"
   >
-    <button
+    <template
       v-for="handle in handles"
       :key="handle.candidate.id"
-      type="button"
-      data-preserve-canvas-selection="true"
-      class="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full border transition-colors shadow-sm flex items-center justify-center"
-      :class="resolveTransitionForCandidate(handle.candidate)
-        ? 'bg-primary text-background border-primary'
-        : 'bg-background text-foreground border-border hover:border-primary/80'"
-      :style="{ left: `${handle.x}px`, top: `${handle.y}px` }"
-      @pointerdown.stop
-      @click.stop="openMenu(handle)"
     >
-      <span text="[9px]" leading-none font-semibold uppercase>fx</span>
-    </button>
-
-    <div
-      v-if="menuState && activeMenuCandidate"
-      ref="menuRef"
-      data-preserve-canvas-selection="true"
-      class="absolute pointer-events-auto rounded-md border border-border bg-background/95 backdrop-blur-sm p-2 shadow-lg space-y-1"
-      :style="activeMenuStyle"
-      @pointerdown.stop
-      @click.stop
-    >
-      <div class="px-1 pb-1 border-b border-border/70">
-        <div class="text-[11px] text-foreground-muted">
-          {{ activeMenuCandidate.fromId }} → {{ activeMenuCandidate.toId }}
-        </div>
-        <div class="text-[10px] text-foreground-muted/80 mt-0.5">
-          Choose transition algorithm
-        </div>
-      </div>
+      <div
+        data-preserve-canvas-selection="true"
+        class="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-transparent"
+        :style="{ left: `${handle.x}px`, top: `${handle.y}px` }"
+        @pointerenter="setHoveredPair(handle.candidate.pairKey)"
+        @pointerleave="setHoveredPair(null)"
+      />
 
       <button
-        v-for="option in transitionTypeOptions"
-        :key="option.value"
+        v-if="isHandleVisible(handle)"
         type="button"
-        class="w-full text-left px-2 py-1.5 rounded text-xs transition-colors"
-        :class="option.value === activeMenuTransitionType
-          ? 'bg-primary/20 text-foreground'
-          : 'hover:bg-secondary text-foreground-muted hover:text-foreground'"
-        @click="handleOptionClick(option.value)"
+        data-preserve-canvas-selection="true"
+        class="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full border transition-colors shadow-sm flex items-center justify-center"
+        :class="resolveHandleClass(handle)"
+        :style="{ left: `${handle.x}px`, top: `${handle.y}px` }"
+        @pointerenter="setHoveredPair(handle.candidate.pairKey)"
+        @pointerleave="setHoveredPair(null)"
+        @pointerdown.stop
+        @click.stop="handleIconClick(handle)"
       >
-        {{ option.label }}
+        <span text="[9px]" leading-none font-semibold uppercase>fx</span>
       </button>
-    </div>
+    </template>
   </div>
 </template>

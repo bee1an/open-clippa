@@ -66,6 +66,28 @@ vec4 transition (vec2 uv) {
       smoothness: 0.5,
     },
   },
+  {
+    type: 'directionalwrap',
+    name: 'Directional Wrap',
+    author: 'custom',
+    license: 'MIT',
+    glsl: `
+uniform vec2 direction; // = vec2(0.0, 1.0)
+
+vec4 transition (vec2 uv) {
+  vec2 p = uv + progress * sign(direction);
+  vec2 f = fract(p);
+  return mix(
+    getToColor(f),
+    getFromColor(f),
+    step(0.0, p.y) * step(p.y, 1.0) * step(0.0, p.x) * step(p.x, 1.0)
+  );
+}
+`.trim(),
+    defaultParams: {
+      direction: [0, 1],
+    },
+  },
 ]
 
 const presetMap = new Map(GL_TRANSITION_PRESETS.map(preset => [preset.type, preset]))
@@ -131,7 +153,8 @@ export function buildGlTransitionFragment(glsl: string): string {
   return `
 precision mediump float;
 
-varying vec2 vTextureCoord;
+in vec2 vTextureCoord;
+out vec4 finalColor;
 
 uniform sampler2D uFrom;
 uniform sampler2D uTo;
@@ -142,17 +165,17 @@ uniform float uRatio;
 #define ratio uRatio
 
 vec4 getFromColor(vec2 uv) {
-  return texture2D(uFrom, uv);
+  return texture(uFrom, uv);
 }
 
 vec4 getToColor(vec2 uv) {
-  return texture2D(uTo, uv);
+  return texture(uTo, uv);
 }
 
 ${glsl}
 
 void main() {
-  gl_FragColor = transition(vTextureCoord);
+  finalColor = transition(vTextureCoord);
 }
 `.trim()
 }

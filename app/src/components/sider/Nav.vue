@@ -28,7 +28,7 @@ const navItems = [
     path: '/editor/transition',
     icon: 'i-ph-arrow-bend-up-right-bold',
     activeIcon: 'i-ph-arrow-bend-up-right-fill',
-    title: 'Transition (Unavailable)',
+    title: 'Transition',
   },
 ]
 
