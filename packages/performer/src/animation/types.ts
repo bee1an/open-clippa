@@ -38,6 +38,11 @@ export interface RelativeTransformState {
   alpha: number
 }
 
+export interface AnimationLayout {
+  localWidth: number
+  localHeight: number
+}
+
 export interface EnterExitAnimationConfig {
   preset: EnterExitPresetType
   durationMs?: number

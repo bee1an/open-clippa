@@ -1,5 +1,5 @@
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
-import type { PerformerAnimationSpec, TransformState } from '../animation'
+import type { AnimationLayout, PerformerAnimationSpec, TransformState } from '../animation'
 import type { Performer, PerformerOption } from '../performer'
 import { EventBus } from '@clippc/utils'
 import { Text as PixiText, TextStyle } from 'pixi.js'
@@ -59,6 +59,8 @@ export type TextEvents = {
 }
 
 export class Text extends EventBus<TextEvents> implements Performer {
+  private static readonly _SCALE_EPSILON = 1e-6
+
   id: string
   start: number
   duration: number
@@ -250,7 +252,7 @@ export class Text extends EventBus<TextEvents> implements Performer {
     if (!this._sprite)
       return
 
-    const bounds = this.getBounds()
+    const bounds = this.getBaseBounds()
     this.emit('positionUpdate', bounds)
   }
 
@@ -298,6 +300,29 @@ export class Text extends EventBus<TextEvents> implements Performer {
     }
   }
 
+  getBaseBounds(): Required<TextBounds> {
+    if (!this._sprite) {
+      return {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        rotation: 0,
+      }
+    }
+
+    const baseTransform = this._resolveBaseTransform()
+    const baseSize = this._resolveBaseSize(baseTransform)
+
+    return {
+      x: baseTransform.x,
+      y: baseTransform.y,
+      width: baseSize.width,
+      height: baseSize.height,
+      rotation: baseTransform.rotation,
+    }
+  }
+
   setAnimation(spec: PerformerAnimationSpec | null): void {
     if (!spec) {
       const baseTransform = this._animationController?.baseTransform
@@ -315,7 +340,6 @@ export class Text extends EventBus<TextEvents> implements Performer {
       this._animationController = new AnimationController(this._getCurrentTransform(), spec)
     }
     else {
-      this._animationController.setBaseTransform(this._getCurrentTransform())
       this._animationController.setSpec(spec)
     }
 
@@ -323,44 +347,68 @@ export class Text extends EventBus<TextEvents> implements Performer {
   }
 
   setPosition(x: number, y: number): void {
-    if (this._sprite) {
-      this._sprite.x = x
-      this._sprite.y = y
-      this.notifyPositionUpdate()
+    if (!this._sprite)
+      return
 
-      if (!this._animationController?.isApplying)
-        this._updateBaseTransform()
+    if (this._setBaseTransformPatch({ x, y })) {
+      this.notifyPositionUpdate()
+      return
     }
+
+    this._sprite.x = x
+    this._sprite.y = y
+    this.notifyPositionUpdate()
+
+    if (!this._animationController?.isApplying)
+      this._updateBaseTransform()
   }
 
   setRotation(angle: number): void {
-    if (this._sprite) {
-      this._sprite.angle = angle
-      this.notifyPositionUpdate()
+    if (!this._sprite)
+      return
 
-      if (!this._animationController?.isApplying)
-        this._updateBaseTransform()
+    if (this._setBaseTransformPatch({ rotation: angle })) {
+      this.notifyPositionUpdate()
+      return
     }
+
+    this._sprite.angle = angle
+    this.notifyPositionUpdate()
+
+    if (!this._animationController?.isApplying)
+      this._updateBaseTransform()
   }
 
   setScale(scaleX: number, scaleY: number): void {
-    if (this._sprite) {
-      this._sprite.scale.x = scaleX
-      this._sprite.scale.y = scaleY
-      this.notifyPositionUpdate()
+    if (!this._sprite)
+      return
 
-      if (!this._animationController?.isApplying)
-        this._updateBaseTransform()
+    if (this._animationController && !this._animationController.isApplying) {
+      const nextBaseScale = this._resolveBaseScaleByRender(scaleX, scaleY)
+      this._setBaseTransformPatch(nextBaseScale)
+      this.notifyPositionUpdate()
+      return
     }
+
+    this._sprite.scale.x = scaleX
+    this._sprite.scale.y = scaleY
+    this.notifyPositionUpdate()
+
+    if (!this._animationController?.isApplying)
+      this._updateBaseTransform()
   }
 
   setAlpha(alpha: number): void {
-    if (this._sprite) {
-      this._sprite.alpha = alpha
+    if (!this._sprite)
+      return
 
-      if (!this._animationController?.isApplying)
-        this._updateBaseTransform()
-    }
+    if (this._setBaseTransformPatch({ alpha }))
+      return
+
+    this._sprite.alpha = alpha
+
+    if (!this._animationController?.isApplying)
+      this._updateBaseTransform()
   }
 
   setFilters(filters: Filter[] | null): void {
@@ -405,6 +453,78 @@ export class Text extends EventBus<TextEvents> implements Performer {
     }
   }
 
+  private _resolveBaseTransform(): TransformState {
+    if (this._animationController)
+      return this._animationController.baseTransform
+
+    return this._getCurrentTransform()
+  }
+
+  private _resolveBaseSize(baseTransform: TransformState): { width: number, height: number } {
+    if (!this._sprite)
+      return { width: 0, height: 0 }
+
+    const currentScaleX = this._sprite.scale.x
+    const currentScaleY = this._sprite.scale.y
+    const localWidth = Math.abs(currentScaleX) > Text._SCALE_EPSILON
+      ? this._sprite.width / Math.abs(currentScaleX)
+      : this._sprite.width
+    const localHeight = Math.abs(currentScaleY) > Text._SCALE_EPSILON
+      ? this._sprite.height / Math.abs(currentScaleY)
+      : this._sprite.height
+
+    return {
+      width: Math.max(0, Math.abs(localWidth * baseTransform.scaleX)),
+      height: Math.max(0, Math.abs(localHeight * baseTransform.scaleY)),
+    }
+  }
+
+  private _resolveAnimationLayout(): AnimationLayout | undefined {
+    if (!this._sprite)
+      return undefined
+
+    const currentScaleX = this._sprite.scale.x
+    const currentScaleY = this._sprite.scale.y
+    const localWidth = Math.abs(currentScaleX) > Text._SCALE_EPSILON
+      ? this._sprite.width / Math.abs(currentScaleX)
+      : this._sprite.width
+    const localHeight = Math.abs(currentScaleY) > Text._SCALE_EPSILON
+      ? this._sprite.height / Math.abs(currentScaleY)
+      : this._sprite.height
+
+    if (
+      !Number.isFinite(localWidth) || !Number.isFinite(localHeight)
+      || localWidth <= Text._SCALE_EPSILON || localHeight <= Text._SCALE_EPSILON
+    ) {
+      return undefined
+    }
+
+    return {
+      localWidth,
+      localHeight,
+    }
+  }
+
+  private _resolveBaseScaleByRender(scaleX: number, scaleY: number): { scaleX: number, scaleY: number } {
+    if (!this._animationController || !this._sprite)
+      return { scaleX, scaleY }
+
+    const baseTransform = this._animationController.baseTransform
+    const relativeScaleX = Math.abs(baseTransform.scaleX) > Text._SCALE_EPSILON
+      ? this._sprite.scale.x / baseTransform.scaleX
+      : 1
+    const relativeScaleY = Math.abs(baseTransform.scaleY) > Text._SCALE_EPSILON
+      ? this._sprite.scale.y / baseTransform.scaleY
+      : 1
+    const safeRelativeScaleX = Math.abs(relativeScaleX) > Text._SCALE_EPSILON ? relativeScaleX : 1
+    const safeRelativeScaleY = Math.abs(relativeScaleY) > Text._SCALE_EPSILON ? relativeScaleY : 1
+
+    return {
+      scaleX: scaleX / safeRelativeScaleX,
+      scaleY: scaleY / safeRelativeScaleY,
+    }
+  }
+
   private _applyTransform(transform: TransformState): void {
     if (!this._sprite)
       return
@@ -424,16 +544,32 @@ export class Text extends EventBus<TextEvents> implements Performer {
     this._animationController.setBaseTransform(this._getCurrentTransform())
   }
 
+  private _setBaseTransformPatch(patch: Partial<TransformState>): boolean {
+    if (!this._animationController || this._animationController.isApplying)
+      return false
+
+    const baseTransform = this._animationController.baseTransform
+    this._animationController.setBaseTransform({
+      ...baseTransform,
+      ...patch,
+    })
+    this._applyAnimationForCurrentTime()
+
+    return true
+  }
+
   private _applyAnimationForCurrentTime(): void {
     if (!this._animationController || !this._sprite)
       return
 
+    const layout = this._resolveAnimationLayout()
     this._animationController.apply(
       this.currentTime,
       this.duration,
       (transform) => {
         this._applyTransform(transform)
       },
+      layout,
     )
   }
 }

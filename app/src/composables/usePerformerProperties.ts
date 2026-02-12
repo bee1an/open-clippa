@@ -76,7 +76,7 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
 
   const bounds = computed<PerformerBounds | null>(() => {
     void revision.value
-    return performer.value?.getBounds() ?? null
+    return performer.value?.getBaseBounds() ?? null
   })
 
   // visual position in center-rotation coordinate system

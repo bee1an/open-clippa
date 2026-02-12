@@ -184,7 +184,7 @@ export function useKeyboardShortcuts() {
 
     const leftDuration = splitTime - train.start
     const rightDuration = train.duration - leftDuration
-    const bounds = performer.getBounds()
+    const bounds = performer.getBaseBounds()
     const zIndex = performer.zIndex
 
     // build right-half config based on performer type

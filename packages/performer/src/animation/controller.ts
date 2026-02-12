@@ -1,5 +1,6 @@
 import type { RelativeAnimationSegment } from './timeline'
 import type {
+  AnimationLayout,
   PerformerAnimationSpec,
   RelativeTransformState,
   TransformState,
@@ -36,6 +37,69 @@ function composeTransform(base: TransformState, relative: RelativeTransformState
     scaleX: base.scaleX * relative.scaleX,
     scaleY: base.scaleY * relative.scaleY,
     rotation: base.rotation + relative.rotation,
+    alpha: clampAlpha(base.alpha * relative.alpha),
+  }
+}
+
+const LAYOUT_EPSILON = 1e-6
+
+function rotateVector(x: number, y: number, rotation: number): { x: number, y: number } {
+  if (!rotation)
+    return { x, y }
+
+  const radians = rotation * Math.PI / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  return {
+    x: x * cos - y * sin,
+    y: x * sin + y * cos,
+  }
+}
+
+function hasValidLayout(layout: AnimationLayout | null | undefined): layout is AnimationLayout {
+  if (!layout)
+    return false
+
+  return Number.isFinite(layout.localWidth)
+    && Number.isFinite(layout.localHeight)
+    && layout.localWidth > LAYOUT_EPSILON
+    && layout.localHeight > LAYOUT_EPSILON
+}
+
+function resolveCenterByTopLeft(transform: TransformState, layout: AnimationLayout): { x: number, y: number } {
+  const halfWidth = layout.localWidth * transform.scaleX / 2
+  const halfHeight = layout.localHeight * transform.scaleY / 2
+  const offset = rotateVector(halfWidth, halfHeight, transform.rotation)
+
+  return {
+    x: transform.x + offset.x,
+    y: transform.y + offset.y,
+  }
+}
+
+function composeTransformByCenter(
+  base: TransformState,
+  relative: RelativeTransformState,
+  layout: AnimationLayout,
+): TransformState {
+  const nextScaleX = base.scaleX * relative.scaleX
+  const nextScaleY = base.scaleY * relative.scaleY
+  const nextRotation = base.rotation + relative.rotation
+  const baseCenter = resolveCenterByTopLeft(base, layout)
+  const nextCenter = {
+    x: baseCenter.x + relative.x,
+    y: baseCenter.y + relative.y,
+  }
+  const nextHalfWidth = layout.localWidth * nextScaleX / 2
+  const nextHalfHeight = layout.localHeight * nextScaleY / 2
+  const nextOffset = rotateVector(nextHalfWidth, nextHalfHeight, nextRotation)
+
+  return {
+    x: nextCenter.x - nextOffset.x,
+    y: nextCenter.y - nextOffset.y,
+    scaleX: nextScaleX,
+    scaleY: nextScaleY,
+    rotation: nextRotation,
     alpha: clampAlpha(base.alpha * relative.alpha),
   }
 }
@@ -84,6 +148,7 @@ export class AnimationController {
     timeMs: number,
     durationMs: number,
     applyTransform: (transform: TransformState) => void,
+    layout?: AnimationLayout,
   ): void {
     if (!this._spec || durationMs <= 0) {
       this._applyWithGuard(applyTransform, this._baseTransform)
@@ -117,7 +182,9 @@ export class AnimationController {
       relative = sampleSegment(this._loopSegment, loopTime)
     }
 
-    const nextTransform = composeTransform(this._baseTransform, relative)
+    const nextTransform = hasValidLayout(layout)
+      ? composeTransformByCenter(this._baseTransform, relative, layout)
+      : composeTransform(this._baseTransform, relative)
     this._applyWithGuard(applyTransform, nextTransform)
   }
 

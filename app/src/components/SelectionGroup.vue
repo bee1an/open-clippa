@@ -149,7 +149,7 @@ function handleSelectionUpdate(item: SelectionItem) {
   // 更新 performer 属性
   const performer = performerStore.getAllPerformers().find(p => p.id === currentSelection.value?.id)
   if (performer) {
-    const currentBounds = performer.getBounds()
+    const currentBounds = performer.getBaseBounds()
     const currentScaleX = performer.sprite?.scale.x ?? 1
     const currentScaleY = performer.sprite?.scale.y ?? 1
 

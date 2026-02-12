@@ -33,6 +33,7 @@ export interface Performer {
   containsPoint: (canvasX: number, canvasY: number) => boolean
 
   getBounds: () => PerformerBounds
+  getBaseBounds: () => PerformerBounds
 
   setPosition: (x: number, y: number) => void
 

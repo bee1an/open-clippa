@@ -147,7 +147,7 @@ export const usePerformerStore = defineStore('performer', () => {
     const performer = performerMap.get(performerId)
     if (performer) {
       // 单选模式：每次选择都刷新，避免同 id 场景下状态不同步
-      const bounds = performer.getBounds()
+      const bounds = performer.getBaseBounds()
       selectedPerformers.value = [{
         id: performerId,
         bounds,
@@ -188,7 +188,7 @@ export const usePerformerStore = defineStore('performer', () => {
     if (!app)
       return
 
-    const bounds = performer.getBounds()
+    const bounds = performer.getBaseBounds()
     if (!bounds.width || !bounds.height)
       return
 
@@ -205,7 +205,7 @@ export const usePerformerStore = defineStore('performer', () => {
       performer.setScale(currentScaleX * scale, currentScaleY * scale)
     }
 
-    const updatedBounds = performer.getBounds()
+    const updatedBounds = performer.getBaseBounds()
     const maxX = Math.max(0, stageWidth - updatedBounds.width)
     const maxY = Math.max(0, stageHeight - updatedBounds.height)
     const nextX = Math.min(Math.max(updatedBounds.x, 0), maxX)
@@ -326,14 +326,14 @@ export const usePerformerStore = defineStore('performer', () => {
     const performer = performerMap.get(performerId)
     if (performer) {
       if (updates.x !== undefined || updates.y !== undefined) {
-        const currentBounds = performer.getBounds()
+        const currentBounds = performer.getBaseBounds()
         const newX = updates.x ?? currentBounds.x
         const newY = updates.y ?? currentBounds.y
         performer.setPosition(newX, newY)
       }
 
       if (updates.width !== undefined || updates.height !== undefined) {
-        const currentBounds = performer.getBounds()
+        const currentBounds = performer.getBaseBounds()
         const newWidth = updates.width ?? currentBounds.width
         const newHeight = updates.height ?? currentBounds.height
         const currentScaleX = performer.sprite?.scale.x ?? 1
