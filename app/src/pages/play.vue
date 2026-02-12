@@ -1,7 +1,7 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+definePage({ redirect: '/editor/media' })
+</script>
 
 <template>
-  <NavItem />
+  <div />
 </template>
-
-<style scoped></style>

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { VideoFile } from '@/store/useMediaStore'
 import { useMediaStore } from '@/store/useMediaStore'
 
 const mediaStore = useMediaStore()
+const hasMediaFiles = computed(() => mediaStore.videoFiles.length > 0 || mediaStore.imageFiles.length > 0)
 </script>
 
 <template>
   <div h-full>
-    <!-- 视频列表 -->
+    <!-- 媒体列表 -->
     <div class="video-list" flex-1 overflow-y-auto hfull p-2>
-      <div v-if="mediaStore.videoFiles.length === 0" min-h-full flex items-center justify-center>
+      <div v-if="!hasMediaFiles" min-h-full flex items-center justify-center>
         <div class="text-center">
           <p text-sm text-gray-500>
             从设备拖放介质以导入
@@ -24,7 +24,11 @@ const mediaStore = useMediaStore()
       >
         <VideoPreviewCard
           v-for="videoFile in mediaStore.videoFiles" :key="videoFile.id"
-          :video-file="videoFile as VideoFile"
+          :video-file="videoFile"
+        />
+        <ImagePreviewCard
+          v-for="imageFile in mediaStore.imageFiles" :key="imageFile.id"
+          :image-file="imageFile"
         />
       </div>
 

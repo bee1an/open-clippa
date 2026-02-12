@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ImageFile } from '@/store'
 import { useEditorStore } from '@/store'
+import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 interface Props {
@@ -12,12 +13,20 @@ const props = defineProps<Props>()
 const DEFAULT_IMAGE_DURATION = 3000
 
 const editorStore = useEditorStore()
+const mediaStore = useMediaStore()
 const performerStore = usePerformerStore()
 const { clippa } = editorStore
 
 const isSelected = ref(false)
+const cardRef = ref<HTMLElement | null>(null)
+const showMenu = ref(false)
+
+onClickOutside(cardRef, () => {
+  showMenu.value = false
+})
 
 async function addToTimeline() {
+  showMenu.value = false
   await clippa.ready
 
   const performer = performerStore.addPerformer({
@@ -34,17 +43,26 @@ async function addToTimeline() {
   clippa.hire(performer)
 }
 
-function _showMenu() {
-  console.warn('Show menu for', props.imageFile.name)
+async function handleMenuAddToTimeline() {
+  await addToTimeline()
 }
 
-function _toggleSelect() {
+function removeFromMediaLibrary() {
+  mediaStore.removeImageFile(props.imageFile.id)
+  showMenu.value = false
+}
+
+function toggleMenu() {
+  showMenu.value = !showMenu.value
+}
+
+function toggleSelect() {
   isSelected.value = !isSelected.value
 }
 </script>
 
 <template>
-  <div class="group hover:bg-secondary" rounded-md p-2 w-full transition-colors cursor-pointer>
+  <div ref="cardRef" class="group hover:bg-secondary" rounded-md p-2 w-full transition-colors cursor-pointer>
     <div class="bg-black/50 border-border/50 group-hover:border-border" aspect-video rounded-md relative flex items-center justify-center overflow-hidden border transition-colors>
       <img
         :src="imageFile.url"
@@ -71,10 +89,33 @@ function _toggleSelect() {
         w-6 h-6 rounded flex items-center justify-center
         class="bg-black/50 hover:bg-black/70" text-white
         transition-all
-        @click.stop="_showMenu"
+        @click.stop="toggleMenu"
       >
-        <div i-ph-dots-three-vert-bold text-sm />
+        <div i-ph-dots-three-vertical-bold text-sm />
       </button>
+
+      <div
+        v-if="showMenu"
+        absolute top-8 right-1 z-10
+        min-w-34 rounded-md border border-border
+        class="bg-background-elevated shadow-xl"
+        p-1
+      >
+        <button
+          w-full text-left text-xs px-2 py-1.5 rounded
+          class="hover:bg-secondary text-foreground"
+          @click.stop="handleMenuAddToTimeline"
+        >
+          Add to timeline
+        </button>
+        <button
+          w-full text-left text-xs px-2 py-1.5 rounded
+          class="hover:bg-secondary text-red-400"
+          @click.stop="removeFromMediaLibrary"
+        >
+          Remove from media
+        </button>
+      </div>
     </div>
 
     <div flex items-center justify-between mt-2 gap-2>
@@ -92,7 +133,7 @@ function _toggleSelect() {
         w-4 h-4 rounded-full class="border-border/50" border flex items-center justify-center
         hover:border-primary transition-colors
         :class="{ 'bg-primary border-primary': isSelected, 'bg-transparent': !isSelected }"
-        @click.stop="_toggleSelect"
+        @click.stop="toggleSelect"
       >
         <div v-if="isSelected" i-ph-check-bold text="xs background" />
       </button>

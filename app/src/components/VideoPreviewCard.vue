@@ -2,6 +2,7 @@
 import type { VideoFile } from '@/store'
 import { ms2TimeStr } from 'clippc'
 import { useEditorStore } from '@/store'
+import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { loadVideoMetadata } from '@/utils/media'
 
@@ -12,14 +13,22 @@ interface Props {
 const props = defineProps<Props>()
 
 const editorStore = useEditorStore()
+const mediaStore = useMediaStore()
 const performerStore = usePerformerStore()
 const { clippa } = editorStore
 
 // 勾选状态
 const isSelected = ref(false)
+const cardRef = ref<HTMLElement | null>(null)
+const showMenu = ref(false)
+
+onClickOutside(cardRef, () => {
+  showMenu.value = false
+})
 
 // 添加到时间轴
 async function addToTimeline() {
+  showMenu.value = false
   await clippa.ready
 
   const { duration, width, height } = await loadVideoMetadata(props.videoFile.url)
@@ -43,19 +52,26 @@ async function addToTimeline() {
   clippa.hire(performer)
 }
 
-// 显示菜单
-function _showMenu() {
-  console.warn('Show menu for', props.videoFile.name)
+async function handleMenuAddToTimeline() {
+  await addToTimeline()
 }
 
-// 切换勾选状态
-function _toggleSelect() {
+function removeFromMediaLibrary() {
+  mediaStore.removeVideoFile(props.videoFile.id)
+  showMenu.value = false
+}
+
+function toggleMenu() {
+  showMenu.value = !showMenu.value
+}
+
+function toggleSelect() {
   isSelected.value = !isSelected.value
 }
 </script>
 
 <template>
-  <div class="group hover:bg-secondary" rounded-md p-2 w-full transition-colors cursor-pointer>
+  <div ref="cardRef" class="group hover:bg-secondary" rounded-md p-2 w-full transition-colors cursor-pointer>
     <!-- 视频预览区 -->
     <div class="bg-black/50 border-border/50 group-hover:border-border" aspect-video rounded-md relative flex items-center justify-center overflow-hidden border transition-colors>
       <!-- 缩略图或默认图标 -->
@@ -105,10 +121,33 @@ function _toggleSelect() {
         w-6 h-6 rounded flex items-center justify-center
         class="bg-black/50 hover:bg-black/70" text-white
         transition-all
-        @click.stop="_showMenu"
+        @click.stop="toggleMenu"
       >
-        <div i-ph-dots-three-vert-bold text-sm />
+        <div i-ph-dots-three-vertical-bold text-sm />
       </button>
+
+      <div
+        v-if="showMenu"
+        absolute top-8 right-1 z-10
+        min-w-34 rounded-md border border-border
+        class="bg-background-elevated shadow-xl"
+        p-1
+      >
+        <button
+          w-full text-left text-xs px-2 py-1.5 rounded
+          class="hover:bg-secondary text-foreground"
+          @click.stop="handleMenuAddToTimeline"
+        >
+          Add to timeline
+        </button>
+        <button
+          w-full text-left text-xs px-2 py-1.5 rounded
+          class="hover:bg-secondary text-red-400"
+          @click.stop="removeFromMediaLibrary"
+        >
+          Remove from media
+        </button>
+      </div>
     </div>
 
     <!-- 文件信息栏 -->
@@ -128,7 +167,7 @@ function _toggleSelect() {
         w-4 h-4 rounded-full class="border-border/50" border flex items-center justify-center
         hover:border-primary transition-colors
         :class="{ 'bg-primary border-primary': isSelected, 'bg-transparent': !isSelected }"
-        @click.stop="_toggleSelect"
+        @click.stop="toggleSelect"
       >
         <div v-if="isSelected" i-ph-check-bold text="xs background" />
       </button>

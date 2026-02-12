@@ -10,9 +10,10 @@ import SelectionGroup from './SelectionGroup.vue'
 
 const CANVAS_WIDTH = 996
 const CANVAS_HEIGHT = CANVAS_WIDTH / 16 * 9
-const DEFAULT_TEST_VIDEO_IDS = ['video1-a', 'video1-b'] as const
-const DEFAULT_TEST_VIDEO_SRC = 'https://pixijs.com/assets/video.mp4'
-const DEFAULT_TEST_VIDEO_CLIP_TARGET_MS = 20000
+const DEFAULT_TEST_VIDEOS = [
+  { id: 'video-test-legacy', src: 'https://pixijs.com/assets/video.mp4' },
+  { id: 'video-test-bunny', src: '/bunny.mp4' },
+] as const
 const MAX_TIMELINE_SYNC_RETRIES = 24
 
 const editorStore = useEditorStore()
@@ -245,47 +246,41 @@ function trySyncSelectionToTimeline(selectedId: string, attempt: number) {
 }
 
 async function ensureDefaultVideoPerformer(): Promise<void> {
-  const defaultTestVideoIdSet = new Set<string>(DEFAULT_TEST_VIDEO_IDS)
+  const defaultTestVideoIds = DEFAULT_TEST_VIDEOS.map(video => video.id)
+  const defaultTestVideoIdSet = new Set<string>(defaultTestVideoIds)
   if (performerStore.getAllPerformers().some(item => defaultTestVideoIdSet.has(item.id)))
     return
-  if (DEFAULT_TEST_VIDEO_IDS.some(id => Boolean(findTrainById(id))))
+  if (defaultTestVideoIds.some(id => Boolean(findTrainById(id))))
     return
 
-  const { duration, width, height } = await loadVideoMetadata(DEFAULT_TEST_VIDEO_SRC)
-  const sourceDuration = Math.max(1000, Math.round(duration || 5000))
-  const clipDuration = Math.min(
-    DEFAULT_TEST_VIDEO_CLIP_TARGET_MS,
-    Math.max(500, Math.floor(sourceDuration / 2)),
-  )
+  const layoutWidth = CANVAS_WIDTH / DEFAULT_TEST_VIDEOS.length
+  const layoutHeight = CANVAS_HEIGHT
+  const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = []
 
-  const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = [
-    {
-      id: DEFAULT_TEST_VIDEO_IDS[0],
-      src: DEFAULT_TEST_VIDEO_SRC,
+  for (const [index, defaultVideo] of DEFAULT_TEST_VIDEOS.entries()) {
+    const { duration, width, height } = await loadVideoMetadata(defaultVideo.src)
+    const sourceDuration = Math.max(1000, Math.round(duration || 5000))
+
+    const sourceWidth = width > 0 ? width : layoutWidth
+    const sourceHeight = height > 0 ? height : layoutHeight
+    const containScale = Math.min(layoutWidth / sourceWidth, layoutHeight / sourceHeight)
+    const displayWidth = Math.max(1, Math.floor(sourceWidth * containScale))
+    const displayHeight = Math.max(1, Math.floor(sourceHeight * containScale))
+
+    clipConfigs.push({
+      id: defaultVideo.id,
+      src: defaultVideo.src,
       start: 0,
-      duration: clipDuration,
+      duration: sourceDuration,
       sourceStart: 0,
       sourceDuration,
-      x: 0,
-      y: 0,
-      width: width || CANVAS_WIDTH,
-      height: height || CANVAS_HEIGHT,
-      zIndex: 0,
-    },
-    {
-      id: DEFAULT_TEST_VIDEO_IDS[1],
-      src: DEFAULT_TEST_VIDEO_SRC,
-      start: clipDuration,
-      duration: clipDuration,
-      sourceStart: 0,
-      sourceDuration,
-      x: 0,
-      y: 0,
-      width: width || CANVAS_WIDTH,
-      height: height || CANVAS_HEIGHT,
-      zIndex: 0,
-    },
-  ]
+      x: Math.round(index * layoutWidth + (layoutWidth - displayWidth) / 2),
+      y: Math.round((layoutHeight - displayHeight) / 2),
+      width: displayWidth,
+      height: displayHeight,
+      zIndex: index,
+    })
+  }
 
   for (const clipConfig of clipConfigs) {
     const performer = performerStore.addPerformer(clipConfig)

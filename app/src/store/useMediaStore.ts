@@ -118,6 +118,7 @@ export interface ImageFile {
 
 export const useMediaStore = defineStore('media', () => {
   const videoFiles = ref<VideoFile[]>([])
+  const imageFiles = ref<ImageFile[]>([])
   const isGeneratingThumbnail = ref(false)
 
   // 添加视频文件
@@ -183,6 +184,39 @@ export const useMediaStore = defineStore('media', () => {
     videoFiles.value = []
   }
 
+  // 添加图片文件
+  function addImageFile(file: File): ImageFile {
+    const imageFile: ImageFile = reactive({
+      id: crypto.randomUUID(),
+      name: file.name,
+      file,
+      url: URL.createObjectURL(file),
+      size: file.size,
+      createdAt: new Date(),
+    })
+
+    imageFiles.value.push(imageFile)
+    return imageFile
+  }
+
+  // 删除图片文件
+  function removeImageFile(id: string) {
+    const index = imageFiles.value.findIndex(v => v.id === id)
+    if (index > -1) {
+      const imageFile = imageFiles.value[index]
+      URL.revokeObjectURL(imageFile.url)
+      imageFiles.value.splice(index, 1)
+    }
+  }
+
+  // 清空所有图片文件
+  function clearImageFiles() {
+    imageFiles.value.forEach((imageFile) => {
+      URL.revokeObjectURL(imageFile.url)
+    })
+    imageFiles.value = []
+  }
+
   // 生成视频缩略图和获取视频信息
   async function generateVideoInfo(videoFile: VideoFile) {
     try {
@@ -246,10 +280,14 @@ export const useMediaStore = defineStore('media', () => {
 
   return {
     videoFiles,
+    imageFiles,
     isGeneratingThumbnail,
     addVideoFile,
     removeVideoFile,
     clearVideoFiles,
+    addImageFile,
+    removeImageFile,
+    clearImageFiles,
     formatFileSize,
     formatDuration,
   }

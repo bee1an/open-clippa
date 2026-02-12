@@ -5,28 +5,30 @@ import { useVideoFiles } from '@/composables/useVideoFiles'
 import { useMediaStore } from '@/store/useMediaStore'
 
 const mediaStore = useMediaStore()
-const { filterVideoFiles, handleDroppedFiles } = useVideoFiles()
+const { isVideoFile, isImageFile, filterMediaFiles, handleDroppedFiles } = useVideoFiles()
 const { isDragging, onDragEnter, onDragLeave, onDragOver, onDrop } = useDragDrop()
 
 function fileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const files = input.files
-  if (files?.length) {
-    Array.from(files).forEach((file) => {
-      mediaStore.addVideoFile(file)
-    })
-  }
+  if (files?.length)
+    addMediaFiles(files)
   input.value = ''
 }
 
-async function handleFiles(files: FileList) {
-  // 过滤出视频文件
-  const videoFiles = filterVideoFiles(files)
-
-  // 批量添加到媒体库
-  videoFiles.forEach((file) => {
+function addMediaFile(file: File) {
+  if (isVideoFile(file)) {
     mediaStore.addVideoFile(file)
-  })
+    return
+  }
+
+  if (isImageFile(file))
+    mediaStore.addImageFile(file)
+}
+
+function addMediaFiles(files: FileList | File[]) {
+  const mediaFiles = filterMediaFiles(files)
+  mediaFiles.forEach(addMediaFile)
 }
 
 async function handleDrop(event: DragEvent) {
@@ -36,13 +38,12 @@ async function handleDrop(event: DragEvent) {
     // 处理文件夹和文件的混合拖拽
     const files = await handleDroppedFiles(items)
 
-    if (files.length > 0) {
-      await handleFiles(files as unknown as FileList)
-    }
+    if (files.length > 0)
+      addMediaFiles(files)
   }
   else if (event.dataTransfer?.files.length) {
     // 兼容直接拖拽文件的情况
-    await handleFiles(event.dataTransfer.files)
+    addMediaFiles(event.dataTransfer.files)
   }
 }
 
@@ -72,7 +73,7 @@ function onDragDrop(event: DragEvent) {
       <input
         id="media-upload"
         type="file"
-        accept="video/*"
+        accept="video/*,image/*"
         multiple
         hidden
         @change="fileSelected"
@@ -115,7 +116,7 @@ function onDragDrop(event: DragEvent) {
         transform-gpu transition-all duration-200
       >
         <div class="i-carbon-cloud-upload text-xl" />
-        <span>拖入视频文件或文件夹</span>
+        <span>拖入视频或图片文件（支持文件夹）</span>
       </div>
     </div>
   </div>

@@ -1,28 +1,58 @@
 // 支持的视频文件扩展名
 const videoExtensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp']
+// 支持的图片文件扩展名
+const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic']
 
 export function useVideoFiles() {
+  function hasExtension(file: File, extensions: string[]): boolean {
+    const fileName = file.name.toLowerCase()
+    return extensions.some(ext => fileName.endsWith(ext))
+  }
+
   /**
    * 检查文件是否为视频文件
    */
   function isVideoFile(file: File): boolean {
-    const fileName = file.name.toLowerCase()
-    return videoExtensions.some(ext => fileName.endsWith(ext))
+    if (file.type.toLowerCase().startsWith('video/'))
+      return true
+    return hasExtension(file, videoExtensions)
+  }
+
+  /**
+   * 检查文件是否为图片文件
+   */
+  function isImageFile(file: File): boolean {
+    if (file.type.toLowerCase().startsWith('image/'))
+      return true
+    return hasExtension(file, imageExtensions)
+  }
+
+  /**
+   * 检查拖拽项是否只是目录占位
+   */
+  function isDirectoryPlaceholder(file: File): boolean {
+    return !file.type && !file.name.includes('.')
   }
 
   /**
    * 过滤出视频文件
    */
   function filterVideoFiles(files: FileList | File[]): File[] {
-    const fileArray = Array.from(files)
+    return Array.from(files).filter(file => !isDirectoryPlaceholder(file) && isVideoFile(file))
+  }
 
-    return fileArray.filter((file) => {
-      // 跳过文件夹（在拖拽时，文件夹会被识别为没有扩展名的文件）
-      if (!file.type && !file.name.includes('.')) {
-        return false
-      }
-      return isVideoFile(file)
-    })
+  /**
+   * 过滤出图片文件
+   */
+  function filterImageFiles(files: FileList | File[]): File[] {
+    return Array.from(files).filter(file => !isDirectoryPlaceholder(file) && isImageFile(file))
+  }
+
+  /**
+   * 过滤出支持的媒体文件
+   */
+  function filterMediaFiles(files: FileList | File[]): File[] {
+    return Array.from(files).filter(file => !isDirectoryPlaceholder(file) && (isVideoFile(file) || isImageFile(file)))
   }
 
   /**
@@ -84,7 +114,10 @@ export function useVideoFiles() {
 
   return {
     isVideoFile,
+    isImageFile,
     filterVideoFiles,
+    filterImageFiles,
+    filterMediaFiles,
     handleDroppedFiles,
   }
 }
