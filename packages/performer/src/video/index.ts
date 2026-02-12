@@ -56,6 +56,7 @@ export interface VideoOption extends PerformerOption {
 }
 
 export class Video extends EventBus<PerformerEvents> implements Performer {
+  private static readonly _DEFAULT_FRAME_INTERVAL_MS = 1000 / 30
   private static readonly _FRAME_SAMPLE_EPSILON_MS = 1
   private static readonly _SCALE_EPSILON = 1e-6
 
@@ -112,15 +113,17 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   private _pendingFilters: Filter[] | null = null
   private _animationController?: AnimationController
 
-  /**
-   * 帧缓存：time (in ms) -> { frame: VideoFrame }
-   */
-  private _frameCache: Map<number, { frame: any }> = new Map()
+  private _frameIntervalMs: number = Video._DEFAULT_FRAME_INTERVAL_MS
 
   /**
    * 最后渲染的时间（避免重复渲染同一帧）
    */
   private _lastRenderedTime: number = -1
+
+  private _cachedFrame: { key: number, frame: VideoFrame, texture: Texture } | null = null
+  private _pendingRenderTime: number | null = null
+  private _rendering = false
+  private _renderIdleWaiters = new Set<() => void>()
 
   load(option?: VideoOption): Promise<void> {
     if (this._loader)
@@ -192,6 +195,17 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     // 创建视频采样器
     this._videoSink = new VideoSampleSink(this._videoTrack)
+
+    try {
+      const stats = await this._videoTrack.computePacketStats(120)
+      const fps = stats.averagePacketRate
+      if (Number.isFinite(fps) && fps > 0)
+        this._frameIntervalMs = 1000 / fps
+    }
+    catch (error) {
+      console.warn('[video] compute packet stats failed, fallback to default frame interval', error)
+      this._frameIntervalMs = Video._DEFAULT_FRAME_INTERVAL_MS
+    }
   }
 
   play(time: number): void {
@@ -221,8 +235,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.showState = ShowState.PLAYING
     this._applyAnimationForCurrentTime()
 
-    // 提取并渲染当前时间的帧
-    this._renderFrameAtTime(this._resolveSourceTime(time))
+    this._queueFrameRender(this._resolveSourceTime(time))
   }
 
   pause(time: number): void {
@@ -234,61 +247,14 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.playState = PlayState.PAUSED
   }
 
-  /**
-   * seek 待执行任务（单个任务而非队列）
-   */
-  private _seekTask: { time: number, resolve: () => void, reject: (error: unknown) => void } | null = null
-  private _isSeeking: boolean = false
   async seek(time: number): Promise<void> {
-    // 清空待执行任务，始终只保留最新的 seek 请求
-    this._seekTask = null
-
-    // 创建 Promise 并添加到任务
-    const { promise, resolve, reject } = Promise.withResolvers<void>()
-    this._seekTask = { time, resolve, reject }
-
-    // 开始处理任务
-    this._processSeekTask()
-
-    return promise
-  }
-
-  /**
-   * 处理 seek 任务
-   */
-  private async _processSeekTask(): Promise<void> {
-    // 如果正在执行或任务为空，直接返回
-    if (this._isSeeking || !this._seekTask || !this._seekTask)
-      return
-
-    this._isSeeking = true
-
-    try {
-      const { time, resolve } = this._seekTask
-
-      // 更新当前时间
-      this.currentTime = time
-      this._applyAnimationForCurrentTime()
-      const sourceTime = this._resolveSourceTime(time)
-
-      // 执行 seek（等待帧提取和渲染完成）
-      await this._renderFrameAtTime(sourceTime)
-
-      resolve()
-
-      this._seekTask = null
-
-      this._isSeeking = false
-    }
-    catch (error) {
-      console.error('Seek error:', error)
-      this._seekTask = null
-      this._isSeeking = false
-    }
+    this.currentTime = time
+    this._applyAnimationForCurrentTime()
+    await this._queueFrameRenderAndWait(this._resolveSourceTime(time))
   }
 
   async renderFrameAtSourceTime(ms: number): Promise<void> {
-    await this._renderFrameAtTime(this._clampSourceTime(ms))
+    await this._queueFrameRenderAndWait(this._clampSourceTime(ms))
   }
 
   private _resolveSourceTime(time: number): number {
@@ -307,56 +273,141 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     return Math.min(safeMax, Math.max(0, time))
   }
 
+  private _normalizeRenderTime(time: number): number {
+    const clampedTime = this._clampSourceTime(time)
+    if (!(this._frameIntervalMs > 0))
+      return clampedTime
+
+    const snapped = Math.round(clampedTime / this._frameIntervalMs) * this._frameIntervalMs
+    return this._clampSourceTime(snapped)
+  }
+
+  private _resolveFrameCacheKey(time: number): number {
+    if (this._frameIntervalMs > 0)
+      return Math.round(time / this._frameIntervalMs)
+
+    return Math.round(time)
+  }
+
+  private _queueFrameRender(time: number): void {
+    this._pendingRenderTime = this._normalizeRenderTime(time)
+    void this._drainRenderQueue()
+  }
+
+  private _queueFrameRenderAndWait(time: number): Promise<void> {
+    this._pendingRenderTime = this._normalizeRenderTime(time)
+    return new Promise<void>((resolve) => {
+      this._renderIdleWaiters.add(resolve)
+      void this._drainRenderQueue()
+    })
+  }
+
+  private _flushRenderIdleWaiters(): void {
+    if (this._renderIdleWaiters.size === 0)
+      return
+
+    const waiters = [...this._renderIdleWaiters]
+    this._renderIdleWaiters.clear()
+    waiters.forEach(resolve => resolve())
+  }
+
+  private async _drainRenderQueue(): Promise<void> {
+    if (this._rendering)
+      return
+
+    this._rendering = true
+    try {
+      while (this._pendingRenderTime !== null) {
+        const time = this._pendingRenderTime
+        this._pendingRenderTime = null
+        await this._renderFrameAtTime(time)
+      }
+    }
+    finally {
+      this._rendering = false
+
+      if (this._pendingRenderTime === null)
+        this._flushRenderIdleWaiters()
+
+      if (this._pendingRenderTime !== null)
+        void this._drainRenderQueue()
+    }
+  }
+
+  private _resolveCachedTexture(cacheKey: number): Texture | null {
+    if (!this._cachedFrame)
+      return null
+
+    return this._cachedFrame.key === cacheKey ? this._cachedFrame.texture : null
+  }
+
+  private _clearCachedFrame(): void {
+    if (!this._cachedFrame)
+      return
+
+    if (this._sprite?.texture === this._cachedFrame.texture) {
+      this._sprite.texture = Texture.EMPTY
+    }
+
+    try {
+      this._cachedFrame.texture.destroy(true)
+    }
+    catch {}
+
+    try {
+      this._cachedFrame.frame.close()
+    }
+    catch {}
+
+    this._cachedFrame = null
+  }
+
   /**
    * 在指定时间渲染帧
    */
   private async _renderFrameAtTime(time: number): Promise<void> {
-    // 避免重复渲染同一帧
-    if (time === this._lastRenderedTime && this._sprite?.texture) {
+    if (!this._sprite)
       return
-    }
+
+    const normalizedTime = this._normalizeRenderTime(time)
+    if (normalizedTime === this._lastRenderedTime && this._sprite.texture)
+      return
 
     try {
-      // 检查缓存
-      const cacheKey = Math.round(time)
-      let frameData = this._frameCache.get(cacheKey)
+      const cacheKey = this._resolveFrameCacheKey(normalizedTime)
+      let texture = this._resolveCachedTexture(cacheKey)
 
-      // 如果缓存不存在，从 mediabunny 获取
-      if (!frameData) {
-        const videoSample = await this._getVideoSampleAtTime(time)
-
-        if (!videoSample) {
+      if (!texture) {
+        const videoSample = await this._getVideoSampleAtTime(normalizedTime)
+        if (!videoSample)
           return
-        }
 
-        // 转换为 VideoFrame
         const videoFrame = videoSample.toVideoFrame()
-
-        // 缓存帧数据
-        frameData = { frame: videoFrame }
-        this._frameCache.set(cacheKey, frameData)
-
-        // 关闭 VideoSample（保留 VideoFrame）
         videoSample.close()
+
+        texture = Texture.from(videoFrame)
+        this._clearCachedFrame()
+        this._cachedFrame = {
+          key: cacheKey,
+          frame: videoFrame,
+          texture,
+        }
       }
 
-      // 创建或更新纹理
-      if (this._sprite) {
-        const preservedSize = {
-          width: this._sprite.width,
-          height: this._sprite.height,
-        }
+      const preservedSize = {
+        width: this._sprite.width,
+        height: this._sprite.height,
+      }
 
-        const texture = Texture.from(frameData.frame)
+      if (this._sprite.texture !== texture)
         this._sprite.texture = texture
 
-        if (preservedSize.width > 0 && preservedSize.height > 0) {
-          this._sprite.width = preservedSize.width
-          this._sprite.height = preservedSize.height
-        }
-
-        this._lastRenderedTime = time
+      if (preservedSize.width > 0 && preservedSize.height > 0) {
+        this._sprite.width = preservedSize.width
+        this._sprite.height = preservedSize.height
       }
+
+      this._lastRenderedTime = normalizedTime
     }
     catch (error) {
       console.error('Error rendering frame:', error)
@@ -382,8 +433,17 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       if (time <= 0)
         return null
 
-      const fallbackTime = Math.max(0, time - Video._FRAME_SAMPLE_EPSILON_MS)
-      return await this._videoSink.getSample(fallbackTime / 1000) || null
+      const step = Math.max(Video._FRAME_SAMPLE_EPSILON_MS, this._frameIntervalMs)
+      const fallbackOffsets = [step, step * 2]
+
+      for (const offset of fallbackOffsets) {
+        const fallbackTime = Math.max(0, time - offset)
+        const fallbackSample = await this._videoSink.getSample(fallbackTime / 1000)
+        if (fallbackSample)
+          return fallbackSample
+      }
+
+      return null
     }
     catch (error) {
       console.error('Error getting video sample:', error)
@@ -590,11 +650,10 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this._animationController?.destroy()
     this._animationController = undefined
 
-    // 清理帧缓存
-    for (const [, frameData] of this._frameCache) {
-      frameData.frame.close()
-    }
-    this._frameCache.clear()
+    this._pendingRenderTime = null
+    this._flushRenderIdleWaiters()
+    this._clearCachedFrame()
+    this._lastRenderedTime = -1
 
     // 关闭 mediabunny 资源
 
@@ -609,7 +668,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     // 清理 Sprite
     if (this._sprite) {
       this._sprite.removeAllListeners()
-      if (this._sprite.texture) {
+      if (this._sprite.texture && this._sprite.texture !== Texture.EMPTY) {
         this._sprite.texture.destroy(true)
       }
       this._sprite.destroy()
