@@ -18,7 +18,7 @@ const editorStore = useEditorStore()
 const exportStore = useExportStore()
 const router = useRouter()
 const isClippaReady = ref(false)
-const exportFrameRate = 30
+const exportFrameRate = 60
 const showDebugPanel = import.meta.env.DEV
 
 const exportState = reactive({
@@ -86,17 +86,19 @@ async function exportHandler() {
     return
   }
 
+  if (editorStore.isPlaying)
+    editorStore.clippa.pause()
+
   exportState.open = true
   exportState.status = 'exporting'
   exportState.currentFrame = 0
-  exportState.totalFrames = Math.floor((duration / 1000) * exportFrameRate)
+  exportState.totalFrames = Math.max(1, Math.ceil((duration / 1000) * exportFrameRate))
   exportState.previewUrl = ''
   exportState.errorMessage = ''
 
-  const canvas = editorStore.clippa.stage.app.canvas
+  const app = editorStore.clippa.stage.app
+  const canvas = app.canvas
   exportState.previewUrl = captureCanvasPreview(canvas)
-  const frameStep = 1000 / exportFrameRate
-  let exportTime = 0
   let lastPreviewFrame = 0
   const previewFrameInterval = Math.max(1, Math.round(exportFrameRate / 6))
 
@@ -104,14 +106,9 @@ async function exportHandler() {
     canvas,
     duration,
     frameRate: exportFrameRate,
-    nextFrame: async () => {
-      await editorStore.clippa.director.seek(exportTime)
-      exportTime = Math.min(duration, exportTime + frameStep)
-      return new Promise((resolve) => {
-        requestAnimationFrame(() => {
-          resolve()
-        })
-      })
+    nextFrame: async ({ timestampMs }) => {
+      await editorStore.clippa.director.seek(timestampMs)
+      app.renderer.render(app.stage)
     },
     onProgress: ({ currentFrame, totalFrames }) => {
       exportState.currentFrame = currentFrame

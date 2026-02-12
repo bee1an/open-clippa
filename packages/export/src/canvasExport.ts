@@ -13,11 +13,19 @@ export class ExportCanceledError extends Error {
   }
 }
 
+export interface ExportFrameContext {
+  frameIndex: number
+  totalFrames: number
+  timestampMs: number
+  timestampUs: number
+  frameDurationUs: number
+}
+
 export interface CanvasExportOptions {
   /** 要导出的 HTML Canvas 元素，作为视频帧的来源 */
   canvas: HTMLCanvasElement
   /** 更新下一帧内容的异步函数，在导出过程中每一帧都会调用此函数 */
-  nextFrame: () => (Promise<void> | void)
+  nextFrame: (context: ExportFrameContext) => (Promise<void> | void)
   /** 视频总时长，单位为毫秒 */
   duration: number
   /** 视频帧率，即每秒的帧数 */
@@ -59,7 +67,7 @@ export class QualityPresets {
 
 export class CanvasExport {
   private _canvas: HTMLCanvasElement
-  private _nextFrame: () => (Promise<void> | void)
+  private _nextFrame: (context: ExportFrameContext) => (Promise<void> | void)
   private _totalFrames: number
   private _frameRate: number
   private _codec: 'avc' | 'vp9' | 'av1' | 'hevc'
@@ -69,10 +77,17 @@ export class CanvasExport {
   private _output?: Output
 
   constructor(options: CanvasExportOptions) {
+    const safeFrameRate = Number.isFinite(options.frameRate) && options.frameRate > 0
+      ? options.frameRate
+      : 30
+    const safeDuration = Number.isFinite(options.duration) && options.duration > 0
+      ? options.duration
+      : 0
+
     this._canvas = options.canvas
     this._nextFrame = options.nextFrame
-    this._totalFrames = Math.floor((options.duration / 1000) * options.frameRate)
-    this._frameRate = options.frameRate
+    this._totalFrames = Math.max(1, Math.ceil((safeDuration / 1000) * safeFrameRate))
+    this._frameRate = safeFrameRate
 
     // 设置编解码器和比特率
     this._codec = options.codec || 'avc'
@@ -113,7 +128,7 @@ export class CanvasExport {
     output.addVideoTrack(videoSampleSource)
     await output.start()
 
-    const frameDuration = 1000000 / this._frameRate // 微秒
+    const frameDurationUs = Math.round(1000000 / this._frameRate)
 
     for (let i = 0; i < this._totalFrames; i++) {
       if (this._canceled) {
@@ -121,8 +136,17 @@ export class CanvasExport {
         throw new ExportCanceledError()
       }
 
+      const timestampMs = (i * 1000) / this._frameRate
+      const timestampUs = Math.round((i * 1000000) / this._frameRate)
+
       // 更新 canvas
-      await this._nextFrame()
+      await this._nextFrame({
+        frameIndex: i,
+        totalFrames: this._totalFrames,
+        timestampMs,
+        timestampUs,
+        frameDurationUs,
+      })
 
       if (this._canceled) {
         await output.cancel()
@@ -131,7 +155,8 @@ export class CanvasExport {
 
       // 将 Canvas 转换为 VideoFrame
       const videoFrame = new VideoFrame(this._canvas, {
-        timestamp: i * frameDuration,
+        timestamp: timestampUs,
+        duration: frameDurationUs,
       })
 
       // 创建 VideoSample

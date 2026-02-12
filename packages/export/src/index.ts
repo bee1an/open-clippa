@@ -1,1 +1,8 @@
-export { CanvasExport, type CanvasExportOptions, ExportCanceledError, type ExportProgress, QualityPresets } from './canvasExport'
+export {
+  CanvasExport,
+  type CanvasExportOptions,
+  ExportCanceledError,
+  type ExportFrameContext,
+  type ExportProgress,
+  QualityPresets,
+} from './canvasExport'
