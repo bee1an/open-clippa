@@ -90,7 +90,15 @@ export class Timeline extends EventBus<TimlineEvents> {
    */
   async mount(elementId: string): Promise<void> {
     if (this.app) {
-      this._mountWithBindEvents(elementId)
+      const wrapper = this._mountWithBindEvents(elementId)
+      if (this.app.canvas.parentElement !== wrapper) {
+        wrapper.appendChild(this.app.canvas)
+      }
+      this.app.resizeTo = wrapper
+      this.app.queueResize()
+      this._updateChildrenSize()
+      this.cursor?.updatePosition(this.currentTime)
+      this.ruler?.render()
       return
     }
 

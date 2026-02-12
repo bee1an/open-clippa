@@ -23,6 +23,7 @@ export function useTimelineBinding(): void {
 
   const railDisposers = new Map<Rail, () => void>()
   const trainDisposers = new Map<Train, () => void>()
+  const TIME_EPSILON_MS = 0.001
   let pendingCanvasTimingSync: number | null = null
   let syncingCanvasTiming = false
 
@@ -239,8 +240,18 @@ export function useTimelineBinding(): void {
     if (!train)
       return
 
-    const nextTime = Math.max(0, Math.min(clippa.timeline.duration, train.start))
-    if (Math.abs(clippa.timeline.currentTime - nextTime) < 0.001)
+    const currentTime = clippa.timeline.currentTime
+    const trainStart = Math.max(0, train.start)
+    const trainEnd = trainStart + Math.max(0, train.duration)
+    if (
+      currentTime >= trainStart - TIME_EPSILON_MS
+      && currentTime <= trainEnd + TIME_EPSILON_MS
+    ) {
+      return
+    }
+
+    const nextTime = Math.min(clippa.timeline.duration, trainStart)
+    if (Math.abs(currentTime - nextTime) < TIME_EPSILON_MS)
       return
 
     clippa.timeline.updateCurrentTime(nextTime)
