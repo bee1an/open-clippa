@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { reactive, ref } from 'vue'
 
 // Validation functions for new data structures
 export function createDefaultVideoMetadata(): VideoMetadata {
