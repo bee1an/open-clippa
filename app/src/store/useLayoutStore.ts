@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 export const SIDER_COLLAPSED_STORAGE_KEY = 'siderCollapsed'
 
 export const useLayoutStore = defineStore('layout', () => {
-  const siderCollapsed = useStorage(SIDER_COLLAPSED_STORAGE_KEY, false)
+  const siderCollapsed = useStorage(SIDER_COLLAPSED_STORAGE_KEY, true)
 
   function setSiderCollapsed(collapsed: boolean): void {
     siderCollapsed.value = collapsed

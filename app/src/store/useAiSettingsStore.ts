@@ -95,7 +95,7 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
   const apiKey = ref(resolveNonEmptyString(persisted.apiKey) ?? '')
   const baseUrl = ref(initialBaseUrl)
   const model = ref(initialModel)
-  const panelOpen = ref(typeof persisted.panelOpen === 'boolean' ? persisted.panelOpen : false)
+  const panelOpen = ref(typeof persisted.panelOpen === 'boolean' ? persisted.panelOpen : true)
 
   const settings = computed<AiSettings>(() => {
     return {
@@ -146,7 +146,7 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
     apiKey.value = ''
     baseUrl.value = DEFAULT_KIMI_BASE_URL
     model.value = DEFAULT_KIMI_MODEL
-    panelOpen.value = false
+    panelOpen.value = true
   }
 
   return {
