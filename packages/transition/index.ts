@@ -1,2 +1,6 @@
+export * from './src/candidateTracker'
 export * from './src/glTransitions'
+export * from './src/manager'
+export * from './src/runtime'
+export * from './src/runtimeCore'
 export * from './src/transition'

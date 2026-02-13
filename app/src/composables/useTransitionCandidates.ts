@@ -1,21 +1,22 @@
-import type { Rail, Train } from 'clippc'
 import type { ComputedRef } from 'vue'
-import type { TransitionCandidate, TransitionClip } from '@clippc/transition'
-import { Image, Video } from 'clippc'
-import { storeToRefs } from 'pinia'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useEditorStore } from '@/store'
-import { usePerformerStore } from '@/store/usePerformerStore'
-import { useTransitionStore } from '@/store/useTransitionStore'
+import type {
+  TransitionCandidate,
+  TransitionCandidateSnapshot,
+  TransitionClip,
+} from '@clippc/transition'
 import {
   DEFAULT_GL_TRANSITION_TYPE,
   getGlTransitionDefaultParams,
-} from '@clippc/transition'
-import {
-  buildTransitionCandidates,
-  buildTransitionPairKey,
   TRANSITION_FEATURE_AVAILABLE,
+  TransitionCandidateTracker,
+  buildTransitionPairKey,
 } from '@clippc/transition'
+import { Image, Video } from 'clippc'
+import { storeToRefs } from 'pinia'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useEditorStore } from '@/store'
+import { usePerformerStore } from '@/store/usePerformerStore'
+import { useTransitionStore } from '@/store/useTransitionStore'
 
 export interface DisplayTransitionCandidate extends TransitionCandidate {
   pairKey: string
@@ -35,15 +36,6 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
   const transitionStore = useTransitionStore()
   const { clippa } = editorStore
   const { transitions, activeTransition, activePairKey } = storeToRefs(transitionStore)
-
-  const timelineVersion = ref(0)
-  const timelineReady = ref(false)
-  const railDisposers = new Map<Rail, () => void>()
-  const trainDisposers = new Map<Train, () => void>()
-
-  function bumpTimelineVersion(): void {
-    timelineVersion.value += 1
-  }
 
   function getTransitionClip(performerId: string): TransitionClip | null {
     const performer = performerStore.getPerformerById(performerId)
@@ -73,53 +65,17 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
     return null
   }
 
-  function bindTrain(train: Train): void {
-    if (trainDisposers.has(train))
-      return
+  const tracker = new TransitionCandidateTracker({
+    timeline: clippa.timeline,
+    resolveClip: getTransitionClip,
+    getActivePairKey: () => activePairKey.value,
+    clearActiveSelection: () => transitionStore.clearActiveSelection(),
+  })
 
-    const handleAfterMove = (): void => bumpTimelineVersion()
-    const handleMoveEnd = (): void => bumpTimelineVersion()
-    const handleBeforeLeftResize = (): void => bumpTimelineVersion()
-    const handleBeforeRightResize = (): void => bumpTimelineVersion()
-    const handleRightResizeEnd = (): void => bumpTimelineVersion()
-
-    train.on('afterMove', handleAfterMove)
-    train.on('moveEnd', handleMoveEnd)
-    train.on('beforeLeftResize', handleBeforeLeftResize)
-    train.on('beforeRightResize', handleBeforeRightResize)
-    train.on('rightResizeEnd', handleRightResizeEnd)
-
-    trainDisposers.set(train, () => {
-      train.off('afterMove', handleAfterMove)
-      train.off('moveEnd', handleMoveEnd)
-      train.off('beforeLeftResize', handleBeforeLeftResize)
-      train.off('beforeRightResize', handleBeforeRightResize)
-      train.off('rightResizeEnd', handleRightResizeEnd)
-    })
-  }
-
-  function bindRail(rail: Rail): void {
-    if (railDisposers.has(rail))
-      return
-
-    const handleInsertTrain = (train: Train): void => {
-      bindTrain(train)
-      bumpTimelineVersion()
-    }
-
-    rail.on('insertTrain', handleInsertTrain)
-    rail.trains.forEach(bindTrain)
-
-    railDisposers.set(rail, () => {
-      rail.off('insertTrain', handleInsertTrain)
-    })
-  }
-
-  function bindTimelineRails(): void {
-    const rails = clippa.timeline.rails?.rails ?? []
-    rails.forEach(bindRail)
-    bumpTimelineVersion()
-  }
+  const trackerSnapshot = ref<TransitionCandidateSnapshot>(tracker.getSnapshot())
+  const unsubscribe = tracker.subscribe((snapshot) => {
+    trackerSnapshot.value = snapshot
+  })
 
   const transitionsByPair = computed(() => {
     const map = new Map<string, string>()
@@ -133,34 +89,20 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
     if (!TRANSITION_FEATURE_AVAILABLE)
       return []
 
-    void timelineVersion.value
-    const rawCandidates = buildTransitionCandidates(clippa.timeline)
-    const result: DisplayTransitionCandidate[] = []
-
-    rawCandidates.forEach((candidate) => {
-      const from = getTransitionClip(candidate.fromId)
-      const to = getTransitionClip(candidate.toId)
-      if (!from || !to)
-        return
-
-      const pairKey = buildTransitionPairKey(candidate.fromId, candidate.toId)
-      result.push({
+    return trackerSnapshot.value.candidates.map((candidate) => {
+      return {
         ...candidate,
-        pairKey,
-        transitionId: transitionsByPair.value.get(pairKey) ?? null,
-      })
+        transitionId: transitionsByPair.value.get(candidate.pairKey) ?? null,
+      }
     })
-
-    return result
   })
 
   const activeCandidate = computed<DisplayTransitionCandidate | null>(() => {
     if (!TRANSITION_FEATURE_AVAILABLE)
       return null
 
-    if (activePairKey.value) {
+    if (activePairKey.value)
       return candidates.value.find(candidate => candidate.pairKey === activePairKey.value) ?? null
-    }
 
     if (!activeTransition.value)
       return null
@@ -192,54 +134,22 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
     })
   }
 
-  const handleDurationChanged = (): void => bindTimelineRails()
-  const handleHire = (): void => bindTimelineRails()
-
-  watch(
-    () => ({
-      candidateKeys: candidates.value.map(item => item.pairKey),
-      currentActivePairKey: activePairKey.value,
-      currentTimelineReady: timelineReady.value,
-    }),
-    ({ candidateKeys, currentActivePairKey, currentTimelineReady }) => {
-      if (!currentTimelineReady)
-        return
-
-      if (!currentActivePairKey)
-        return
-
-      if (!candidateKeys.includes(currentActivePairKey)) {
-        transitionStore.clearActiveSelection()
-      }
-    },
-    { immediate: true },
-  )
-
   let disposed = false
   onMounted(async () => {
     await clippa.ready
     if (disposed)
       return
+
     if (!TRANSITION_FEATURE_AVAILABLE)
       return
 
-    bindTimelineRails()
-    timelineReady.value = true
-    clippa.timeline.on('durationChanged', handleDurationChanged)
-    clippa.theater.on('hire', handleHire)
+    tracker.start()
   })
 
   onUnmounted(() => {
     disposed = true
-    timelineReady.value = false
-    clippa.timeline.off('durationChanged', handleDurationChanged)
-    clippa.theater.off('hire', handleHire)
-
-    railDisposers.forEach(dispose => dispose())
-    railDisposers.clear()
-
-    trainDisposers.forEach(dispose => dispose())
-    trainDisposers.clear()
+    unsubscribe()
+    tracker.stop()
   })
 
   return {

@@ -2,5 +2,9 @@
   "name": "@clippc/transition",
   "version": "0.0.0",
   "packageManager": "pnpm@10.13.1",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@clippc/utils": "workspace:*",
+    "pixi.js": "catalog:"
+  }
 }

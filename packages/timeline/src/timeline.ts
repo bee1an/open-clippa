@@ -1,3 +1,4 @@
+import type { RailsTransitionHandle } from './rails'
 import type { Train } from './train'
 import { TIMELINE_APP_BACKGROUND_FILL, TIMELINE_LEFT_PADDING } from '@clippc/constants'
 import { EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
@@ -8,12 +9,15 @@ import { Ruler } from './ruler'
 import { State } from './state'
 import { QueueRun } from './utils'
 
+export interface TimelineTransitionHandle extends RailsTransitionHandle {}
+
 export type TimlineEvents = {
   play: []
   pause: []
   seeked: [time: number]
   currentTimeUpdated: [time: number]
   durationChanged: [number]
+  transitionHandleClick: [TimelineTransitionHandle]
 }
 
 const ZOOM_SENSITIVITY = 0.002
@@ -62,6 +66,8 @@ export class Timeline extends EventBus<TimlineEvents> {
    * 是否播放中
    */
   private _playing: boolean = false
+  private _transitionHandles: TimelineTransitionHandle[] = []
+  private _activeTransitionPairKey: string | null = null
   /**
    * 记录上一次翻页的时间戳，防止连续翻页
    */
@@ -236,6 +242,10 @@ export class Timeline extends EventBus<TimlineEvents> {
       this.ruler?.render()
     })
 
+    this.rails.on('transitionHandleClick', (handle) => {
+      this.emit('transitionHandleClick', { ...handle })
+    })
+
     this.rails.scrollBox.on('zoom', ({ deltaY, pointerX }) => {
       const oldPxPerMs = this.state.pxPerMs
 
@@ -261,6 +271,8 @@ export class Timeline extends EventBus<TimlineEvents> {
       this.cursor?.updatePosition(this.currentTime)
     })
 
+    this.rails.setTransitionHandles(this._transitionHandles)
+    this.rails.setActiveTransitionPairKey(this._activeTransitionPairKey)
     this.ruler?.render()
   }
 
@@ -421,6 +433,19 @@ export class Timeline extends EventBus<TimlineEvents> {
     withEffect && this.cursor?.seek(boundedTime)
 
     this.emit('seeked', boundedTime)
+  }
+
+  setTransitionHandles(handles: TimelineTransitionHandle[]): void {
+    this._transitionHandles = handles.map(handle => ({ ...handle }))
+    this.rails?.setTransitionHandles(this._transitionHandles)
+  }
+
+  setActiveTransitionPairKey(pairKey: string | null): void {
+    if (this._activeTransitionPairKey === pairKey)
+      return
+
+    this._activeTransitionPairKey = pairKey
+    this.rails?.setActiveTransitionPairKey(pairKey)
   }
 
   addTrainByZIndex(train: Train, zIndex: number): void {

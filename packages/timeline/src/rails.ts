@@ -1,4 +1,5 @@
 import type { FederatedPointerEvent } from 'pixi.js'
+import type { RailTransitionHandle } from './rail'
 import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
 import {
@@ -20,6 +21,10 @@ export interface RailsOption {
   maxZIndex?: number
 }
 
+export interface RailsTransitionHandle extends RailTransitionHandle {
+  railZIndex: number
+}
+
 export type RailsEvents = {
   scroll: [{ x: number, y: number }]
 
@@ -30,6 +35,7 @@ export type RailsEvents = {
    */
   updateDuration: [number]
   layoutChanged: []
+  transitionHandleClick: [RailsTransitionHandle]
 }
 
 type GlobalGapRange = {
@@ -80,6 +86,8 @@ export class Rails extends EventBus<RailsEvents> {
   duration: number
 
   maxZIndex: number = -1
+  private _transitionHandles: RailsTransitionHandle[] = []
+  private _activeTransitionPairKey: string | null = null
   private _activeGapRail: Rail | null = null
   get offsetX(): number {
     return this.scrollBox.offsetX
@@ -278,6 +286,17 @@ export class Rails extends EventBus<RailsEvents> {
     }
   }
 
+  private _resolveTransitionHandlesForRail(zIndex: number): RailTransitionHandle[] {
+    return this._transitionHandles
+      .filter(handle => handle.railZIndex === zIndex)
+      .map(handle => ({
+        id: handle.id,
+        pairKey: handle.pairKey,
+        fromId: handle.fromId,
+        toId: handle.toId,
+      }))
+  }
+
   private _createRail(zIndex: number, railStyle: TrainRailStyle = 'default', trainsOptions: TrainOption[] = []): Rail {
     const rail = new Rail(
       {
@@ -367,9 +386,18 @@ export class Rails extends EventBus<RailsEvents> {
       this._emitLayoutChanged()
     })
 
+    rail.on('transitionHandleClick', (handle) => {
+      this.emit('transitionHandleClick', {
+        ...handle,
+        railZIndex: rail.zIndex,
+      })
+    })
+
     this._insertRailByZIndex(rail, zIndex)
 
     this.railsContainer.addChild(rail.container)
+    rail.setTransitionHandles(this._resolveTransitionHandlesForRail(rail.zIndex))
+    rail.setActiveTransitionPairKey(this._activeTransitionPairKey)
 
     return rail
   }
@@ -707,6 +735,21 @@ export class Rails extends EventBus<RailsEvents> {
     return this.rails[this.maxZIndex - zIndex]
   }
 
+  setTransitionHandles(handles: RailsTransitionHandle[]): void {
+    this._transitionHandles = handles.map(handle => ({ ...handle }))
+    this.rails.forEach((rail) => {
+      rail.setTransitionHandles(this._resolveTransitionHandlesForRail(rail.zIndex))
+    })
+  }
+
+  setActiveTransitionPairKey(pairKey: string | null): void {
+    if (this._activeTransitionPairKey === pairKey)
+      return
+
+    this._activeTransitionPairKey = pairKey
+    this.rails.forEach(rail => rail.setActiveTransitionPairKey(pairKey))
+  }
+
   listGlobalGaps(): Array<{ start: number, end: number, duration: number }> {
     return this._collectGlobalGaps()
   }
@@ -866,6 +909,11 @@ export class Rails extends EventBus<RailsEvents> {
 
     const lastGap = gapByZIndex.get(0)
     lastGap?.updateY(cursorY)
+
+    this.rails.forEach((rail) => {
+      rail.setTransitionHandles(this._resolveTransitionHandlesForRail(rail.zIndex))
+      rail.setActiveTransitionPairKey(this._activeTransitionPairKey)
+    })
   }
 
   /**

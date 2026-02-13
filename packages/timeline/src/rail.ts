@@ -2,6 +2,7 @@ import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
 import {
+  PRIMARYCOLOR,
   TIMELINE_FILTER_TRAIN_HEIGHT,
   TIMELINE_RAIL_FILL,
   TIMELINE_TEXT_TRAIN_HEIGHT,
@@ -47,6 +48,13 @@ export interface RailOption {
   trainsOption: TrainOption[]
 }
 
+export interface RailTransitionHandle {
+  id: string
+  pairKey: string
+  fromId: string
+  toId: string
+}
+
 export type RailEvents = {
   trainLeave: [Train, FederatedPointerEvent]
   trainBeforeMoveEnd: [Train]
@@ -72,6 +80,8 @@ export type RailEvents = {
    * selected gap changed
    */
   gapSelectionChanged: [ClosableGap | null]
+
+  transitionHandleClick: [RailTransitionHandle]
 }
 
 type ClosableGap = {
@@ -90,6 +100,19 @@ const GAP_DELETE_ICON_FOREGROUND = 0x171717
 const GAP_GRID_COLOR = 0xFFFFFF
 const GAP_GRID_SPACING = 9
 const GAP_GRID_LINE_WIDTH = 1
+const TRANSITION_HANDLE_HIT_RADIUS = 14
+const TRANSITION_HANDLE_VISIBLE_RADIUS = 10
+const TRANSITION_HANDLE_STROKE_WIDTH = 1.5
+const RAIL_SEAM_LAYER_Z_INDEX = 20
+const RAIL_GAP_LAYER_Z_INDEX = 30
+const RAIL_TRANSITION_HANDLE_LAYER_Z_INDEX = 40
+const TRANSITION_HANDLE_IDLE_FILL = '#16181f'
+const TRANSITION_HANDLE_IDLE_STROKE = '#8d8f99'
+const TRANSITION_HANDLE_IDLE_ICON = '#f2f2f2'
+const TRANSITION_HANDLE_ACTIVE_FILL = PRIMARYCOLOR
+const TRANSITION_HANDLE_ACTIVE_STROKE = PRIMARYCOLOR
+const TRANSITION_HANDLE_ACTIVE_ICON = '#171717'
+const TRANSITION_HANDLE_HOVER_RING = '#f2f2f2'
 
 export class Rail extends EventBus<RailEvents> {
   container: Container
@@ -107,8 +130,12 @@ export class Rail extends EventBus<RailEvents> {
   state: State = State.getInstance()
   private _seamLayer: Graphics
   private _gapInteractionLayer: Graphics
+  private _transitionHandleLayer: Graphics
   private _hoveredGap: ClosableGap | null = null
   private _selectedGap: ClosableGap | null = null
+  private _transitionHandles: RailTransitionHandle[] = []
+  private _hoveredTransitionPairKey: string | null = null
+  private _activeTransitionPairKey: string | null = null
   private _dragDockState = new Map<Train, { target: Train, side: 'left' | 'right', escapeOffset: number }>()
   private _handlePxPerMsUpdated = (): void => {
     this._refreshVisualLayoutAndAdjacentVisuals()
@@ -277,6 +304,7 @@ export class Rail extends EventBus<RailEvents> {
     this.height = getRailHeightByStyle(railStyle)
     this._drawBg()
     this._drawAdjacentSeams()
+    this._renderTransitionHandles()
     return true
   }
 
@@ -289,6 +317,7 @@ export class Rail extends EventBus<RailEvents> {
     this._syncTrainJoinState()
     this._drawAdjacentSeams()
     this._refreshGapInteractionAfterLayout()
+    this._renderTransitionHandles()
   }
 
   private _bindPxPerMsEvents(): void {
@@ -310,6 +339,7 @@ export class Rail extends EventBus<RailEvents> {
     this._drawBg()
     this._seamLayer = this._createSeamLayer()
     this._gapInteractionLayer = this._createGapInteractionLayer()
+    this._transitionHandleLayer = this._createTransitionHandleLayer()
 
     option.trainsOption.forEach(item => this.insertTrain(new Train(item)))
 
@@ -488,6 +518,7 @@ export class Rail extends EventBus<RailEvents> {
   private _createSeamLayer(): Graphics {
     const seamLayer = new Graphics({ label: 'rail-seam' })
     seamLayer.eventMode = 'none'
+    seamLayer.zIndex = RAIL_SEAM_LAYER_Z_INDEX
     seamLayer.visible = true
     this.container.addChild(seamLayer)
     return seamLayer
@@ -496,9 +527,104 @@ export class Rail extends EventBus<RailEvents> {
   private _createGapInteractionLayer(): Graphics {
     const gapInteractionLayer = new Graphics({ label: 'rail-gap-interaction' })
     gapInteractionLayer.eventMode = 'none'
+    gapInteractionLayer.zIndex = RAIL_GAP_LAYER_Z_INDEX
     gapInteractionLayer.visible = true
     this.container.addChild(gapInteractionLayer)
     return gapInteractionLayer
+  }
+
+  private _createTransitionHandleLayer(): Graphics {
+    const transitionHandleLayer = new Graphics({ label: 'rail-transition-handle' })
+    transitionHandleLayer.eventMode = 'static'
+    transitionHandleLayer.zIndex = RAIL_TRANSITION_HANDLE_LAYER_Z_INDEX
+    transitionHandleLayer.visible = true
+    this.container.addChild(transitionHandleLayer)
+    return transitionHandleLayer
+  }
+
+  private _resolveTransitionHandleCenter(handle: RailTransitionHandle): { x: number, y: number } | null {
+    const fromTrain = this.trains.find(train => train.id === handle.fromId)
+    if (!fromTrain)
+      return null
+
+    return {
+      x: fromTrain.container.x + fromTrain.width,
+      y: fromTrain.container.y + fromTrain.height / 2,
+    }
+  }
+
+  private _resolveTransitionHandleByPoint(x: number, y: number): RailTransitionHandle | null {
+    for (const handle of this._transitionHandles) {
+      const center = this._resolveTransitionHandleCenter(handle)
+      if (!center)
+        continue
+
+      const dx = x - center.x
+      const dy = y - center.y
+      if (Math.sqrt(dx * dx + dy * dy) <= TRANSITION_HANDLE_HIT_RADIUS)
+        return handle
+    }
+
+    return null
+  }
+
+  private _drawTransitionHandleGlyph(centerX: number, centerY: number, color: string): void {
+    this._transitionHandleLayer
+      .moveTo(centerX - 5, centerY - 3)
+      .lineTo(centerX - 1, centerY)
+      .lineTo(centerX - 5, centerY + 3)
+      .stroke({ color, alpha: 0.98, width: 1.6, cap: 'round', join: 'round' })
+      .moveTo(centerX + 1, centerY - 3)
+      .lineTo(centerX + 5, centerY)
+      .lineTo(centerX + 1, centerY + 3)
+      .stroke({ color, alpha: 0.98, width: 1.6, cap: 'round', join: 'round' })
+  }
+
+  private _renderTransitionHandles(): void {
+    this._transitionHandleLayer.clear()
+
+    for (const handle of this._transitionHandles) {
+      const center = this._resolveTransitionHandleCenter(handle)
+      if (!center)
+        continue
+
+      const isHovered = this._hoveredTransitionPairKey === handle.pairKey
+      const isActive = this._activeTransitionPairKey === handle.pairKey
+      const isVisible = isHovered || isActive
+
+      this._transitionHandleLayer
+        .circle(center.x, center.y, TRANSITION_HANDLE_HIT_RADIUS)
+        .fill({ color: '#000000', alpha: 0.001 })
+
+      if (!isVisible)
+        continue
+
+      if (isHovered && !isActive) {
+        this._transitionHandleLayer
+          .circle(center.x, center.y, TRANSITION_HANDLE_VISIBLE_RADIUS + 2)
+          .fill({ color: TRANSITION_HANDLE_HOVER_RING, alpha: 0.12 })
+      }
+
+      const fill = isActive ? TRANSITION_HANDLE_ACTIVE_FILL : TRANSITION_HANDLE_IDLE_FILL
+      const stroke = isActive ? TRANSITION_HANDLE_ACTIVE_STROKE : TRANSITION_HANDLE_IDLE_STROKE
+      const iconColor = isActive ? TRANSITION_HANDLE_ACTIVE_ICON : TRANSITION_HANDLE_IDLE_ICON
+
+      this._transitionHandleLayer
+        .circle(center.x, center.y, TRANSITION_HANDLE_VISIBLE_RADIUS)
+        .fill({ color: fill, alpha: 0.96 })
+        .circle(center.x, center.y, TRANSITION_HANDLE_VISIBLE_RADIUS)
+        .stroke({ color: stroke, alpha: 0.98, width: TRANSITION_HANDLE_STROKE_WIDTH })
+
+      this._drawTransitionHandleGlyph(center.x, center.y, iconColor)
+    }
+  }
+
+  private _setHoveredTransitionPairKey(pairKey: string | null): void {
+    if (this._hoveredTransitionPairKey === pairKey)
+      return
+
+    this._hoveredTransitionPairKey = pairKey
+    this._renderTransitionHandles()
   }
 
   private _isSameGap(a: ClosableGap | null, b: ClosableGap | null): boolean {
@@ -722,7 +848,17 @@ export class Rail extends EventBus<RailEvents> {
       this.emit('gapSelectionChanged', this._selectedGap)
 
     this._renderGapInteraction()
-    this.container.cursor = 'default'
+    this.container.cursor = this._resolveRailCursor()
+  }
+
+  private _resolveRailCursor(): string {
+    if (this._hoveredTransitionPairKey)
+      return 'pointer'
+
+    if (this._hoveredGap)
+      return 'pointer'
+
+    return 'default'
   }
 
   private _updateHoveredGap(x: number, y: number): void {
@@ -732,7 +868,7 @@ export class Rail extends EventBus<RailEvents> {
 
     this._hoveredGap = nextGap
     this._renderGapInteraction()
-    this.container.cursor = nextGap ? 'pointer' : 'default'
+    this.container.cursor = this._resolveRailCursor()
   }
 
   private _closeGap(gap: ClosableGap): boolean {
@@ -770,6 +906,29 @@ export class Rail extends EventBus<RailEvents> {
     this._setSelectedGap(null)
     this._renderGapInteraction()
     return true
+  }
+
+  setTransitionHandles(handles: RailTransitionHandle[]): void {
+    this._transitionHandles = handles.map(handle => ({ ...handle }))
+
+    if (this._hoveredTransitionPairKey) {
+      const hasHovered = this._transitionHandles.some(
+        handle => handle.pairKey === this._hoveredTransitionPairKey,
+      )
+      if (!hasHovered)
+        this._hoveredTransitionPairKey = null
+    }
+
+    this._renderTransitionHandles()
+    this.container.cursor = this._resolveRailCursor()
+  }
+
+  setActiveTransitionPairKey(pairKey: string | null): void {
+    if (this._activeTransitionPairKey === pairKey)
+      return
+
+    this._activeTransitionPairKey = pairKey
+    this._renderTransitionHandles()
   }
 
   private _drawAdjacentSeams(): void {
@@ -815,6 +974,7 @@ export class Rail extends EventBus<RailEvents> {
   private _moveVisualLayerToTop(): void {
     this.container.addChild(this._seamLayer)
     this.container.addChild(this._gapInteractionLayer)
+    this.container.addChild(this._transitionHandleLayer)
   }
 
   private _drawBg(): void {
@@ -838,21 +998,42 @@ export class Rail extends EventBus<RailEvents> {
 
     this.container.on('pointermove', (e) => {
       if (this.state.trainDragging) {
+        this._setHoveredTransitionPairKey(null)
         this._hoveredGap = null
         this._renderGapInteraction()
-        this.container.cursor = 'default'
+        this.container.cursor = this._resolveRailCursor()
         return
       }
 
       const point = e.getLocalPosition(this.container)
+      const hoveredTransitionHandle = this._resolveTransitionHandleByPoint(point.x, point.y)
+      this._setHoveredTransitionPairKey(hoveredTransitionHandle?.pairKey ?? null)
+
+      if (hoveredTransitionHandle) {
+        if (this._hoveredGap) {
+          this._hoveredGap = null
+          this._renderGapInteraction()
+        }
+        this.container.cursor = this._resolveRailCursor()
+        return
+      }
+
       this._updateHoveredGap(point.x, point.y)
     })
 
     this.container.on('pointerdown', (e) => {
+      const point = e.getLocalPosition(this.container)
+      const transitionHandle = this._resolveTransitionHandleByPoint(point.x, point.y)
+      if (transitionHandle) {
+        this._setHoveredTransitionPairKey(transitionHandle.pairKey)
+        this.emit('transitionHandleClick', transitionHandle)
+        e.stopPropagation()
+        return
+      }
+
       if (this.state.trainDragging)
         return
 
-      const point = e.getLocalPosition(this.container)
       this._updateHoveredGap(point.x, point.y)
 
       const iconGap = this._resolveIconGap()
@@ -862,7 +1043,7 @@ export class Rail extends EventBus<RailEvents> {
           this._setSelectedGap(null)
           this._hoveredGap = null
           this._renderGapInteraction()
-          this.container.cursor = 'default'
+          this.container.cursor = this._resolveRailCursor()
         }
         e.stopPropagation()
         return
@@ -873,7 +1054,7 @@ export class Rail extends EventBus<RailEvents> {
         this._setSelectedGap(gap)
         this._hoveredGap = gap
         this._renderGapInteraction()
-        this.container.cursor = 'pointer'
+        this.container.cursor = this._resolveRailCursor()
         e.stopPropagation()
         return
       }
@@ -885,9 +1066,10 @@ export class Rail extends EventBus<RailEvents> {
     })
 
     this.container.on('pointerleave', (e) => {
+      this._setHoveredTransitionPairKey(null)
       this._hoveredGap = null
       this._renderGapInteraction()
-      this.container.cursor = 'default'
+      this.container.cursor = this._resolveRailCursor()
 
       // 如果是train正在拖拽状态, 那么需要将这个train从当前rail中移除
       if (!this.state.trainDragging)
@@ -1051,6 +1233,7 @@ export class Rail extends EventBus<RailEvents> {
     this.width = width
 
     this._drawBg()
+    this._renderTransitionHandles()
   }
 
   updateY(y: number): void {
