@@ -2,7 +2,7 @@
 import type { Train } from 'clippc'
 import type { VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { loadVideoMetadata } from '@/utils/media'
@@ -27,13 +27,51 @@ const sliderValue = ref(0)
 const isSyncingFromTimeline = ref(false)
 const isSyncingFromSelection = ref(false)
 const canvasPointerTarget = ref<HTMLCanvasElement | null>(null)
+const canvasContainerRef = ref<HTMLElement | null>(null)
 const canvasWrapperRef = ref<HTMLElement | null>(null)
 let stopSelectionWatch: (() => void) | null = null
 let isTimelineListenerActive = false
+let canvasContainerResizeObserver: ResizeObserver | null = null
 const PRESERVE_SELECTION_ATTR = 'data-preserve-canvas-selection'
 
 // Canvas 缩放率
 const canvasScaleRatio = ref(1)
+const canvasDisplaySize = ref({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
+const CANVAS_RATIO = CANVAS_WIDTH / CANVAS_HEIGHT
+const CANVAS_MAX_WIDTH_FACTOR = 0.95
+const CANVAS_MAX_HEIGHT_FACTOR = 0.85
+const canvasWrapperStyle = computed(() => ({
+  width: `${canvasDisplaySize.value.width}px`,
+  height: `${canvasDisplaySize.value.height}px`,
+}))
+
+function calculateCanvasDisplaySize() {
+  const containerElement = canvasContainerRef.value
+  if (!containerElement)
+    return
+
+  const availableWidth = containerElement.clientWidth * CANVAS_MAX_WIDTH_FACTOR
+  const availableHeight = containerElement.clientHeight * CANVAS_MAX_HEIGHT_FACTOR
+  if (availableWidth <= 0 || availableHeight <= 0)
+    return
+
+  let width = availableWidth
+  let height = width / CANVAS_RATIO
+
+  if (height > availableHeight) {
+    height = availableHeight
+    width = height * CANVAS_RATIO
+  }
+
+  canvasDisplaySize.value = {
+    width: Math.max(1, Math.floor(width)),
+    height: Math.max(1, Math.floor(height)),
+  }
+
+  nextTick(() => {
+    calculateCanvasScaleRatio()
+  })
+}
 
 // 获取 Canvas 元素并计算缩放率
 function calculateCanvasScaleRatio() {
@@ -292,6 +330,12 @@ onMounted(async () => {
   await clippa.ready
   clippa.stage.mount('canvas')
 
+  canvasContainerResizeObserver = new ResizeObserver(() => {
+    calculateCanvasDisplaySize()
+  })
+  if (canvasContainerRef.value)
+    canvasContainerResizeObserver.observe(canvasContainerRef.value)
+
   const canvasElement = clippa.stage.app?.canvas as HTMLCanvasElement | undefined
   if (canvasElement) {
     canvasPointerTarget.value = canvasElement
@@ -302,11 +346,8 @@ onMounted(async () => {
 
   // 计算初始缩放率
   nextTick(() => {
-    calculateCanvasScaleRatio()
+    calculateCanvasDisplaySize()
   })
-
-  // 监听 window 大小变化
-  window.addEventListener('resize', calculateCanvasScaleRatio)
 
   clippa.timeline.state.on('activeTrainChanged', handleActiveTrainChange)
   isTimelineListenerActive = true
@@ -336,7 +377,8 @@ onUnmounted(() => {
   }
 
   document.removeEventListener('pointerdown', handleDocumentPointerDown, { capture: true })
-  window.removeEventListener('resize', calculateCanvasScaleRatio)
+  canvasContainerResizeObserver?.disconnect()
+  canvasContainerResizeObserver = null
 
   if (isTimelineListenerActive) {
     clippa.timeline.state.off('activeTrainChanged', handleActiveTrainChange)
@@ -350,16 +392,16 @@ onUnmounted(() => {
 
 <template>
   <div h-full w-full flex flex-col items-center justify-center bg-background relative overflow-hidden>
-    <!-- Background Pattern - Subtle -->
-
-    <div
-      id="canvas"
-      ref="canvasWrapperRef"
-      flex-1 aspect-video max-h="[85%]" max-w="[95%]" rounded-sm overflow-visible border="white/5" relative bg-black
-      @pointerdown="handleCanvasPointerDown"
-    >
-      <!-- Selection Group 组件 -->
-      <SelectionGroup :scale-ratio="canvasScaleRatio" />
+    <div ref="canvasContainerRef" h-full w-full flex items-center justify-center overflow-hidden>
+      <div
+        id="canvas"
+        ref="canvasWrapperRef"
+        rounded-sm overflow-visible border="white/5" relative bg-black shrink-0
+        :style="canvasWrapperStyle"
+        @pointerdown="handleCanvasPointerDown"
+      >
+        <SelectionGroup :scale-ratio="canvasScaleRatio" />
+      </div>
     </div>
   </div>
 </template>
