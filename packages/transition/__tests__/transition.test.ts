@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTransitionCandidates, buildTransitionPairKey, computeTransitionMaxMs } from './transition'
+import { buildTransitionCandidates, buildTransitionPairKey, computeTransitionMaxMs } from '../index'
 
 describe('computeTransitionMaxMs', () => {
   it('returns zero maxMs when both video clips have no crop margin', () => {

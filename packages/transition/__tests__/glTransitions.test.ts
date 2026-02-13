@@ -5,7 +5,7 @@ import {
   getGlTransitionPresetByType,
   GL_TRANSITION_PRESETS,
   normalizeGlTransitionParams,
-} from './glTransitions'
+} from '../index'
 
 describe('glTransitions presets', () => {
   it('contains directionalwrap preset with expected default params', () => {

@@ -7,7 +7,7 @@ import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { useTransitionStore } from '@/store/useTransitionStore'
-import { TRANSITION_FEATURE_AVAILABLE } from '@/utils/transition'
+import { TRANSITION_FEATURE_AVAILABLE } from '@clippc/transition'
 
 interface TransitionHandleLayout {
   candidate: DisplayTransitionCandidate

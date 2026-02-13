@@ -1,8 +1,8 @@
-import type { TransitionSpec } from '@/utils/transition'
+import type { TransitionSpec } from '@clippc/transition'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { DEFAULT_GL_TRANSITION_TYPE, getGlTransitionDefaultParams } from '@/utils/glTransitions'
-import { buildTransitionPairKey, DEFAULT_TRANSITION_DURATION } from '@/utils/transition'
+import { DEFAULT_GL_TRANSITION_TYPE, getGlTransitionDefaultParams } from '@clippc/transition'
+import { buildTransitionPairKey, DEFAULT_TRANSITION_DURATION } from '@clippc/transition'
 
 export type { TransitionSpec }
 export { DEFAULT_TRANSITION_DURATION }

@@ -1,6 +1,6 @@
 import type { Rail, Train } from 'clippc'
 import type { ComputedRef } from 'vue'
-import type { TransitionCandidate, TransitionClip } from '@/utils/transition'
+import type { TransitionCandidate, TransitionClip } from '@clippc/transition'
 import { Image, Video } from 'clippc'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -10,12 +10,12 @@ import { useTransitionStore } from '@/store/useTransitionStore'
 import {
   DEFAULT_GL_TRANSITION_TYPE,
   getGlTransitionDefaultParams,
-} from '@/utils/glTransitions'
+} from '@clippc/transition'
 import {
   buildTransitionCandidates,
   buildTransitionPairKey,
   TRANSITION_FEATURE_AVAILABLE,
-} from '@/utils/transition'
+} from '@clippc/transition'
 
 export interface DisplayTransitionCandidate extends TransitionCandidate {
   pairKey: string

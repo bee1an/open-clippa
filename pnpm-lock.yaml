@@ -187,6 +187,9 @@ importers:
       '@clippc/filter':
         specifier: workspace:*
         version: link:../packages/filter
+      '@clippc/transition':
+        specifier: workspace:*
+        version: link:../packages/transition
       '@iconify/json':
         specifier: catalog:app
         version: 2.2.402
@@ -245,7 +248,11 @@ importers:
 
   packages/canvas: {}
 
-  packages/clippc: {}
+  packages/clippc:
+    dependencies:
+      '@clippc/transition':
+        specifier: workspace:*
+        version: link:../transition
 
   packages/codec: {}
 
@@ -272,6 +279,8 @@ importers:
         version: 3.5.22(typescript@5.9.3)
 
   packages/timeline: {}
+
+  packages/transition: {}
 
   packages/utils: {}
 

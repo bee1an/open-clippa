@@ -3,12 +3,12 @@ import { computed } from 'vue'
 import { Slider } from '@/components/ui/slider'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useTransitionStore } from '@/store/useTransitionStore'
-import { GL_TRANSITION_PRESETS } from '@/utils/glTransitions'
+import { GL_TRANSITION_PRESETS } from '@clippc/transition'
 import {
   computeTransitionMaxMs,
   DEFAULT_TRANSITION_DURATION,
   TRANSITION_FEATURE_AVAILABLE,
-} from '@/utils/transition'
+} from '@clippc/transition'
 
 const transitionStore = useTransitionStore()
 const transitionFeatureAvailable = TRANSITION_FEATURE_AVAILABLE

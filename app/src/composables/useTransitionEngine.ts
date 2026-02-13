@@ -1,7 +1,7 @@
 import type { Filter, Texture } from 'pixi.js'
 import type { Rail } from 'clippc'
-import type { GlTransitionParamValue } from '@/utils/glTransitions'
-import type { TransitionCandidate, TransitionSpec } from '@/utils/transition'
+import type { GlTransitionParamValue } from '@clippc/transition'
+import type { TransitionCandidate, TransitionSpec } from '@clippc/transition'
 import { Image, Video } from 'clippc'
 import { storeToRefs } from 'pinia'
 import { Container, Filter as PixiFilter, RenderTexture, Texture as PixiTexture, Sprite } from 'pixi.js'
@@ -13,12 +13,12 @@ import {
   buildGlTransitionFragment,
   getGlTransitionPresetByType,
   normalizeGlTransitionParams,
-} from '@/utils/glTransitions'
+} from '@clippc/transition'
 import {
   buildTransitionCandidates,
   buildTransitionPairKey,
   TRANSITION_FEATURE_AVAILABLE,
-} from '@/utils/transition'
+} from '@clippc/transition'
 
 interface TransitionEngineOptions {
   fragmentShader?: string
