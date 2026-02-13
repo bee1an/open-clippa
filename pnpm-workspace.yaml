@@ -16,6 +16,7 @@ catalog:
   husky: ^9.1.7
   lint-staged: ^16.2.6
   mediabunny: ^1.24.2
+  openai: ^4.104.0
   pixi.js: ^8.14.0
   rolldown: 1.0.0-beta.29
   tsx: ^4.20.6

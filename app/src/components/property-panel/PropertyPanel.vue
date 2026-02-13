@@ -78,7 +78,7 @@ const typeComponents = {
           <div class="i-ph-sparkle-bold" text-sm />
           Animation
         </span>
-        <div class="i-ph-caret-right-bold" text-xs opacity-50 />
+        <div class="i-ph-caret-left-bold" text-xs opacity-50 />
       </button>
 
       <div class="h-px bg-border/50" />

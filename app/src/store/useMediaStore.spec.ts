@@ -89,8 +89,8 @@ describe('useMediaStore helpers', () => {
 })
 
 describe('useMediaStore', () => {
-  let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>
-  let createObjectURLSpy: ReturnType<typeof vi.spyOn>
+  let revokeObjectURLSpy: { mockRestore: () => void }
+  let createObjectURLSpy: { mockRestore: () => void }
   let objectUrlIndex: number
 
   beforeEach(() => {

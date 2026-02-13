@@ -6,14 +6,15 @@ import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useEditorStore } from '@/store'
+import { useLayoutStore } from '@/store/useLayoutStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { useTransitionStore } from '@/store/useTransitionStore'
 
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const transitionStore = useTransitionStore()
+const layoutStore = useLayoutStore()
 const router = useRouter()
-const siderCollapsed = useStorage('siderCollapsed', false)
 const { clippa } = editorStore
 const { activePairKey } = storeToRefs(transitionStore)
 const {
@@ -52,7 +53,7 @@ async function openTransitionPanel(handle: TimelineTransitionHandle): Promise<vo
 
   transitionStore.selectPair(handle.fromId, handle.toId)
 
-  siderCollapsed.value = false
+  layoutStore.setSiderCollapsed(false)
   await router.push('/editor/transition')
 }
 

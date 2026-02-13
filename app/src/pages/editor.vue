@@ -1,26 +1,32 @@
 <script setup lang="ts">
 import { CanvasExport, ExportCanceledError } from 'clippc'
+import { storeToRefs } from 'pinia'
 import { nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import ChatPanel from '@/components/chat/ChatPanel.vue'
 import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
 import { useFilterEngine } from '@/composables/useFilterEngine'
 import { useTimelineBinding } from '@/composables/useTimelineBinding'
 import { useTransitionEngine } from '@/composables/useTransitionEngine'
+import { useAiSettingsStore } from '@/store/useAiSettingsStore'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useExportStore } from '@/store/useExportStore'
+import { useLayoutStore } from '@/store/useLayoutStore'
 
 definePage({ redirect: '/editor/media' })
 
-const siderCollapsed = useStorage('siderCollapsed', false)
-
 const editorStore = useEditorStore()
 const exportStore = useExportStore()
+const aiSettingsStore = useAiSettingsStore()
+const layoutStore = useLayoutStore()
 const router = useRouter()
 const isClippaReady = ref(false)
 const exportFrameRate = 60
 const showDebugPanel = import.meta.env.DEV
+const { panelOpen: chatPanelOpen } = storeToRefs(aiSettingsStore)
+const { siderCollapsed } = storeToRefs(layoutStore)
 
 const exportState = reactive({
   open: false,
@@ -171,6 +177,10 @@ async function handleExportCancel() {
 
   await exportInstance.value.cancel()
 }
+
+function toggleChatPanel(): void {
+  aiSettingsStore.setPanelOpen(!chatPanelOpen.value)
+}
 </script>
 
 <template>
@@ -184,13 +194,23 @@ async function handleExportCancel() {
       <div flex-1 />
 
       <div flex items-center gap-1>
-        <!-- Left Sidebar Toggle -->
+        <!-- Right Sidebar Toggle -->
         <button
           w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
-          title="Toggle Left Sidebar"
-          @click="siderCollapsed = !siderCollapsed"
+          title="Toggle Right Sidebar"
+          @click="layoutStore.toggleSiderCollapsed()"
         >
           <div :class="!siderCollapsed ? 'i-ph-sidebar-simple-fill' : 'i-ph-sidebar-simple-bold'" text-lg />
+        </button>
+
+        <div w-px h-4 bg-border mx-2 />
+
+        <button
+          w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
+          :title="chatPanelOpen ? 'Hide AI Chat' : 'Show AI Chat'"
+          @click="toggleChatPanel"
+        >
+          <div :class="chatPanelOpen ? 'i-ph-chat-circle-text-fill' : 'i-ph-chat-circle-text-bold'" text-lg />
         </button>
 
         <div w-px h-4 bg-border mx-2 />
@@ -208,12 +228,14 @@ async function handleExportCancel() {
 
     <!-- Main Workspace -->
     <div flex flex-1 w-full overflow-hidden relative>
-      <!-- Left Sider -->
+      <!-- Left Chat Panel -->
       <aside
-        :style="{ width: siderCollapsed ? '56px' : '320px' }"
-        flex-shrink-0 bg-background-elevated border-r border="border/50" transition-all duration-300 ease="[cubic-bezier(0.25,1,0.5,1)]" z-40 flex flex-col relative group
+        :style="{ width: chatPanelOpen ? '360px' : '0px' }"
+        class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+        :class="chatPanelOpen ? 'border-r' : 'border-r-0'"
+        border="border/50"
       >
-        <Sider />
+        <ChatPanel v-if="chatPanelOpen" />
       </aside>
 
       <!-- Center Stage -->
@@ -224,6 +246,15 @@ async function handleExportCancel() {
         </div>
         <ResizableTimeline />
       </main>
+
+      <!-- Right Sider -->
+      <aside
+        :style="{ width: siderCollapsed ? '56px' : '320px' }"
+        class="h-full shrink-0 bg-background-elevated border-l transition-[width] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] z-40 flex flex-col relative group overflow-hidden"
+        border="border/50"
+      >
+        <Sider />
+      </aside>
     </div>
 
     <DebugPanel v-if="showDebugPanel" />

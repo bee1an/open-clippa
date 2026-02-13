@@ -117,7 +117,7 @@ function handleDurationChange(channel: AnimationChannel, value: number, fallback
         class="flex items-center justify-center rounded-md p-1 text-foreground-muted transition-colors hover:bg-secondary/40 hover:text-foreground"
         @click="emit('back')"
       >
-        <div class="i-ph-caret-left-bold" text-sm />
+        <div class="i-ph-caret-right-bold" text-sm />
       </button>
       <span text-foreground font-medium>Animation</span>
     </div>

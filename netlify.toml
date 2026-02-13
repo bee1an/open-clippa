@@ -5,6 +5,20 @@ command = "pnpm run build:app"
 [build.environment]
 NODE_VERSION = "23"
 
+# Redirect Netlify default domain to primary Cloudflare domain.
+# IMPORTANT: keep this block before the SPA fallback rule below.
+[[redirects]]
+from = "https://clippc.netlify.app/*"
+to = "https://clippc.com/:splat"
+status = 301
+force = true
+
+[[redirects]]
+from = "http://clippc.netlify.app/*"
+to = "https://clippc.com/:splat"
+status = 301
+force = true
+
 [[redirects]]
 from = "/*"
 to = "/index.html"

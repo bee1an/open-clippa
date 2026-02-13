@@ -39,7 +39,7 @@ function handleItemClick(path: string) {
 
 <template>
   <div
-    h-full w-14 flex-shrink-0 flex flex-col items-center pt-3 gap-1 bg-background-elevated border-r border-border
+    h-full w-14 flex-shrink-0 flex flex-col items-center pt-3 gap-1 bg-background-elevated
     data-preserve-canvas-selection="true"
   >
     <RouterLink

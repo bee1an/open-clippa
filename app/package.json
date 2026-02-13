@@ -12,6 +12,7 @@
     "vue-tsc": "vue-tsc"
   },
   "dependencies": {
+    "@clippc/ai": "workspace:*",
     "@clippc/filter": "workspace:*",
     "@clippc/transition": "workspace:*",
     "@iconify/json": "catalog:app",
