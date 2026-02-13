@@ -8,6 +8,15 @@ import type {
 } from '../types'
 import OpenAI from 'openai'
 
+const PROXY_KEY_SOURCE_HEADER = 'x-clippc-key-source'
+const MANAGED_PLACEHOLDER_API_KEY = 'clippc-managed-placeholder'
+
+type KimiClientSettings = {
+  apiKeySource: 'managed' | 'byok'
+  apiKey: string
+  baseUrl: string
+}
+
 function trimTrailingSlash(input: string): string {
   return input.replace(/\/+$/g, '')
 }
@@ -137,10 +146,51 @@ function parseToolCalls(message: unknown): ChatCompletionResult['toolCalls'] {
     .filter((value): value is NonNullable<typeof value> => value !== null)
 }
 
-function createOpenAiClient(settings: { apiKey: string, baseUrl: string }): OpenAI {
+function shouldAttachProxyKeySourceHeader(baseUrl: string): boolean {
+  const normalized = baseUrl.trim()
+  if (normalized.startsWith('/'))
+    return true
+
+  if (typeof window === 'undefined' || !window.location?.origin)
+    return false
+
+  try {
+    const url = new URL(normalized, window.location.origin)
+    return url.origin === window.location.origin && url.pathname.startsWith('/api/')
+  }
+  catch {
+    return false
+  }
+}
+
+function resolveClientApiKey(settings: KimiClientSettings): string {
+  if (settings.apiKeySource === 'byok')
+    return settings.apiKey
+  return MANAGED_PLACEHOLDER_API_KEY
+}
+
+function resolveClientHeaders(settings: KimiClientSettings): Record<string, string | null> | undefined {
+  const headers: Record<string, string | null> = {}
+  if (shouldAttachProxyKeySourceHeader(settings.baseUrl))
+    headers[PROXY_KEY_SOURCE_HEADER] = settings.apiKeySource
+
+  if (settings.apiKeySource === 'managed') {
+    // Managed mode must never send browser Authorization headers.
+    headers.authorization = null
+  }
+
+  if (Object.keys(headers).length === 0)
+    return undefined
+
+  return headers
+}
+
+function createOpenAiClient(settings: KimiClientSettings): OpenAI {
+  const defaultHeaders = resolveClientHeaders(settings)
   return new OpenAI({
-    apiKey: settings.apiKey,
+    apiKey: resolveClientApiKey(settings),
     baseURL: resolveKimiBaseUrl(settings.baseUrl),
+    ...(defaultHeaders ? { defaultHeaders } : {}),
     // This project currently runs chat calls from browser runtime.
     dangerouslyAllowBrowser: true,
   })
@@ -194,7 +244,7 @@ export const kimiClient: ChatProviderClient = {
 }
 
 export async function streamChatCompletion(
-  settings: { apiKey: string, baseUrl: string, model: string },
+  settings: { apiKeySource: 'managed' | 'byok', apiKey: string, baseUrl: string, model: string },
   messages: ChatCompletionMessage[],
   handlers: StreamChatHandlers,
 ): Promise<void> {
@@ -202,7 +252,7 @@ export async function streamChatCompletion(
 }
 
 export async function createChatCompletion(
-  settings: { apiKey: string, baseUrl: string, model: string },
+  settings: { apiKeySource: 'managed' | 'byok', apiKey: string, baseUrl: string, model: string },
   messages: ChatCompletionMessage[],
   options?: CreateChatCompletionOptions,
 ): Promise<ChatCompletionResult> {

@@ -1,9 +1,10 @@
-import type { AiProviderId, AiSettings } from '@clippc/ai'
+import type { AiApiKeySource, AiProviderId, AiSettings } from '@clippc/ai'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
 interface PersistedAiSettings {
   provider?: AiProviderId
+  apiKeySource?: AiApiKeySource
   apiKey?: string
   baseUrl?: string
   model?: string
@@ -12,6 +13,7 @@ interface PersistedAiSettings {
 
 export const AI_SETTINGS_STORAGE_KEY = 'open-clippa.ai.settings.v1'
 export const DEFAULT_AI_PROVIDER: AiProviderId = 'kimi'
+export const DEFAULT_API_KEY_SOURCE: AiApiKeySource = 'managed'
 export const DEV_PROXY_KIMI_BASE_URL = '/api/kimi'
 export const DIRECT_KIMI_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 export const DEFAULT_KIMI_BASE_URL = DEV_PROXY_KIMI_BASE_URL
@@ -35,6 +37,10 @@ function resolveNonEmptyString(value: unknown): string | null {
 
 function normalizeProvider(provider: unknown): AiProviderId {
   return provider === 'kimi' ? 'kimi' : DEFAULT_AI_PROVIDER
+}
+
+function normalizeApiKeySource(source: unknown): AiApiKeySource {
+  return source === 'byok' ? 'byok' : DEFAULT_API_KEY_SOURCE
 }
 
 function normalizeModel(model: string): string {
@@ -92,6 +98,7 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
   })()
 
   const provider = ref<AiProviderId>(normalizeProvider(persisted.provider))
+  const apiKeySource = ref<AiApiKeySource>(normalizeApiKeySource(persisted.apiKeySource))
   const apiKey = ref(resolveNonEmptyString(persisted.apiKey) ?? '')
   const baseUrl = ref(initialBaseUrl)
   const model = ref(initialModel)
@@ -100,6 +107,7 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
   const settings = computed<AiSettings>(() => {
     return {
       provider: provider.value,
+      apiKeySource: apiKeySource.value,
       apiKey: apiKey.value,
       baseUrl: baseUrl.value,
       model: model.value,
@@ -113,6 +121,7 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
 
     const payload: PersistedAiSettings = {
       provider: provider.value,
+      apiKeySource: apiKeySource.value,
       apiKey: apiKey.value,
       baseUrl: baseUrl.value,
       model: model.value,
@@ -122,11 +131,13 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
     localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(payload))
   }
 
-  watch([provider, apiKey, baseUrl, model, panelOpen], persistSettings)
+  watch([provider, apiKeySource, apiKey, baseUrl, model, panelOpen], persistSettings)
 
   function updateSettings(patch: Partial<AiSettings>): void {
     if (patch.provider !== undefined)
       provider.value = normalizeProvider(patch.provider)
+    if (patch.apiKeySource !== undefined)
+      apiKeySource.value = normalizeApiKeySource(patch.apiKeySource)
     if (patch.apiKey !== undefined)
       apiKey.value = patch.apiKey
     if (patch.baseUrl !== undefined)
@@ -143,6 +154,7 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
 
   function resetSettings(): void {
     provider.value = DEFAULT_AI_PROVIDER
+    apiKeySource.value = DEFAULT_API_KEY_SOURCE
     apiKey.value = ''
     baseUrl.value = DEFAULT_KIMI_BASE_URL
     model.value = DEFAULT_KIMI_MODEL
@@ -151,6 +163,7 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
 
   return {
     provider,
+    apiKeySource,
     apiKey,
     baseUrl,
     model,

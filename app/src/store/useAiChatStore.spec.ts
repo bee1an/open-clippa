@@ -51,6 +51,7 @@ describe('useAiChatStore', () => {
 
     const settingsStore = useAiSettingsStore()
     settingsStore.updateSettings({
+      apiKeySource: 'byok',
       apiKey: 'test-key',
       baseUrl: 'https://integrate.api.nvidia.com/v1',
       model: 'moonshotai/kimi-k2.5',
@@ -73,6 +74,7 @@ describe('useAiChatStore', () => {
 
     const callOptions = chatWithToolsMock.mock.calls[0][0]
     expect(callOptions.settings).toEqual({
+      apiKeySource: 'byok',
       apiKey: 'test-key',
       baseUrl: 'https://integrate.api.nvidia.com/v1',
       model: 'moonshotai/kimi-k2.5',
@@ -80,15 +82,51 @@ describe('useAiChatStore', () => {
     expect(callOptions.messages[0].role).toBe('system')
   })
 
-  it('blocks send when required settings are missing', async () => {
+  it('blocks send when byok api key is missing', async () => {
+    const settingsStore = useAiSettingsStore()
+    settingsStore.updateSettings({
+      apiKeySource: 'byok',
+      apiKey: '',
+    })
+
     const store = useAiChatStore()
     store.draft = 'hello'
 
     await store.sendMessage()
 
     expect(store.messages).toHaveLength(0)
-    expect(store.lastError).toBe('Missing required settings: API Key, Base URL, Model')
+    expect(store.lastError).toBe('Missing required settings: API Key')
     expect(chatWithToolsMock).not.toHaveBeenCalled()
+  })
+
+  it('allows managed mode without client api key', async () => {
+    chatWithToolsMock.mockImplementation(async (options: any) => {
+      options.onToken('managed')
+      options.onDone?.()
+    })
+
+    const settingsStore = useAiSettingsStore()
+    settingsStore.updateSettings({
+      apiKeySource: 'managed',
+      apiKey: '',
+      baseUrl: '/api/kimi',
+      model: 'moonshotai/kimi-k2.5',
+    })
+
+    const store = useAiChatStore()
+    store.draft = 'hello'
+
+    await store.sendMessage()
+
+    expect(store.lastError).toBeNull()
+    expect(chatWithToolsMock).toHaveBeenCalledTimes(1)
+    const callOptions = chatWithToolsMock.mock.calls[0][0]
+    expect(callOptions.settings).toEqual({
+      apiKeySource: 'managed',
+      apiKey: '',
+      baseUrl: '/api/kimi',
+      model: 'moonshotai/kimi-k2.5',
+    })
   })
 
   it('marks assistant message as error when request fails', async () => {
@@ -96,6 +134,7 @@ describe('useAiChatStore', () => {
 
     const settingsStore = useAiSettingsStore()
     settingsStore.updateSettings({
+      apiKeySource: 'byok',
       apiKey: 'test-key',
       baseUrl: 'https://integrate.api.nvidia.com/v1',
       model: 'moonshotai/kimi-k2.5',
@@ -126,6 +165,7 @@ describe('useAiChatStore', () => {
 
     const settingsStore = useAiSettingsStore()
     settingsStore.updateSettings({
+      apiKeySource: 'byok',
       apiKey: 'test-key',
       baseUrl: 'https://integrate.api.nvidia.com/v1',
       model: 'moonshotai/kimi-k2.5',
@@ -155,6 +195,7 @@ describe('useAiChatStore', () => {
 
     const settingsStore = useAiSettingsStore()
     settingsStore.updateSettings({
+      apiKeySource: 'byok',
       apiKey: 'test-key',
       baseUrl: 'https://integrate.api.nvidia.com/v1',
       model: 'moonshotai/kimi-k2.5',
@@ -186,6 +227,7 @@ describe('useAiChatStore', () => {
 
     const settingsStore = useAiSettingsStore()
     settingsStore.updateSettings({
+      apiKeySource: 'byok',
       apiKey: 'test-key',
       baseUrl: 'https://integrate.api.nvidia.com/v1',
       model: 'moonshotai/kimi-k2.5',

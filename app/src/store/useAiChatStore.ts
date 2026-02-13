@@ -1,11 +1,10 @@
-import type { ChatMessage, ChatRequestMessage } from '@clippc/ai'
+import type { AiApiKeySource, ChatMessage, ChatRequestMessage } from '@clippc/ai'
 import { chatWithTools } from '@clippc/ai'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { resolveAppAiTools } from '@/ai/context/tools'
 import { useAiSettingsStore } from './useAiSettingsStore'
 
-const MISSING_SETTINGS_ERROR = 'Missing required settings: API Key, Base URL, Model'
 const CONTEXT_AWARE_SYSTEM_PROMPT = [
   'You are an assistant inside a video editor.',
   'If the user asks about current canvas, timeline, selected elements, or active transition, call the available tools before answering.',
@@ -68,6 +67,26 @@ function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0)
     return error.message.trim()
   return 'Chat request failed'
+}
+
+function buildMissingSettingsError(settings: {
+  apiKeySource: AiApiKeySource
+  apiKey: string
+  baseUrl: string
+  model: string
+}): string | null {
+  const missing: string[] = []
+  if (settings.apiKeySource === 'byok' && settings.apiKey.trim().length === 0)
+    missing.push('API Key')
+  if (settings.baseUrl.trim().length === 0)
+    missing.push('Base URL')
+  if (settings.model.trim().length === 0)
+    missing.push('Model')
+
+  if (missing.length === 0)
+    return null
+
+  return `Missing required settings: ${missing.join(', ')}`
 }
 
 export const useAiChatStore = defineStore('ai-chat', () => {
@@ -143,10 +162,17 @@ export const useAiChatStore = defineStore('ai-chat', () => {
       return
 
     const apiKey = aiSettingsStore.apiKey.trim()
+    const apiKeySource = aiSettingsStore.apiKeySource
     const baseUrl = aiSettingsStore.baseUrl.trim()
     const model = aiSettingsStore.model.trim()
-    if (!apiKey || !baseUrl || !model) {
-      lastError.value = MISSING_SETTINGS_ERROR
+    const missingSettingsError = buildMissingSettingsError({
+      apiKeySource,
+      apiKey,
+      baseUrl,
+      model,
+    })
+    if (missingSettingsError) {
+      lastError.value = missingSettingsError
       return
     }
 
@@ -164,6 +190,7 @@ export const useAiChatStore = defineStore('ai-chat', () => {
     try {
       await chatWithTools({
         settings: {
+          apiKeySource,
           apiKey,
           baseUrl,
           model,

@@ -16,12 +16,21 @@ describe('chatPanel helpers', () => {
 
   it('builds missing settings message', () => {
     expect(buildMissingSettingsMessage({
+      apiKeySource: 'byok',
       apiKey: '',
       baseUrl: '',
       model: '',
     })).toBe('Missing required settings: API Key, Base URL, Model')
 
     expect(buildMissingSettingsMessage({
+      apiKeySource: 'managed',
+      apiKey: '',
+      baseUrl: '',
+      model: '',
+    })).toBe('Missing required settings: Base URL, Model')
+
+    expect(buildMissingSettingsMessage({
+      apiKeySource: 'managed',
       apiKey: 'k',
       baseUrl: 'https://host',
       model: 'kimi',

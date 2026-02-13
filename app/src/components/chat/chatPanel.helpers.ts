@@ -18,12 +18,13 @@ export function shouldSubmitOnEnter(options: {
 }
 
 export function buildMissingSettingsMessage(settings: {
+  apiKeySource: 'managed' | 'byok'
   apiKey: string
   baseUrl: string
   model: string
 }): string | null {
   const missing: string[] = []
-  if (settings.apiKey.trim().length === 0)
+  if (settings.apiKeySource === 'byok' && settings.apiKey.trim().length === 0)
     missing.push('API Key')
   if (settings.baseUrl.trim().length === 0)
     missing.push('Base URL')

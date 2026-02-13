@@ -32,7 +32,7 @@ export interface AiToolResult {
 }
 
 export interface ChatWithToolsOptions {
-  settings: Pick<AiSettings, 'apiKey' | 'baseUrl' | 'model'>
+  settings: Pick<AiSettings, 'apiKeySource' | 'apiKey' | 'baseUrl' | 'model'>
   messages: ChatRequestMessage[] | ChatCompletionMessage[]
   tools: AiToolDefinition[]
   signal?: AbortSignal

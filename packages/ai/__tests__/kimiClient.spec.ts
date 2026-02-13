@@ -84,6 +84,7 @@ describe('streamChatCompletion', () => {
 
     await streamChatCompletion(
       {
+        apiKeySource: 'byok',
         apiKey: 'test-key',
         baseUrl: 'https://integrate.api.nvidia.com/v1',
         model: 'moonshotai/kimi-k2.5',
@@ -120,6 +121,7 @@ describe('streamChatCompletion', () => {
 
     await expect(() => streamChatCompletion(
       {
+        apiKeySource: 'byok',
         apiKey: 'bad-key',
         baseUrl: 'https://integrate.api.nvidia.com/v1',
         model: 'moonshotai/kimi-k2.5',
@@ -135,6 +137,7 @@ describe('streamChatCompletion', () => {
 
     await streamChatCompletion(
       {
+        apiKeySource: 'byok',
         apiKey: 'test-key',
         baseUrl: 'https://integrate.api.nvidia.com/v1',
         model: 'moonshotai/kimi-k2.5',
@@ -149,6 +152,55 @@ describe('streamChatCompletion', () => {
         signal: controller.signal,
       },
     )
+  })
+
+  it('does not send authorization in managed mode for proxy base url', async () => {
+    chatCompletionCreateMock.mockResolvedValue(createMockStream(['ok']))
+
+    await streamChatCompletion(
+      {
+        apiKeySource: 'managed',
+        apiKey: 'should-not-leak',
+        baseUrl: '/api/kimi',
+        model: 'moonshotai/kimi-k2.5',
+      },
+      [{ role: 'user', content: 'hello' }],
+      { onToken: vi.fn() },
+    )
+
+    expect(openAICtorMock).toHaveBeenCalledWith({
+      apiKey: 'clippc-managed-placeholder',
+      baseURL: '/api/kimi/v1',
+      defaultHeaders: {
+        'x-clippc-key-source': 'managed',
+        'authorization': null,
+      },
+      dangerouslyAllowBrowser: true,
+    })
+  })
+
+  it('includes key source header in byok proxy mode', async () => {
+    chatCompletionCreateMock.mockResolvedValue(createMockStream(['ok']))
+
+    await streamChatCompletion(
+      {
+        apiKeySource: 'byok',
+        apiKey: 'test-key',
+        baseUrl: '/api/kimi',
+        model: 'moonshotai/kimi-k2.5',
+      },
+      [{ role: 'user', content: 'hello' }],
+      { onToken: vi.fn() },
+    )
+
+    expect(openAICtorMock).toHaveBeenCalledWith({
+      apiKey: 'test-key',
+      baseURL: '/api/kimi/v1',
+      defaultHeaders: {
+        'x-clippc-key-source': 'byok',
+      },
+      dangerouslyAllowBrowser: true,
+    })
   })
 })
 
@@ -182,6 +234,7 @@ describe('createChatCompletion', () => {
 
     const result = await createChatCompletion(
       {
+        apiKeySource: 'byok',
         apiKey: 'test-key',
         baseUrl: 'https://integrate.api.nvidia.com/v1',
         model: 'moonshotai/kimi-k2.5',
@@ -261,6 +314,7 @@ describe('createChatCompletion', () => {
 
     const result = await createChatCompletion(
       {
+        apiKeySource: 'byok',
         apiKey: 'test-key',
         baseUrl: 'https://integrate.api.nvidia.com/v1',
         model: 'moonshotai/kimi-k2.5',
@@ -286,6 +340,7 @@ describe('createChatCompletion', () => {
 
     await createChatCompletion(
       {
+        apiKeySource: 'byok',
         apiKey: 'test-key',
         baseUrl: 'https://integrate.api.nvidia.com/v1',
         model: 'moonshotai/kimi-k2.5',

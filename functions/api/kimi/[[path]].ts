@@ -3,7 +3,16 @@ interface ProxyEnv {
   KIMI_API_KEY?: string
 }
 
+interface KimiProxyContext {
+  request: Request
+  env: ProxyEnv
+  params: {
+    path?: string | string[]
+  }
+}
+
 const DEFAULT_KIMI_UPSTREAM = 'https://integrate.api.nvidia.com'
+const KEY_SOURCE_HEADER = 'x-clippc-key-source'
 
 const HOP_BY_HOP_HEADERS = [
   'connection',
@@ -51,19 +60,28 @@ function isBodyAllowed(method: string): boolean {
   return method !== 'GET' && method !== 'HEAD'
 }
 
+function resolveKeySource(value: string | null): 'managed' | 'byok' {
+  return value?.trim().toLowerCase() === 'byok' ? 'byok' : 'managed'
+}
+
 function buildProxyHeaders(request: Request, env: ProxyEnv): Headers {
   const headers = new Headers(request.headers)
   headers.delete('host')
   HOP_BY_HOP_HEADERS.forEach(header => headers.delete(header))
+  const keySource = resolveKeySource(headers.get(KEY_SOURCE_HEADER))
+  headers.delete(KEY_SOURCE_HEADER)
+
+  const authorization = headers.get('authorization')?.trim()
+  if (keySource === 'byok' && authorization)
+    return headers
 
   const secret = env.KIMI_API_KEY?.trim()
   if (secret) {
-    // Prefer server-side secret over any client-provided Authorization header.
+    // Managed mode uses server-side secret when available.
     headers.set('authorization', `Bearer ${secret}`)
     return headers
   }
 
-  const authorization = headers.get('authorization')?.trim()
   if (authorization)
     return headers
 
@@ -85,7 +103,7 @@ function jsonError(status: number, message: string): Response {
   )
 }
 
-export const onRequest: PagesFunction<ProxyEnv> = async (context) => {
+export async function onRequest(context: KimiProxyContext): Promise<Response> {
   const { request, env, params } = context
   const upstreamBaseUrl = resolveUpstreamBase(env)
   const upstreamPath = resolveUpstreamPath(upstreamBaseUrl, resolveRawPath(params.path))

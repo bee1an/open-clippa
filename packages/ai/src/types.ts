@@ -1,7 +1,9 @@
 export type AiProviderId = 'kimi'
+export type AiApiKeySource = 'managed' | 'byok'
 
 export interface AiSettings {
   provider: AiProviderId
+  apiKeySource: AiApiKeySource
   apiKey: string
   baseUrl: string
   model: string
@@ -119,12 +121,12 @@ export interface ChatCompletionResult {
 
 export interface ChatProviderClient {
   createChatCompletion: (
-    settings: Pick<AiSettings, 'apiKey' | 'baseUrl' | 'model'>,
+    settings: Pick<AiSettings, 'apiKeySource' | 'apiKey' | 'baseUrl' | 'model'>,
     messages: ChatCompletionMessage[],
     options?: CreateChatCompletionOptions,
   ) => Promise<ChatCompletionResult>
   streamChatCompletion: (
-    settings: Pick<AiSettings, 'apiKey' | 'baseUrl' | 'model'>,
+    settings: Pick<AiSettings, 'apiKeySource' | 'apiKey' | 'baseUrl' | 'model'>,
     messages: ChatCompletionMessage[],
     handlers: StreamChatHandlers,
   ) => Promise<void>

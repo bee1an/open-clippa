@@ -10,7 +10,7 @@ import { buildMissingSettingsMessage, isNearBottom, shouldSubmitOnEnter } from '
 const aiSettingsStore = useAiSettingsStore()
 const aiChatStore = useAiChatStore()
 
-const { provider, apiKey, baseUrl, model } = storeToRefs(aiSettingsStore)
+const { provider, apiKeySource, apiKey, baseUrl, model } = storeToRefs(aiSettingsStore)
 const { messages, isStreaming, lastError, draft } = storeToRefs(aiChatStore)
 
 const showSettings = ref(false)
@@ -24,8 +24,11 @@ const providerLabel = computed(() => {
   return provider.value
 })
 
+const isByokMode = computed(() => apiKeySource.value === 'byok')
+
 const settingsWarning = computed(() => {
   return buildMissingSettingsMessage({
+    apiKeySource: apiKeySource.value,
     apiKey: apiKey.value,
     baseUrl: baseUrl.value,
     model: model.value,
@@ -92,6 +95,11 @@ watch(isStreaming, () => {
   void scrollToBottom(true)
 })
 
+watch(apiKeySource, (source) => {
+  if (source === 'managed')
+    revealApiKey.value = false
+})
+
 onMounted(() => {
   void scrollToBottom(true)
 })
@@ -147,6 +155,28 @@ onMounted(() => {
       </div>
 
       <div class="grid gap-2">
+        <label class="text-[11px] uppercase tracking-wider text-foreground-subtle">Key Mode</label>
+        <select
+          v-model="apiKeySource"
+          class="h-8 rounded-md border border-border/70 bg-secondary/30 px-2 text-xs text-foreground"
+        >
+          <option value="byok">
+            Bring your key (OpenAI-compatible)
+          </option>
+          <option value="managed">
+            Managed key (server-side default)
+          </option>
+        </select>
+      </div>
+
+      <div
+        v-if="!isByokMode"
+        class="rounded-md border border-border/60 bg-secondary/20 px-2 py-1.5 text-[11px] text-foreground-muted"
+      >
+        Using managed server-side API key. No key is shown or stored in browser.
+      </div>
+
+      <div v-if="isByokMode" class="grid gap-2">
         <label class="text-[11px] uppercase tracking-wider text-foreground-subtle">API Key</label>
         <div class="flex items-center gap-2">
           <input

@@ -17,6 +17,7 @@ vi.mock('../src/providers/kimiClient', () => {
 })
 
 const defaultSettings = {
+  apiKeySource: 'byok' as const,
   apiKey: 'test-key',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
   model: 'moonshotai/kimi-k2.5',
