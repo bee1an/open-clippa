@@ -12,6 +12,7 @@ import type {
 import { TextTrain as TextTrainImpl } from '@clippc/timeline'
 import { EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
 import { ColorMatrixFilter as ColorMatrixFilterImpl } from 'pixi.js'
+import { getFilterPresetConfig } from './presets'
 import {
   applyFilterConfig,
   cloneFilterConfig,
@@ -79,9 +80,10 @@ export class FilterManager extends EventBus<FilterManagerEvents> {
     const duration = options.duration ?? DEFAULT_FILTER_DURATION
     const zIndex = options.zIndex ?? 1
 
+    const presetConfig = getFilterPresetConfig(options.preset)
     const config = options.config
       ? cloneFilterConfig(options.config)
-      : cloneFilterConfig(DEFAULT_FILTER_CONFIG)
+      : presetConfig ?? cloneFilterConfig(DEFAULT_FILTER_CONFIG)
     const filter: ColorMatrixFilter = new ColorMatrixFilterImpl()
     applyFilterConfig(filter, config)
 
