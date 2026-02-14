@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@clippc/ai'
+import { AI_DISPLAY_NAME } from '@/ai/constants'
 
 interface Props {
   message: ChatMessage
@@ -9,12 +10,12 @@ const props = defineProps<Props>()
 
 const roleLabel = computed(() => {
   if (props.message.role === 'user')
-    return 'You'
+    return '你'
   if (props.message.role === 'assistant')
-    return 'Kimi'
+    return AI_DISPLAY_NAME
   if (props.message.role === 'system')
-    return 'System'
-  return 'Error'
+    return '系统'
+  return '错误'
 })
 
 const rowClass = computed(() => {

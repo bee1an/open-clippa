@@ -1,6 +1,21 @@
+import {
+  HOP_BY_HOP_HEADERS,
+  KEY_SOURCE_HEADER,
+  resolveAllowHttpLocalhost,
+  resolveKeySource,
+  resolveManagedApiKey,
+  resolveManagedUpstreamBase,
+  resolveProxyUpstreamBase,
+  resolveUpstreamPath,
+  UPSTREAM_BASE_HEADER,
+} from './proxyShared'
+
 interface ProxyEnv {
+  AI_MANAGED_UPSTREAM?: string
   KIMI_UPSTREAM?: string
+  AI_MANAGED_API_KEY?: string
   KIMI_API_KEY?: string
+  AI_PROXY_ALLOW_LOCALHOST_HTTP?: string
 }
 
 interface KimiProxyContext {
@@ -11,24 +26,6 @@ interface KimiProxyContext {
   }
 }
 
-const DEFAULT_KIMI_UPSTREAM = 'https://integrate.api.nvidia.com'
-const KEY_SOURCE_HEADER = 'x-clippc-key-source'
-
-const HOP_BY_HOP_HEADERS = [
-  'connection',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-]
-
-function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/g, '')
-}
-
 function resolveRawPath(pathParam: string | string[] | undefined): string {
   if (Array.isArray(pathParam))
     return pathParam.join('/')
@@ -37,54 +34,16 @@ function resolveRawPath(pathParam: string | string[] | undefined): string {
   return ''
 }
 
-function resolveUpstreamBase(env: ProxyEnv): string {
-  const candidate = env.KIMI_UPSTREAM?.trim() || DEFAULT_KIMI_UPSTREAM
-  if (!/^https?:\/\//i.test(candidate))
-    return DEFAULT_KIMI_UPSTREAM
-  return trimTrailingSlash(candidate)
-}
-
-function resolveUpstreamPath(baseUrl: string, rawPath: string): string {
-  let normalizedPath = rawPath.replace(/^\/+/g, '')
-  if (!normalizedPath)
-    normalizedPath = 'v1/chat/completions'
-
-  const lowerBaseUrl = baseUrl.toLowerCase()
-  if (lowerBaseUrl.endsWith('/v1') && normalizedPath.toLowerCase().startsWith('v1/'))
-    normalizedPath = normalizedPath.slice(3)
-
-  return normalizedPath
-}
-
 function isBodyAllowed(method: string): boolean {
   return method !== 'GET' && method !== 'HEAD'
 }
 
-function resolveKeySource(value: string | null): 'managed' | 'byok' {
-  return value?.trim().toLowerCase() === 'byok' ? 'byok' : 'managed'
-}
-
-function buildProxyHeaders(request: Request, env: ProxyEnv): Headers {
+function buildProxyHeaders(request: Request): Headers {
   const headers = new Headers(request.headers)
   headers.delete('host')
   HOP_BY_HOP_HEADERS.forEach(header => headers.delete(header))
-  const keySource = resolveKeySource(headers.get(KEY_SOURCE_HEADER))
   headers.delete(KEY_SOURCE_HEADER)
-
-  const authorization = headers.get('authorization')?.trim()
-  if (keySource === 'byok' && authorization)
-    return headers
-
-  const secret = env.KIMI_API_KEY?.trim()
-  if (secret) {
-    // Managed mode uses server-side secret when available.
-    headers.set('authorization', `Bearer ${secret}`)
-    return headers
-  }
-
-  if (authorization)
-    return headers
-
+  headers.delete(UPSTREAM_BASE_HEADER)
   return headers
 }
 
@@ -105,17 +64,39 @@ function jsonError(status: number, message: string): Response {
 
 export async function onRequest(context: KimiProxyContext): Promise<Response> {
   const { request, env, params } = context
-  const upstreamBaseUrl = resolveUpstreamBase(env)
-  const upstreamPath = resolveUpstreamPath(upstreamBaseUrl, resolveRawPath(params.path))
+  const keySource = resolveKeySource(request.headers.get(KEY_SOURCE_HEADER))
+  const allowHttpLocalhost = resolveAllowHttpLocalhost(env.AI_PROXY_ALLOW_LOCALHOST_HTTP)
+  const managedUpstreamBase = resolveManagedUpstreamBase(env, { allowHttpLocalhost })
+  const upstreamBaseResult = resolveProxyUpstreamBase({
+    keySource,
+    managedUpstreamBase,
+    requestedUpstreamBase: request.headers.get(UPSTREAM_BASE_HEADER),
+    allowHttpLocalhost,
+  })
+  if (!upstreamBaseResult.ok)
+    return jsonError(400, upstreamBaseResult.error)
+
+  const upstreamPath = resolveUpstreamPath(resolveRawPath(params.path))
   const inboundUrl = new URL(request.url)
-  const upstreamUrl = new URL(`${upstreamBaseUrl}/${upstreamPath}`)
+  const upstreamUrl = new URL(upstreamPath, `${upstreamBaseResult.value}/`)
   upstreamUrl.search = inboundUrl.search
 
-  const headers = buildProxyHeaders(request, env)
+  const headers = buildProxyHeaders(request)
+  const authorization = headers.get('authorization')?.trim()
+  if (keySource !== 'byok' || !authorization) {
+    const managedApiKey = resolveManagedApiKey(env)
+    if (managedApiKey) {
+      headers.set('authorization', `Bearer ${managedApiKey}`)
+    }
+    else if (!authorization) {
+      headers.delete('authorization')
+    }
+  }
+
   if (!headers.get('authorization')) {
     return jsonError(
       500,
-      'Missing Authorization header. Provide API key in request or set KIMI_API_KEY secret.',
+      '缺少 Authorization 请求头。请在请求中提供 API Key，或在服务端配置 AI_MANAGED_API_KEY（兼容旧变量 KIMI_API_KEY）。',
     )
   }
 
@@ -138,6 +119,6 @@ export async function onRequest(context: KimiProxyContext): Promise<Response> {
     })
   }
   catch {
-    return jsonError(502, 'Kimi upstream request failed')
+    return jsonError(502, '上游服务请求失败')
   }
 }

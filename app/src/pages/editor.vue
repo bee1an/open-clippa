@@ -83,13 +83,13 @@ async function exportHandler() {
     return
 
   if (!isClippaReady.value) {
-    openExportError('Editor is not ready yet')
+    openExportError('编辑器尚未就绪')
     return
   }
 
   const duration = editorStore.duration
   if (!duration || duration <= 0) {
-    openExportError('Nothing to export')
+    openExportError('当前没有可导出的内容')
     return
   }
 
@@ -153,11 +153,11 @@ async function exportHandler() {
   catch (error) {
     if (error instanceof ExportCanceledError) {
       exportState.status = 'canceled'
-      exportState.errorMessage = 'Export canceled'
+      exportState.errorMessage = '导出已取消'
       return
     }
 
-    const message = error instanceof Error ? error.message : 'Export failed'
+    const message = error instanceof Error ? error.message : '导出失败'
     openExportError(message)
   }
   finally {
@@ -197,7 +197,7 @@ function toggleChatPanel(): void {
         <!-- Right Sidebar Toggle -->
         <button
           w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
-          title="Toggle Right Sidebar"
+          title="切换右侧栏"
           @click="layoutStore.toggleSiderCollapsed()"
         >
           <div :class="!siderCollapsed ? 'i-ph-sidebar-simple-fill' : 'i-ph-sidebar-simple-bold'" text-lg />
@@ -207,7 +207,7 @@ function toggleChatPanel(): void {
 
         <button
           w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
-          :title="chatPanelOpen ? 'Hide AI Chat' : 'Show AI Chat'"
+          :title="chatPanelOpen ? '隐藏 AI 助手' : '显示 AI 助手'"
           @click="toggleChatPanel"
         >
           <div :class="chatPanelOpen ? 'i-ph-chat-circle-text-fill' : 'i-ph-chat-circle-text-bold'" text-lg />
@@ -221,7 +221,7 @@ function toggleChatPanel(): void {
           @click="exportHandler"
         >
           <div i-ph-export-bold text-sm />
-          <span>{{ isExporting ? 'Exporting' : 'Export' }}</span>
+          <span>{{ isExporting ? '导出中' : '导出' }}</span>
         </Button>
       </div>
     </header>

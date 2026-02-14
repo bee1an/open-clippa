@@ -45,13 +45,13 @@ const typeComponents = {
     data-preserve-canvas-selection="true"
   >
     <div p-4 pb-0 text-foreground font-medium>
-      Properties
+      属性
     </div>
 
     <div flex-1 overflow-y-auto p-4 space-y-3>
       <!-- Target Info -->
       <div flex items-center justify-between gap-3>
-        <span text-xs uppercase tracking-widest text-foreground-subtle>Target</span>
+        <span text-xs uppercase tracking-widest text-foreground-subtle>目标</span>
         <span class="max-w-44 truncate rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-xs font-medium text-foreground">
           {{ selectedId }}
         </span>
@@ -76,7 +76,7 @@ const typeComponents = {
       >
         <span flex items-center gap-2>
           <div class="i-ph-sparkle-bold" text-sm />
-          Animation
+          动画
         </span>
         <div class="i-ph-caret-left-bold" text-xs opacity-50 />
       </button>

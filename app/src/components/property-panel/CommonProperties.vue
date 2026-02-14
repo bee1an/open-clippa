@@ -47,7 +47,7 @@ function handleAlphaChange(value: number) {
 <template>
   <div space-y-3>
     <div text-xs uppercase tracking-widest text-foreground-subtle>
-      Transform
+      变换
     </div>
 
     <!-- Position -->
@@ -93,7 +93,7 @@ function handleAlphaChange(value: number) {
     <!-- Rotation -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>Rotation</span>
+        <span text-xs text-foreground-muted>旋转</span>
         <span class="text-[11px] font-mono tabular-nums text-foreground-subtle">
           {{ rotation }}<span class="ml-0.5 text-[9px] opacity-60">°</span>
         </span>
@@ -111,7 +111,7 @@ function handleAlphaChange(value: number) {
     <!-- Opacity -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>Opacity</span>
+        <span text-xs text-foreground-muted>透明度</span>
         <span class="text-[11px] font-mono tabular-nums text-foreground-subtle">
           {{ alphaPercent }}<span class="ml-0.5 text-[9px] opacity-60">%</span>
         </span>

@@ -25,14 +25,14 @@ export function buildMissingSettingsMessage(settings: {
 }): string | null {
   const missing: string[] = []
   if (settings.apiKeySource === 'byok' && settings.apiKey.trim().length === 0)
-    missing.push('API Key')
-  if (settings.baseUrl.trim().length === 0)
-    missing.push('Base URL')
+    missing.push('API 密钥')
+  if (settings.apiKeySource === 'byok' && settings.baseUrl.trim().length === 0)
+    missing.push('接口地址')
   if (settings.model.trim().length === 0)
-    missing.push('Model')
+    missing.push('模型')
 
   if (missing.length === 0)
     return null
 
-  return `Missing required settings: ${missing.join(', ')}`
+  return `缺少必要配置：${missing.join('、')}`
 }

@@ -24,21 +24,21 @@ interface PresetOption {
 }
 
 const enterExitPresets: PresetOption[] = [
-  { label: 'Fade', value: 'fade', icon: 'i-ph-drop-half-bottom-bold' },
-  { label: 'Slide Up', value: 'slide-up', icon: 'i-ph-arrow-up-bold' },
-  { label: 'Slide Down', value: 'slide-down', icon: 'i-ph-arrow-down-bold' },
-  { label: 'Slide Left', value: 'slide-left', icon: 'i-ph-arrow-left-bold' },
-  { label: 'Slide Right', value: 'slide-right', icon: 'i-ph-arrow-right-bold' },
-  { label: 'Zoom In', value: 'zoom-in', icon: 'i-ph-magnifying-glass-plus-bold' },
-  { label: 'Zoom Out', value: 'zoom-out', icon: 'i-ph-magnifying-glass-minus-bold' },
-  { label: 'Rotate Left', value: 'rotate-left', icon: 'i-ph-arrow-counter-clockwise-bold' },
-  { label: 'Rotate Right', value: 'rotate-right', icon: 'i-ph-arrow-clockwise-bold' },
+  { label: '淡入淡出', value: 'fade', icon: 'i-ph-drop-half-bottom-bold' },
+  { label: '上滑', value: 'slide-up', icon: 'i-ph-arrow-up-bold' },
+  { label: '下滑', value: 'slide-down', icon: 'i-ph-arrow-down-bold' },
+  { label: '左滑', value: 'slide-left', icon: 'i-ph-arrow-left-bold' },
+  { label: '右滑', value: 'slide-right', icon: 'i-ph-arrow-right-bold' },
+  { label: '放大', value: 'zoom-in', icon: 'i-ph-magnifying-glass-plus-bold' },
+  { label: '缩小', value: 'zoom-out', icon: 'i-ph-magnifying-glass-minus-bold' },
+  { label: '左旋', value: 'rotate-left', icon: 'i-ph-arrow-counter-clockwise-bold' },
+  { label: '右旋', value: 'rotate-right', icon: 'i-ph-arrow-clockwise-bold' },
 ]
 
 const loopPresets: PresetOption[] = [
-  { label: 'Float', value: 'float', icon: 'i-ph-cloud-bold' },
-  { label: 'Pulse', value: 'pulse', icon: 'i-ph-heartbeat-bold' },
-  { label: 'Spin', value: 'spin', icon: 'i-ph-spinner-bold' },
+  { label: '漂浮', value: 'float', icon: 'i-ph-cloud-bold' },
+  { label: '脉冲', value: 'pulse', icon: 'i-ph-heartbeat-bold' },
+  { label: '旋转', value: 'spin', icon: 'i-ph-spinner-bold' },
 ]
 
 type AnimationChannel = 'enter' | 'exit' | 'loop'
@@ -51,9 +51,9 @@ interface ChannelConfig {
 }
 
 const channels: ChannelConfig[] = [
-  { key: 'enter', label: 'Enter', presets: enterExitPresets, defaultDuration: DEFAULT_ENTER_EXIT_DURATION_MS },
-  { key: 'exit', label: 'Exit', presets: enterExitPresets, defaultDuration: DEFAULT_ENTER_EXIT_DURATION_MS },
-  { key: 'loop', label: 'Loop', presets: loopPresets, defaultDuration: DEFAULT_LOOP_DURATION_MS },
+  { key: 'enter', label: '入场', presets: enterExitPresets, defaultDuration: DEFAULT_ENTER_EXIT_DURATION_MS },
+  { key: 'exit', label: '出场', presets: enterExitPresets, defaultDuration: DEFAULT_ENTER_EXIT_DURATION_MS },
+  { key: 'loop', label: '循环', presets: loopPresets, defaultDuration: DEFAULT_LOOP_DURATION_MS },
 ]
 
 const selectedPerformerId = computed(() => selectedPerformers.value[0]?.id ?? null)
@@ -119,7 +119,7 @@ function handleDurationChange(channel: AnimationChannel, value: number, fallback
       >
         <div class="i-ph-caret-right-bold" text-sm />
       </button>
-      <span text-foreground font-medium>Animation</span>
+      <span text-foreground font-medium>动画</span>
     </div>
 
     <div flex-1 overflow-y-auto p-4 space-y-3>
@@ -161,7 +161,7 @@ function handleDurationChange(channel: AnimationChannel, value: number, fallback
           <!-- Duration Slider -->
           <div space-y-1>
             <div flex items-center justify-between>
-              <span text-xs text-foreground-muted>Duration</span>
+              <span text-xs text-foreground-muted>时长</span>
               <span text="[11px]" font-mono tabular-nums text-foreground-subtle>
                 {{ getDuration(ch.key, ch.defaultDuration) }}<span text="[9px]" ml-0.5 opacity-60>ms</span>
               </span>

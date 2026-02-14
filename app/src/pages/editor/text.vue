@@ -15,7 +15,7 @@ async function addText() {
   const textPerformer = performerStore.addPerformer({
     id: `text-${Date.now()}`,
     type: 'text',
-    content: 'Double click to edit',
+    content: '双击编辑文本',
     start: 0,
     duration: 5000,
     zIndex: nextZIndex,
@@ -38,7 +38,7 @@ async function addText() {
 <template>
   <div h-full flex="~ col">
     <div p-4 p-b-0 text-foreground>
-      Text
+      文本
     </div>
 
     <div p-4>
@@ -48,7 +48,7 @@ async function addText() {
         @click="addText"
       >
         <div i-ph-text-t-bold text-lg mr-2 />
-        <span>Text</span>
+        <span>添加文本</span>
       </Button>
     </div>
   </div>

@@ -27,8 +27,8 @@ const fontFamilyOptions = [
 ]
 
 const fontWeightOptions = [
-  { label: 'Normal', value: 'normal' },
-  { label: 'Bold', value: 'bold' },
+  { label: '常规', value: 'normal' },
+  { label: '加粗', value: 'bold' },
 ]
 
 const currentFontFamily = computed(() => {
@@ -72,12 +72,12 @@ function handleFillChange(e: Event) {
 <template>
   <div space-y-3>
     <div text-xs uppercase tracking-widest text-foreground-subtle>
-      Text
+      文本
     </div>
 
     <!-- Content -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>Content</span>
+      <span text-xs text-foreground-muted>内容</span>
       <textarea
         :value="textContent"
         rows="3"
@@ -89,7 +89,7 @@ function handleFillChange(e: Event) {
 
     <!-- Font Family -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>Font Family</span>
+      <span text-xs text-foreground-muted>字体</span>
       <Select
         :model-value="currentFontFamily"
         :options="fontFamilyOptions"
@@ -100,7 +100,7 @@ function handleFillChange(e: Event) {
 
     <!-- Font Size -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>Font Size</span>
+      <span text-xs text-foreground-muted>字号</span>
       <input
         type="number"
         :value="currentFontSize"
@@ -114,7 +114,7 @@ function handleFillChange(e: Event) {
 
     <!-- Font Weight -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>Font Weight</span>
+      <span text-xs text-foreground-muted>字重</span>
       <Select
         :model-value="currentFontWeight"
         :options="fontWeightOptions"
@@ -126,7 +126,7 @@ function handleFillChange(e: Event) {
     <!-- Fill Color -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>Fill Color</span>
+        <span text-xs text-foreground-muted>填充颜色</span>
         <span class="text-[11px] font-mono text-foreground-subtle">{{ currentFill }}</span>
       </div>
       <input
@@ -140,7 +140,7 @@ function handleFillChange(e: Event) {
 
     <!-- Text Align -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>Text Align</span>
+      <span text-xs text-foreground-muted>对齐方式</span>
       <div class="flex gap-1">
         <button
           v-for="align in (['left', 'center', 'right'] as const)"
@@ -167,7 +167,7 @@ function handleFillChange(e: Event) {
     <!-- Letter Spacing -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>Letter Spacing</span>
+        <span text-xs text-foreground-muted>字间距</span>
         <span class="text-[11px] font-mono tabular-nums text-foreground-subtle">
           {{ currentLetterSpacing }}<span class="ml-0.5 text-[9px] opacity-60">px</span>
         </span>

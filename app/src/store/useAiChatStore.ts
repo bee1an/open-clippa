@@ -66,7 +66,7 @@ function buildRequestMessages(messages: ChatMessage[]): ChatRequestMessage[] {
 function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0)
     return error.message.trim()
-  return 'Chat request failed'
+  return '聊天请求失败'
 }
 
 function buildMissingSettingsError(settings: {
@@ -77,16 +77,16 @@ function buildMissingSettingsError(settings: {
 }): string | null {
   const missing: string[] = []
   if (settings.apiKeySource === 'byok' && settings.apiKey.trim().length === 0)
-    missing.push('API Key')
-  if (settings.baseUrl.trim().length === 0)
-    missing.push('Base URL')
+    missing.push('API 密钥')
+  if (settings.apiKeySource === 'byok' && settings.baseUrl.trim().length === 0)
+    missing.push('接口地址')
   if (settings.model.trim().length === 0)
-    missing.push('Model')
+    missing.push('模型')
 
   if (missing.length === 0)
     return null
 
-  return `Missing required settings: ${missing.join(', ')}`
+  return `缺少必要配置：${missing.join('、')}`
 }
 
 export const useAiChatStore = defineStore('ai-chat', () => {

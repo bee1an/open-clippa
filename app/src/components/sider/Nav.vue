@@ -10,25 +10,25 @@ const navItems = [
     path: '/editor/media',
     icon: 'i-ph-film-strip-bold',
     activeIcon: 'i-ph-film-strip-fill',
-    title: 'Media',
+    title: '媒体',
   },
   {
     path: '/editor/filter',
     icon: 'i-ph-magic-wand-bold',
     activeIcon: 'i-ph-magic-wand-fill',
-    title: 'Filter',
+    title: '滤镜',
   },
   {
     path: '/editor/text',
     icon: 'i-ph-text-t-bold',
     activeIcon: 'i-ph-text-t-fill',
-    title: 'Text',
+    title: '文本',
   },
   {
     path: '/editor/transition',
     icon: 'i-ph-arrow-bend-up-right-bold',
     activeIcon: 'i-ph-arrow-bend-up-right-fill',
-    title: 'Transition',
+    title: '转场',
   },
 ]
 

@@ -35,10 +35,10 @@ const canClose = computed(() => props.status !== 'exporting')
 
 const title = computed(() => {
   if (props.status === 'error')
-    return 'Export failed'
+    return '导出失败'
   if (props.status === 'canceled')
-    return 'Export canceled'
-  return 'Exporting'
+    return '导出已取消'
+  return '正在导出'
 })
 
 function handleClose() {
@@ -61,7 +61,7 @@ function handleCancel() {
   >
     <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between text-sm text-foreground-muted">
-        <div>Frame {{ currentFrame }} / {{ totalFrames }}</div>
+        <div>帧 {{ currentFrame }} / {{ totalFrames }}</div>
         <div>{{ percentText }}</div>
       </div>
 
@@ -76,29 +76,29 @@ function handleCancel() {
         <img
           v-if="previewUrl"
           :src="previewUrl"
-          alt="Export preview"
+          alt="导出预览"
           class="h-full w-full object-cover"
         >
         <div v-else class="text-xs text-foreground-muted">
-          Preview will appear here
+          预览图将在这里显示
         </div>
       </div>
 
       <div v-if="status === 'error'" class="text-sm text-destructive">
-        {{ errorMessage || 'Export failed. Please try again.' }}
+        {{ errorMessage || '导出失败，请重试。' }}
       </div>
       <div v-else-if="status === 'canceled'" class="text-sm text-foreground-muted">
-        {{ errorMessage || 'Export canceled.' }}
+        {{ errorMessage || '导出已取消。' }}
       </div>
     </div>
 
     <template #footer>
       <div class="flex justify-end gap-2">
         <Button v-if="status === 'exporting'" size="sm" variant="ghost" @click="handleCancel">
-          Cancel
+          取消
         </Button>
         <Button size="sm" variant="secondary" :disabled="!canClose" @click="handleClose">
-          Close
+          关闭
         </Button>
       </div>
     </template>

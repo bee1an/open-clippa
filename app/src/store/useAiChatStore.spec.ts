@@ -87,6 +87,8 @@ describe('useAiChatStore', () => {
     settingsStore.updateSettings({
       apiKeySource: 'byok',
       apiKey: '',
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
     })
 
     const store = useAiChatStore()
@@ -95,7 +97,7 @@ describe('useAiChatStore', () => {
     await store.sendMessage()
 
     expect(store.messages).toHaveLength(0)
-    expect(store.lastError).toBe('Missing required settings: API Key')
+    expect(store.lastError).toBe('缺少必要配置：API 密钥')
     expect(chatWithToolsMock).not.toHaveBeenCalled()
   })
 
@@ -109,7 +111,7 @@ describe('useAiChatStore', () => {
     settingsStore.updateSettings({
       apiKeySource: 'managed',
       apiKey: '',
-      baseUrl: '/api/kimi',
+      baseUrl: '',
       model: 'moonshotai/kimi-k2.5',
     })
 
@@ -124,7 +126,7 @@ describe('useAiChatStore', () => {
     expect(callOptions.settings).toEqual({
       apiKeySource: 'managed',
       apiKey: '',
-      baseUrl: '/api/kimi',
+      baseUrl: '',
       model: 'moonshotai/kimi-k2.5',
     })
   })

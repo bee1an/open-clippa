@@ -13,6 +13,7 @@ export const selectTriggerVariants = cva(
   {
     variants: {
       size: {
+        xs: 'h-7 px-2 text-xs',
         sm: 'h-8 px-2.5 text-xs',
         md: 'h-9 px-3 text-sm',
       },
@@ -51,6 +52,7 @@ export const selectContentVariants = cva(
 export const selectViewportVariants = cva('p-1', {
   variants: {
     size: {
+      xs: 'text-xs',
       sm: 'text-xs',
       md: 'text-sm',
     },
@@ -71,6 +73,7 @@ export const selectItemVariants = cva(
   {
     variants: {
       size: {
+        xs: 'text-xs py-1 pl-2 pr-6',
         sm: 'text-xs',
         md: 'text-sm',
       },

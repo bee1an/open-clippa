@@ -20,14 +20,14 @@ describe('chatPanel helpers', () => {
       apiKey: '',
       baseUrl: '',
       model: '',
-    })).toBe('Missing required settings: API Key, Base URL, Model')
+    })).toBe('缺少必要配置：API 密钥、接口地址、模型')
 
     expect(buildMissingSettingsMessage({
       apiKeySource: 'managed',
       apiKey: '',
       baseUrl: '',
       model: '',
-    })).toBe('Missing required settings: Base URL, Model')
+    })).toBe('缺少必要配置：模型')
 
     expect(buildMissingSettingsMessage({
       apiKeySource: 'managed',

@@ -22,19 +22,19 @@ const sourceFileName = computed(() => {
   if (src instanceof File) {
     return src.name
   }
-  return 'Blob'
+  return '二进制资源'
 })
 </script>
 
 <template>
   <div space-y-3>
     <div text-xs uppercase tracking-widest text-foreground-subtle>
-      Image
+      图片
     </div>
 
     <div space-y-2>
       <div flex items-center justify-between gap-2>
-        <span text-xs text-foreground-muted>Source</span>
+        <span text-xs text-foreground-muted>素材</span>
         <span class="max-w-40 truncate text-xs text-foreground">{{ sourceFileName }}</span>
       </div>
     </div>

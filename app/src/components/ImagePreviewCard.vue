@@ -76,7 +76,7 @@ function toggleSelect() {
         <button
           w-8 h-8 rounded-full bg-primary text-background flex items-center justify-center
           hover:scale-110 active:scale-95 transition-all shadow-lg
-          title="Add to timeline"
+          title="添加到时间轴"
           @click.stop="addToTimeline"
         >
           <div i-ph-plus-bold text-lg />
@@ -106,14 +106,14 @@ function toggleSelect() {
           class="hover:bg-secondary text-foreground"
           @click.stop="handleMenuAddToTimeline"
         >
-          Add to timeline
+          添加到时间轴
         </button>
         <button
           w-full text-left text-xs px-2 py-1.5 rounded
           class="hover:bg-secondary text-red-400"
           @click.stop="removeFromMediaLibrary"
         >
-          Remove from media
+          从媒体库移除
         </button>
       </div>
     </div>

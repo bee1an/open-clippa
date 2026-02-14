@@ -19,14 +19,14 @@ interface FilterPreset {
 }
 
 const FILTER_PRESETS: FilterPreset[] = [
-  { label: 'Warm', value: 'warm', icon: 'i-ph-sun-bold', config: { brightness: 1.1, contrast: 1.05, saturation: 1.1, hue: 15 } },
-  { label: 'Cool', value: 'cool', icon: 'i-ph-snowflake-bold', config: { brightness: 0.95, contrast: 1.05, saturation: 0.9, hue: -15 } },
-  { label: 'Vintage', value: 'vintage', icon: 'i-ph-film-strip-bold', config: { brightness: 0.9, contrast: 1.15, saturation: 0.7, hue: 10 } },
-  { label: 'B&W', value: 'bw', icon: 'i-ph-circle-half-bold', config: { brightness: 1.0, contrast: 1.1, saturation: 0, hue: 0 } },
-  { label: 'Vivid', value: 'vivid', icon: 'i-ph-palette-bold', config: { brightness: 1.05, contrast: 1.2, saturation: 1.5, hue: 0 } },
-  { label: 'Faded', value: 'faded', icon: 'i-ph-drop-bold', config: { brightness: 1.1, contrast: 0.85, saturation: 0.6, hue: 0 } },
-  { label: 'Dramatic', value: 'dramatic', icon: 'i-ph-lightning-bold', config: { brightness: 0.9, contrast: 1.4, saturation: 1.1, hue: 0 } },
-  { label: 'Sepia', value: 'sepia', icon: 'i-ph-coffee-bold', config: { brightness: 0.95, contrast: 1.05, saturation: 0.4, hue: 30 } },
+  { label: '暖调', value: 'warm', icon: 'i-ph-sun-bold', config: { brightness: 1.1, contrast: 1.05, saturation: 1.1, hue: 15 } },
+  { label: '冷调', value: 'cool', icon: 'i-ph-snowflake-bold', config: { brightness: 0.95, contrast: 1.05, saturation: 0.9, hue: -15 } },
+  { label: '复古', value: 'vintage', icon: 'i-ph-film-strip-bold', config: { brightness: 0.9, contrast: 1.15, saturation: 0.7, hue: 10 } },
+  { label: '黑白', value: 'bw', icon: 'i-ph-circle-half-bold', config: { brightness: 1.0, contrast: 1.1, saturation: 0, hue: 0 } },
+  { label: '鲜艳', value: 'vivid', icon: 'i-ph-palette-bold', config: { brightness: 1.05, contrast: 1.2, saturation: 1.5, hue: 0 } },
+  { label: '褪色', value: 'faded', icon: 'i-ph-drop-bold', config: { brightness: 1.1, contrast: 0.85, saturation: 0.6, hue: 0 } },
+  { label: '戏剧化', value: 'dramatic', icon: 'i-ph-lightning-bold', config: { brightness: 0.9, contrast: 1.4, saturation: 1.1, hue: 0 } },
+  { label: '棕褐', value: 'sepia', icon: 'i-ph-coffee-bold', config: { brightness: 0.95, contrast: 1.05, saturation: 0.4, hue: 30 } },
 ]
 
 const editorStore = useEditorStore()

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import type { SelectTriggerVariants } from './select.un'
+import { computed, ref } from 'vue'
 import {
   SelectContent,
   SelectIcon,
@@ -35,11 +36,15 @@ interface Props {
   options: SelectOption[]
   placeholder?: string
   disabled?: boolean
+  searchable?: boolean
+  searchPlaceholder?: string
+  noResultsText?: string
   size?: SelectSize
   tone?: SelectTone
   preserveSelection?: boolean
   class?: HTMLAttributes['class']
   contentClass?: HTMLAttributes['class']
+  viewportClass?: HTMLAttributes['class']
 }
 
 interface Emits {
@@ -49,20 +54,43 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: null,
-  placeholder: 'Select an option',
+  placeholder: '请选择',
   disabled: false,
+  searchable: false,
+  searchPlaceholder: '搜索选项',
+  noResultsText: '无匹配项',
   size: 'md',
   tone: 'default',
   preserveSelection: true,
 })
 
 const emit = defineEmits<Emits>()
+const searchKeyword = ref('')
+
+const visibleOptions = computed(() => {
+  if (!props.searchable)
+    return props.options
+
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  if (!keyword)
+    return props.options
+
+  return props.options.filter((option) => {
+    return option.label.toLowerCase().includes(keyword)
+      || option.value.toLowerCase().includes(keyword)
+  })
+})
 
 function handleUpdateModelValue(value: unknown): void {
   if (typeof value !== 'string')
     return
   emit('update:modelValue', value)
   emit('change', value)
+}
+
+function handleOpenChange(open: boolean): void {
+  if (!open)
+    searchKeyword.value = ''
 }
 </script>
 
@@ -71,6 +99,7 @@ function handleUpdateModelValue(value: unknown): void {
     :model-value="modelValue ?? undefined"
     :disabled="disabled"
     @update:model-value="handleUpdateModelValue"
+    @update:open="handleOpenChange"
   >
     <SelectTrigger
       :class="cn(selectTriggerVariants({ size, tone }), props.class)"
@@ -89,9 +118,23 @@ function handleUpdateModelValue(value: unknown): void {
         :class="cn(selectContentVariants({ tone }), props.contentClass)"
         :data-preserve-canvas-selection="preserveSelection ? 'true' : undefined"
       >
-        <SelectViewport :class="selectViewportVariants({ size })">
+        <div
+          v-if="props.searchable"
+          class="border-b border-border/60 p-1.5"
+        >
+          <input
+            v-model="searchKeyword"
+            type="text"
+            class="h-7 w-full rounded-md border border-border/70 bg-background/70 px-2 text-xs text-foreground outline-none focus:border-foreground/40"
+            :placeholder="props.searchPlaceholder"
+            :data-preserve-canvas-selection="preserveSelection ? 'true' : undefined"
+            @keydown.stop
+          >
+        </div>
+
+        <SelectViewport :class="cn(selectViewportVariants({ size }), props.viewportClass)">
           <SelectItem
-            v-for="item in options"
+            v-for="item in visibleOptions"
             :key="item.value"
             :value="item.value"
             :disabled="item.disabled"
@@ -106,6 +149,13 @@ function handleUpdateModelValue(value: unknown): void {
               <div class="i-ph-check-bold text-xs" />
             </SelectItemIndicator>
           </SelectItem>
+
+          <div
+            v-if="props.searchable && visibleOptions.length === 0"
+            class="px-2 py-2 text-xs text-foreground-muted"
+          >
+            {{ props.noResultsText }}
+          </div>
         </SelectViewport>
       </SelectContent>
     </SelectPortal>

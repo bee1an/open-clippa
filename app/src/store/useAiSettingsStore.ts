@@ -16,10 +16,18 @@ export const DEFAULT_AI_PROVIDER: AiProviderId = 'kimi'
 export const DEFAULT_API_KEY_SOURCE: AiApiKeySource = 'managed'
 export const DEV_PROXY_KIMI_BASE_URL = '/api/kimi'
 export const DIRECT_KIMI_BASE_URL = 'https://integrate.api.nvidia.com/v1'
-export const DEFAULT_KIMI_BASE_URL = DEV_PROXY_KIMI_BASE_URL
-export const DEFAULT_KIMI_MODEL = 'moonshotai/kimi-k2.5'
+export const DEFAULT_KIMI_BASE_URL = ''
+export const DEFAULT_KIMI_MODEL = ''
+export const ENV_AI_BASE_URL = import.meta.env.VITE_AI_BASE_URL
 export const ENV_KIMI_BASE_URL = import.meta.env.VITE_KIMI_BASE_URL
 export const ENV_KIMI_MODEL = import.meta.env.VITE_KIMI_MODEL
+
+const LEGACY_BASE_URLS = new Set([
+  '/api/kimi',
+  'https://integrate.api.nvidia.com',
+  'https://integrate.api.nvidia.com/v1',
+])
+
 const LEGACY_KIMI_MODELS = new Set([
   'nvidia/kimi-k2.5-free',
   'kimi-k2.5-free',
@@ -35,6 +43,32 @@ function resolveNonEmptyString(value: unknown): string | null {
   return normalized
 }
 
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/g, '')
+}
+
+function stripChatCompletionsSuffix(value: string): string {
+  const normalized = trimTrailingSlash(value)
+  if (normalized.toLowerCase().endsWith('/chat/completions'))
+    return normalized.slice(0, -'/chat/completions'.length)
+  return normalized
+}
+
+function normalizeBaseUrl(value: string): string {
+  const normalized = stripChatCompletionsSuffix(value.trim())
+  if (!normalized)
+    return ''
+
+  return trimTrailingSlash(normalized)
+}
+
+function migrateLegacyBaseUrl(value: string): string {
+  const normalized = normalizeBaseUrl(value)
+  if (LEGACY_BASE_URLS.has(normalized))
+    return ''
+  return normalized
+}
+
 function normalizeProvider(provider: unknown): AiProviderId {
   return provider === 'kimi' ? 'kimi' : DEFAULT_AI_PROVIDER
 }
@@ -44,9 +78,13 @@ function normalizeApiKeySource(source: unknown): AiApiKeySource {
 }
 
 function normalizeModel(model: string): string {
-  if (LEGACY_KIMI_MODELS.has(model))
-    return DEFAULT_KIMI_MODEL
-  return model
+  const normalized = model.trim()
+  if (!normalized)
+    return ''
+
+  if (LEGACY_KIMI_MODELS.has(normalized))
+    return ''
+  return normalized
 }
 
 function loadPersistedSettings(): PersistedAiSettings {
@@ -70,30 +108,31 @@ function loadPersistedSettings(): PersistedAiSettings {
 
 export const useAiSettingsStore = defineStore('ai-settings', () => {
   const persisted = loadPersistedSettings()
-  const persistedBaseUrl = resolveNonEmptyString(persisted.baseUrl)
-  const envBaseUrl = resolveNonEmptyString(ENV_KIMI_BASE_URL)
-  const persistedModel = resolveNonEmptyString(persisted.model)
+  const persistedBaseUrl = typeof persisted.baseUrl === 'string'
+    ? migrateLegacyBaseUrl(persisted.baseUrl)
+    : null
+  const envBaseUrl = resolveNonEmptyString(ENV_AI_BASE_URL)
+    ?? resolveNonEmptyString(ENV_KIMI_BASE_URL)
+  const persistedModel = typeof persisted.model === 'string'
+    ? normalizeModel(persisted.model)
+    : null
   const envModel = resolveNonEmptyString(ENV_KIMI_MODEL)
 
   const initialBaseUrl = (() => {
+    if (persistedBaseUrl !== null)
+      return persistedBaseUrl
+
     if (envBaseUrl)
-      return envBaseUrl
+      return migrateLegacyBaseUrl(envBaseUrl)
 
-    if (!persistedBaseUrl)
-      return DEFAULT_KIMI_BASE_URL
-
-    // Migrate legacy direct URL to local reverse-proxy path.
-    if (persistedBaseUrl === DIRECT_KIMI_BASE_URL)
-      return DEV_PROXY_KIMI_BASE_URL
-
-    return persistedBaseUrl
+    return DEFAULT_KIMI_BASE_URL
   })()
 
   const initialModel = (() => {
+    if (persistedModel !== null)
+      return persistedModel
     if (envModel)
       return normalizeModel(envModel)
-    if (persistedModel)
-      return normalizeModel(persistedModel)
     return DEFAULT_KIMI_MODEL
   })()
 
@@ -141,9 +180,9 @@ export const useAiSettingsStore = defineStore('ai-settings', () => {
     if (patch.apiKey !== undefined)
       apiKey.value = patch.apiKey
     if (patch.baseUrl !== undefined)
-      baseUrl.value = patch.baseUrl
+      baseUrl.value = normalizeBaseUrl(patch.baseUrl)
     if (patch.model !== undefined)
-      model.value = patch.model
+      model.value = normalizeModel(patch.model)
     if (patch.panelOpen !== undefined)
       panelOpen.value = patch.panelOpen
   }

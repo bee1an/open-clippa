@@ -3,6 +3,7 @@ import {
   createChatCompletion,
   resolveKimiBaseUrl,
   resolveKimiChatUrl,
+  resolveProxyUpstreamBase,
   streamChatCompletion,
 } from '../src/providers/kimiClient'
 
@@ -49,8 +50,8 @@ describe('resolveKimiChatUrl', () => {
     expect(resolveKimiBaseUrl('https://host/v1/chat/completions')).toBe('https://host/v1')
   })
 
-  it('appends /v1 for plain base url', () => {
-    expect(resolveKimiBaseUrl('https://host/api')).toBe('https://host/api/v1')
+  it('keeps plain base url unchanged', () => {
+    expect(resolveKimiBaseUrl('https://host/api')).toBe('https://host/api')
   })
 
   it('keeps /chat/completions unchanged', () => {
@@ -61,8 +62,16 @@ describe('resolveKimiChatUrl', () => {
     expect(resolveKimiChatUrl('https://host/v1')).toBe('https://host/v1/chat/completions')
   })
 
-  it('appends /v1/chat/completions for plain base url', () => {
-    expect(resolveKimiChatUrl('https://host/api')).toBe('https://host/api/v1/chat/completions')
+  it('appends /chat/completions for plain base url', () => {
+    expect(resolveKimiChatUrl('https://host/api')).toBe('https://host/api/chat/completions')
+  })
+
+  it('returns null upstream for legacy proxy path', () => {
+    expect(resolveProxyUpstreamBase('/api/kimi')).toBeNull()
+  })
+
+  it('normalizes absolute upstream base for byok mode', () => {
+    expect(resolveProxyUpstreamBase('https://api.openai.com/v1/chat/completions')).toBe('https://api.openai.com/v1')
   })
 })
 
@@ -96,7 +105,11 @@ describe('streamChatCompletion', () => {
     expect(openAICtorMock).toHaveBeenCalledTimes(1)
     expect(openAICtorMock).toHaveBeenCalledWith({
       apiKey: 'test-key',
-      baseURL: 'https://integrate.api.nvidia.com/v1',
+      baseURL: '/api/kimi',
+      defaultHeaders: {
+        'x-clippc-key-source': 'byok',
+        'x-clippc-upstream-base': 'https://integrate.api.nvidia.com/v1',
+      },
       dangerouslyAllowBrowser: true,
     })
     expect(chatCompletionCreateMock).toHaveBeenCalledTimes(1)
@@ -170,7 +183,7 @@ describe('streamChatCompletion', () => {
 
     expect(openAICtorMock).toHaveBeenCalledWith({
       apiKey: 'clippc-managed-placeholder',
-      baseURL: '/api/kimi/v1',
+      baseURL: '/api/kimi',
       defaultHeaders: {
         'x-clippc-key-source': 'managed',
         'authorization': null,
@@ -195,9 +208,34 @@ describe('streamChatCompletion', () => {
 
     expect(openAICtorMock).toHaveBeenCalledWith({
       apiKey: 'test-key',
-      baseURL: '/api/kimi/v1',
+      baseURL: '/api/kimi',
       defaultHeaders: {
         'x-clippc-key-source': 'byok',
+      },
+      dangerouslyAllowBrowser: true,
+    })
+  })
+
+  it('keeps deep path base in byok upstream header', async () => {
+    chatCompletionCreateMock.mockResolvedValue(createMockStream(['ok']))
+
+    await streamChatCompletion(
+      {
+        apiKeySource: 'byok',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/compatible-mode/v1/',
+        model: 'moonshotai/kimi-k2.5',
+      },
+      [{ role: 'user', content: 'hello' }],
+      { onToken: vi.fn() },
+    )
+
+    expect(openAICtorMock).toHaveBeenCalledWith({
+      apiKey: 'test-key',
+      baseURL: '/api/kimi',
+      defaultHeaders: {
+        'x-clippc-key-source': 'byok',
+        'x-clippc-upstream-base': 'https://example.com/compatible-mode/v1',
       },
       dangerouslyAllowBrowser: true,
     })

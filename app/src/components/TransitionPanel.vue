@@ -18,9 +18,16 @@ const {
   applyTransitionType,
 } = useTransitionCandidates()
 
+const TRANSITION_TYPE_LABELS: Record<string, string> = {
+  fade: '淡入淡出',
+  crosswarp: '交叉扭曲',
+  directionalwipe: '方向擦除',
+  directionalwrap: '方向包裹',
+}
+
 const transitionTypeOptions = GL_TRANSITION_PRESETS.map(preset => ({
   value: preset.type,
-  label: preset.name,
+  label: TRANSITION_TYPE_LABELS[preset.type] ?? preset.name,
 }))
 
 const activeTransition = computed(() => {
@@ -120,10 +127,10 @@ function clearActiveSelection(): void {
   <div h-full flex="~ col" overflow-hidden data-preserve-canvas-selection="true">
     <div p-4 border-b border-border>
       <div text-sm font-medium text-foreground>
-        Transition
+        转场
       </div>
       <div text-xs text-foreground-muted mt-1>
-        {{ transitionFeatureAvailable ? 'Edit transition effect and duration' : 'Transition is currently unavailable' }}
+        {{ transitionFeatureAvailable ? '编辑转场效果与时长' : '当前不可使用转场功能' }}
       </div>
     </div>
 
@@ -133,7 +140,7 @@ function clearActiveSelection(): void {
       data-preserve-canvas-selection="true"
     >
       <div class="text-xs text-foreground-muted border border-border/60 rounded-md px-3 py-2 bg-background">
-        Transition feature is temporarily unavailable
+        转场功能暂不可用
       </div>
     </div>
 
@@ -146,7 +153,7 @@ function clearActiveSelection(): void {
         v-if="!activeCandidate"
         class="text-xs text-foreground-muted border border-border/60 rounded-md px-3 py-2 bg-background"
       >
-        Click a transition icon in timeline to start editing
+        点击时间轴上的转场图标开始编辑
       </div>
 
       <div
@@ -155,7 +162,7 @@ function clearActiveSelection(): void {
       >
         <div class="space-y-2">
           <div class="text-xs text-foreground-muted">
-            Select an effect type. Transition will be created on first selection.
+            先选择一个效果类型，首次选择会自动创建转场。
           </div>
           <div class="grid grid-cols-2 gap-1.5">
             <button
@@ -178,11 +185,11 @@ function clearActiveSelection(): void {
 
         <div class="space-y-3">
           <div v-if="!activeTransition || !activeLimit" class="text-xs text-foreground-muted border border-border/60 rounded-md px-3 py-2 bg-background">
-            Select an effect first, then adjust duration
+            请先选择效果，再调整时长
           </div>
           <template v-else>
             <div class="flex items-center justify-between text-xs text-foreground-muted">
-              <span>Duration</span>
+              <span>时长</span>
               <span>{{ displayDuration }}ms</span>
             </div>
             <Slider
@@ -194,7 +201,7 @@ function clearActiveSelection(): void {
               @update:model-value="(value: number) => handleDurationChange(value)"
             />
             <div class="text-[11px] text-foreground-muted">
-              Max allowed by source trim: {{ activeLimit.maxMs }}ms
+              受素材裁剪限制的最大时长：{{ activeLimit.maxMs }}ms
             </div>
           </template>
         </div>
@@ -208,7 +215,7 @@ function clearActiveSelection(): void {
             data-preserve-canvas-selection="true"
             @click="clearActiveSelection"
           >
-            Clear active transition selection
+            清除当前转场选择
           </button>
           <button
             type="button"
@@ -217,7 +224,7 @@ function clearActiveSelection(): void {
             :disabled="!activeTransition"
             @click="removeActiveTransition"
           >
-            Delete transition
+            删除转场
           </button>
         </div>
       </div>

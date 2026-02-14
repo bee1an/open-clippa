@@ -9,6 +9,8 @@ import type {
 import OpenAI from 'openai'
 
 const PROXY_KEY_SOURCE_HEADER = 'x-clippc-key-source'
+const PROXY_UPSTREAM_BASE_HEADER = 'x-clippc-upstream-base'
+const PROXY_BASE_PATH = '/api/kimi'
 const MANAGED_PLACEHOLDER_API_KEY = 'clippc-managed-placeholder'
 
 type KimiClientSettings = {
@@ -21,8 +23,30 @@ function trimTrailingSlash(input: string): string {
   return input.replace(/\/+$/g, '')
 }
 
+function stripChatCompletionsSuffix(input: string): string {
+  const normalized = trimTrailingSlash(input)
+  if (normalized.toLowerCase().endsWith('/chat/completions'))
+    return normalized.slice(0, -'/chat/completions'.length)
+  return normalized
+}
+
 function isAbsoluteHttpUrl(input: string): boolean {
   return /^https?:\/\//i.test(input)
+}
+
+function resolveWindowBase(): string | null {
+  if (typeof window === 'undefined' || !window.location)
+    return null
+
+  const origin = window.location.origin
+  if (typeof origin === 'string' && /^https?:\/\//i.test(origin))
+    return origin
+
+  const href = window.location.href
+  if (typeof href === 'string' && href.length > 0)
+    return href
+
+  return null
 }
 
 function resolveAbsoluteUrl(input: string): string {
@@ -31,22 +55,21 @@ function resolveAbsoluteUrl(input: string): string {
     return normalized
 
   // Browser runtime: allow relative base URL like "/api/kimi".
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return new URL(normalized, window.location.origin).toString()
+  const windowBase = resolveWindowBase()
+  if (windowBase) {
+    try {
+      return new URL(normalized, windowBase).toString()
+    }
+    catch {
+      return normalized
+    }
   }
 
   return normalized
 }
 
 export function resolveKimiBaseUrl(baseUrl: string): string {
-  const normalizedBaseUrl = trimTrailingSlash(resolveAbsoluteUrl(baseUrl))
-  const lowerCased = normalizedBaseUrl.toLowerCase()
-
-  if (lowerCased.endsWith('/chat/completions'))
-    return normalizedBaseUrl.slice(0, -'/chat/completions'.length)
-  if (lowerCased.endsWith('/v1'))
-    return normalizedBaseUrl
-  return `${normalizedBaseUrl}/v1`
+  return stripChatCompletionsSuffix(resolveAbsoluteUrl(baseUrl))
 }
 
 export function resolveKimiChatUrl(baseUrl: string): string {
@@ -146,20 +169,41 @@ function parseToolCalls(message: unknown): ChatCompletionResult['toolCalls'] {
     .filter((value): value is NonNullable<typeof value> => value !== null)
 }
 
-function shouldAttachProxyKeySourceHeader(baseUrl: string): boolean {
+function isProxyUrl(baseUrl: string): boolean {
   const normalized = baseUrl.trim()
   if (normalized.startsWith('/'))
     return true
 
-  if (typeof window === 'undefined' || !window.location?.origin)
+  const windowBase = resolveWindowBase()
+  if (!windowBase)
     return false
 
   try {
-    const url = new URL(normalized, window.location.origin)
-    return url.origin === window.location.origin && url.pathname.startsWith('/api/')
+    const url = new URL(normalized, windowBase)
+    const base = new URL(windowBase)
+    return url.origin === base.origin && url.pathname.startsWith('/api/')
   }
   catch {
     return false
+  }
+}
+
+export function resolveProxyUpstreamBase(baseUrl: string): string | null {
+  if (isProxyUrl(baseUrl))
+    return null
+
+  const normalizedBaseUrl = resolveKimiBaseUrl(baseUrl).trim()
+  if (!isAbsoluteHttpUrl(normalizedBaseUrl))
+    return null
+
+  try {
+    const parsed = new URL(normalizedBaseUrl)
+    parsed.search = ''
+    parsed.hash = ''
+    return trimTrailingSlash(parsed.toString())
+  }
+  catch {
+    return null
   }
 }
 
@@ -170,9 +214,15 @@ function resolveClientApiKey(settings: KimiClientSettings): string {
 }
 
 function resolveClientHeaders(settings: KimiClientSettings): Record<string, string | null> | undefined {
-  const headers: Record<string, string | null> = {}
-  if (shouldAttachProxyKeySourceHeader(settings.baseUrl))
-    headers[PROXY_KEY_SOURCE_HEADER] = settings.apiKeySource
+  const headers: Record<string, string | null> = {
+    [PROXY_KEY_SOURCE_HEADER]: settings.apiKeySource,
+  }
+
+  if (settings.apiKeySource === 'byok') {
+    const upstreamBase = resolveProxyUpstreamBase(settings.baseUrl)
+    if (upstreamBase)
+      headers[PROXY_UPSTREAM_BASE_HEADER] = upstreamBase
+  }
 
   if (settings.apiKeySource === 'managed') {
     // Managed mode must never send browser Authorization headers.
@@ -185,11 +235,24 @@ function resolveClientHeaders(settings: KimiClientSettings): Record<string, stri
   return headers
 }
 
+function resolveProxyBaseUrl(): string {
+  const windowBase = resolveWindowBase()
+  if (!windowBase)
+    return PROXY_BASE_PATH
+
+  try {
+    return new URL(PROXY_BASE_PATH, windowBase).toString()
+  }
+  catch {
+    return PROXY_BASE_PATH
+  }
+}
+
 function createOpenAiClient(settings: KimiClientSettings): OpenAI {
   const defaultHeaders = resolveClientHeaders(settings)
   return new OpenAI({
     apiKey: resolveClientApiKey(settings),
-    baseURL: resolveKimiBaseUrl(settings.baseUrl),
+    baseURL: resolveProxyBaseUrl(),
     ...(defaultHeaders ? { defaultHeaders } : {}),
     // This project currently runs chat calls from browser runtime.
     dangerouslyAllowBrowser: true,

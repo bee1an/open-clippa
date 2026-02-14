@@ -22,7 +22,7 @@ const sourceFileName = computed(() => {
   if (src instanceof File) {
     return src.name
   }
-  return 'Blob'
+  return '二进制资源'
 })
 
 const sourceDuration = computed(() => {
@@ -43,22 +43,22 @@ const timelineDuration = computed(() => {
 <template>
   <div space-y-3>
     <div text-xs uppercase tracking-widest text-foreground-subtle>
-      Video
+      视频
     </div>
 
     <div space-y-2>
       <div flex items-center justify-between gap-2>
-        <span text-xs text-foreground-muted>Source</span>
+        <span text-xs text-foreground-muted>素材</span>
         <span class="max-w-40 truncate text-xs text-foreground">{{ sourceFileName }}</span>
       </div>
 
       <div flex items-center justify-between gap-2>
-        <span text-xs text-foreground-muted>Source Duration</span>
+        <span text-xs text-foreground-muted>素材时长</span>
         <span class="font-mono text-xs tabular-nums text-foreground">{{ sourceDuration }}</span>
       </div>
 
       <div flex items-center justify-between gap-2>
-        <span text-xs text-foreground-muted>Clip Duration</span>
+        <span text-xs text-foreground-muted>片段时长</span>
         <span class="font-mono text-xs tabular-nums text-foreground">{{ timelineDuration }}</span>
       </div>
     </div>
