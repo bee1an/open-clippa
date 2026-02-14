@@ -491,6 +491,8 @@ function createHarness(options: {
       id: file.id,
       name: file.name,
       file: new Blob([file.name], { type: 'image/png' }),
+      source: new Blob([file.name], { type: 'image/png' }),
+      sourceType: 'file',
       url: file.url ?? `blob:image-${file.id}`,
       size: file.size,
       createdAt: new Date(),
@@ -538,6 +540,47 @@ function createHarness(options: {
         },
       }
       this.videoFiles.push(asset)
+      return asset
+    },
+    addImageFromUrl(url: string, name?: string) {
+      const parsedUrl = new URL(url)
+      const inferredName = parsedUrl.pathname.split('/').pop() || 'remote-image.jpg'
+      const asset = {
+        id: `image-url-${this.imageFiles.length + 1}`,
+        name: name?.trim().length ? name.trim() : inferredName,
+        source: parsedUrl.toString(),
+        sourceType: 'url',
+        url: parsedUrl.toString(),
+        size: 0,
+        createdAt: new Date(),
+      }
+      this.imageFiles.push(asset)
+      return asset
+    },
+    async importRandomImageFromPexels(options: any = {}) {
+      const querySuffix = typeof options.query === 'string' && options.query.trim().length > 0
+        ? options.query.trim().replace(/\s+/g, '-')
+        : 'curated'
+      const assetName = typeof options.name === 'string' && options.name.trim().length > 0
+        ? options.name.trim()
+        : `random-image-${this.imageFiles.length + 1}.jpg`
+      return this.addImageFromUrl(
+        `https://images.pexels.com/photos/${1000 + this.imageFiles.length}/pexels-photo-${querySuffix}.jpeg`,
+        assetName,
+      )
+    },
+    async importRandomVideoFromPexels(options: any = {}) {
+      const querySuffix = typeof options.query === 'string' && options.query.trim().length > 0
+        ? options.query.trim().replace(/\s+/g, '-')
+        : 'popular'
+      const assetName = typeof options.name === 'string' && options.name.trim().length > 0
+        ? options.name.trim()
+        : `random-video-${this.videoFiles.length + 1}.mp4`
+      const asset = this.addVideoFromUrl(
+        `https://player.vimeo.com/external/${500000 + this.videoFiles.length}.hd.mp4?q=${querySuffix}`,
+        assetName,
+      )
+      asset.duration = 8000
       return asset
     },
   }
@@ -848,6 +891,41 @@ describe('aI control acceptance e2e', () => {
 
     expect(addResult.ok).toBe(true)
     expect(addResult.data.type).toBe('video')
+  })
+
+  it('scenario 1d: import random assets and randomly pick from media library', async () => {
+    const harness = createHarness({
+      currentTime: 2000,
+    })
+
+    const randomImageResult = await harness.runTool('media_import_random_image', {
+      query: 'city skyline',
+    })
+    expect(randomImageResult.ok).toBe(true)
+    expect(randomImageResult.data.asset.type).toBe('image')
+
+    const randomVideoResult = await harness.runTool('media_import_random_video', {
+      query: 'drone',
+      minDurationSec: 5,
+      maxDurationSec: 12,
+    })
+    expect(randomVideoResult.ok).toBe(true)
+    expect(randomVideoResult.data.asset.type).toBe('video')
+
+    const pickImageResult = await harness.runTool('media_pick_random_asset', {
+      type: 'image',
+    })
+    expect(pickImageResult.ok).toBe(true)
+    expect(pickImageResult.data.asset.type).toBe('image')
+
+    const addResult = await harness.runTool('media_add_asset_to_timeline', {
+      assetId: pickImageResult.data.asset.id,
+      startMs: 2000,
+      durationMs: 3000,
+    })
+
+    expect(addResult.ok).toBe(true)
+    expect(addResult.data.type).toBe('image')
   })
 
   it('scenario 1c: create text element with default and explicit arguments', async () => {

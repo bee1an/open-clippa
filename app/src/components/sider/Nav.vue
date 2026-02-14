@@ -30,6 +30,12 @@ const navItems = [
     activeIcon: 'i-ph-arrow-bend-up-right-fill',
     title: '转场',
   },
+  {
+    path: '/editor/library',
+    icon: 'i-ph-images-bold',
+    activeIcon: 'i-ph-images-fill',
+    title: '素材库',
+  },
 ]
 
 function handleItemClick(path: string) {

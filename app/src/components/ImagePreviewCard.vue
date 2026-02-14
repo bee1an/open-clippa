@@ -32,7 +32,7 @@ async function addToTimeline() {
   const performer = performerStore.addPerformer({
     id: `image-${crypto.randomUUID()}`,
     type: 'image',
-    src: props.imageFile.file,
+    src: props.imageFile.source,
     start: 0,
     duration: DEFAULT_IMAGE_DURATION,
     x: 0,

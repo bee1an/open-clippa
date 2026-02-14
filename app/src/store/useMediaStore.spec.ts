@@ -4,6 +4,7 @@ import {
   createDefaultProcessingStatus,
   createDefaultThumbnailSet,
   createDefaultVideoMetadata,
+  MediaStoreError,
   useMediaStore,
   validateThumbnailSet,
   validateVideoMetadata,
@@ -34,6 +35,15 @@ async function flushTasks(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
   await Promise.resolve()
+}
+
+function createJsonResponse(payload: unknown, status: number = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+    },
+  })
 }
 
 describe('useMediaStore helpers', () => {
@@ -166,6 +176,16 @@ describe('useMediaStore', () => {
     expect(revokeObjectURLSpy).not.toHaveBeenCalledWith('https://cdn.example.com/media/intro.mp4')
   })
 
+  it('deduplicates remote video url import', () => {
+    const store = useMediaStore()
+
+    const first = store.addVideoFromUrl('https://cdn.example.com/media/intro.mp4')
+    const duplicate = store.addVideoFromUrl('https://cdn.example.com/media/intro.mp4')
+
+    expect(store.videoFiles).toHaveLength(1)
+    expect(duplicate.id).toBe(first.id)
+  })
+
   it('rejects invalid remote video url', () => {
     const store = useMediaStore()
 
@@ -250,21 +270,135 @@ describe('useMediaStore', () => {
     expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:b-frame')
   })
 
-  it('supports image add/remove and formatter helpers', () => {
+  it('supports image add/remove with local and remote sources', () => {
     const store = useMediaStore()
-    const image = store.addImageFile(createMockFile('cover.png', 'image/png'))
+    const localImage = store.addImageFile(createMockFile('cover.png', 'image/png'))
+    const remoteImage = store.addImageFromUrl('https://cdn.example.com/cover.jpg')
+    const duplicateRemoteImage = store.addImageFromUrl('https://cdn.example.com/cover.jpg')
 
+    expect(store.imageFiles).toHaveLength(2)
+    expect(localImage.id).toBe('id-0')
+    expect(localImage.url).toBe('blob:mock-0')
+    expect(localImage.sourceType).toBe('file')
+    expect(localImage.source).toBe(localImage.file)
+    expect(remoteImage.id).toBe('id-1')
+    expect(duplicateRemoteImage.id).toBe(remoteImage.id)
+    expect(remoteImage.url).toBe('https://cdn.example.com/cover.jpg')
+    expect(remoteImage.sourceType).toBe('url')
+    expect(remoteImage.file).toBeUndefined()
+
+    store.removeImageFile(localImage.id)
     expect(store.imageFiles).toHaveLength(1)
-    expect(image.id).toBe('id-0')
-    expect(image.url).toBe('blob:mock-0')
-
-    store.removeImageFile(image.id)
-    expect(store.imageFiles).toHaveLength(0)
     expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock-0')
+    store.removeImageFile(remoteImage.id)
+    expect(store.imageFiles).toHaveLength(0)
+    expect(revokeObjectURLSpy).not.toHaveBeenCalledWith('https://cdn.example.com/cover.jpg')
 
     expect(store.formatFileSize(0)).toBe('0 B')
     expect(store.formatFileSize(1536)).toBe('1.5 KB')
     expect(store.formatDuration(61000)).toBe('1:01')
     expect(store.formatDuration(3599000)).toBe('59:59')
+  })
+
+  it('imports random image from pexels', async () => {
+    generateThumbnailWithCodecMock.mockResolvedValue('blob:thumbnail')
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      return createJsonResponse({
+        ok: true,
+        data: {
+          provider: 'pexels',
+          kind: 'image',
+          asset: {
+            sourceUrl: 'https://images.pexels.com/photos/100/pexels-photo-100.jpeg',
+            previewUrl: 'https://images.pexels.com/photos/100/preview.jpeg',
+            width: 1920,
+            height: 1080,
+            name: 'pexels-image-100',
+            externalId: '100',
+          },
+        },
+      })
+    }))
+
+    const store = useMediaStore()
+    const image = await store.importRandomImageFromPexels({
+      query: 'city',
+      orientation: 'landscape',
+    })
+
+    expect(image.sourceType).toBe('url')
+    expect(image.url).toBe('https://images.pexels.com/photos/100/pexels-photo-100.jpeg')
+    expect(image.name).toBe('pexels-image-100')
+    expect(store.imageFiles).toHaveLength(1)
+    expect((globalThis.fetch as any).mock.calls[0][0]).toContain('/api/pexels/random?')
+  })
+
+  it('imports random video from pexels and applies returned duration', async () => {
+    generateThumbnailWithCodecMock.mockResolvedValue('blob:remote-thumb')
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      return createJsonResponse({
+        ok: true,
+        data: {
+          provider: 'pexels',
+          kind: 'video',
+          asset: {
+            sourceUrl: 'https://player.vimeo.com/external/123.hd.mp4',
+            previewUrl: 'https://images.pexels.com/videos/123/preview.jpeg',
+            width: 1280,
+            height: 720,
+            durationMs: 9000,
+            name: 'pexels-video-123',
+            externalId: '123',
+          },
+        },
+      })
+    }))
+
+    const store = useMediaStore()
+    const video = await store.importRandomVideoFromPexels({
+      query: 'nature',
+      minDurationSec: 3,
+      maxDurationSec: 12,
+    })
+
+    expect(video.sourceType).toBe('url')
+    expect(video.url).toBe('https://player.vimeo.com/external/123.hd.mp4')
+    expect(video.duration).toBe(9000)
+    expect(video.metadata.resolution).toEqual({
+      width: 1280,
+      height: 720,
+    })
+    expect(store.videoFiles).toHaveLength(1)
+  })
+
+  it('throws INVALID_ARGUMENT for invalid pexels duration range', async () => {
+    const store = useMediaStore()
+
+    await expect(store.importRandomVideoFromPexels({
+      minDurationSec: 8,
+      maxDurationSec: 2,
+    })).rejects.toBeInstanceOf(MediaStoreError)
+
+    await expect(store.importRandomVideoFromPexels({
+      minDurationSec: -1,
+    })).rejects.toThrow('minDurationSec must be >= 0')
+  })
+
+  it('maps pexels upstream failure to NOT_READY', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      return createJsonResponse({
+        ok: false,
+        error: 'PEXELS_API_KEY is not configured',
+      }, 503)
+    }))
+
+    const store = useMediaStore()
+    await expect(store.importRandomImageFromPexels()).rejects.toMatchObject({
+      code: 'NOT_READY',
+      message: 'PEXELS_API_KEY is not configured',
+    })
+
+    expect(store.formatFileSize(0)).toBe('0 B')
+    expect((globalThis.fetch as any).mock.calls).toHaveLength(1)
   })
 })

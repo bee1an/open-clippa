@@ -38,6 +38,9 @@ describe('createEditorControlTools', () => {
       'timeline_seek',
       'media_add_asset_to_timeline',
       'media_import_video_from_url',
+      'media_import_random_image',
+      'media_import_random_video',
+      'media_pick_random_asset',
       'create_text_element',
       'performer_update_text_style',
       'filter_update_config',
@@ -189,6 +192,84 @@ describe('createEditorControlTools', () => {
     expect(mediaImportVideoFromUrl).toHaveBeenCalledWith({
       url: 'https://cdn.example.com/video.mp4',
       name: 'demo',
+    })
+  })
+
+  it('validates media_import_random_video arguments', async () => {
+    const mediaImportRandomVideo: EditorControlAdapter['mediaImportRandomVideo'] = vi.fn(async () => ({ ok: true as const, data: {} }))
+    const adapter = createAdapter({ mediaImportRandomVideo })
+    const tool = getTool(adapter, 'media_import_random_video')
+
+    const invalidOrientation = await tool.handler({ orientation: 'diagonal' }, context)
+    expect(invalidOrientation).toEqual({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'orientation must be one of: landscape, portrait, square',
+      },
+    })
+
+    const invalidDuration = await tool.handler({ minDurationSec: Number.NaN }, context)
+    expect(invalidDuration).toEqual({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'minDurationSec must be a finite number',
+      },
+    })
+
+    const negativeDuration = await tool.handler({ minDurationSec: -1 }, context)
+    expect(negativeDuration).toEqual({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'minDurationSec must be >= 0',
+      },
+    })
+
+    const invalidRange = await tool.handler({ minDurationSec: 8, maxDurationSec: 5 }, context)
+    expect(invalidRange).toEqual({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'maxDurationSec must be >= minDurationSec',
+      },
+    })
+
+    await tool.handler({
+      query: 'city',
+      orientation: 'landscape',
+      minDurationSec: 3,
+      maxDurationSec: 10,
+      name: 'demo',
+    }, context)
+
+    expect(mediaImportRandomVideo).toHaveBeenCalledWith({
+      query: 'city',
+      orientation: 'landscape',
+      minDurationSec: 3,
+      maxDurationSec: 10,
+      name: 'demo',
+    })
+  })
+
+  it('validates media_pick_random_asset type before invoking adapter', async () => {
+    const mediaPickRandomAsset: EditorControlAdapter['mediaPickRandomAsset'] = vi.fn(async () => ({ ok: true as const, data: {} }))
+    const adapter = createAdapter({ mediaPickRandomAsset })
+    const tool = getTool(adapter, 'media_pick_random_asset')
+
+    const invalidResult = await tool.handler({ type: 'invalid' }, context)
+    expect(invalidResult).toEqual({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'type must be one of: all, video, image',
+      },
+    })
+
+    await tool.handler({}, context)
+    expect(mediaPickRandomAsset).toHaveBeenCalledWith({
+      type: 'all',
     })
   })
 })

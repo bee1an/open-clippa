@@ -66,6 +66,26 @@ export interface MediaImportVideoFromUrlInput {
   name?: string
 }
 
+export type MediaRandomOrientation = 'landscape' | 'portrait' | 'square'
+
+export interface MediaImportRandomImageInput {
+  query?: string
+  orientation?: MediaRandomOrientation
+  name?: string
+}
+
+export interface MediaImportRandomVideoInput {
+  query?: string
+  orientation?: MediaRandomOrientation
+  minDurationSec?: number
+  maxDurationSec?: number
+  name?: string
+}
+
+export interface MediaPickRandomAssetInput {
+  type?: 'all' | 'video' | 'image'
+}
+
 export interface MediaRemoveAssetInput {
   assetId: string
 }
@@ -226,6 +246,9 @@ export interface EditorControlAdapter {
 
   mediaAddAssetToTimeline: (input: MediaAddAssetToTimelineInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   mediaImportVideoFromUrl: (input: MediaImportVideoFromUrlInput) => EditorControlActionResult | Promise<EditorControlActionResult>
+  mediaImportRandomImage: (input: MediaImportRandomImageInput) => EditorControlActionResult | Promise<EditorControlActionResult>
+  mediaImportRandomVideo: (input: MediaImportRandomVideoInput) => EditorControlActionResult | Promise<EditorControlActionResult>
+  mediaPickRandomAsset: (input: MediaPickRandomAssetInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   mediaRemoveAsset: (input: MediaRemoveAssetInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   mediaClearLibrary: (input: MediaClearLibraryInput) => EditorControlActionResult | Promise<EditorControlActionResult>
 

@@ -1,4 +1,5 @@
 import type { IncomingHttpHeaders } from 'node:http'
+import { Buffer } from 'node:buffer'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -21,6 +22,10 @@ import {
   resolveUpstreamPath,
   UPSTREAM_BASE_HEADER,
 } from './functions/api/kimi/proxyShared'
+import {
+  handlePexelsListRequest,
+  handlePexelsRandomRequest,
+} from './functions/api/pexels/shared'
 
 function isBodyAllowed(method: string): boolean {
   return method !== 'GET' && method !== 'HEAD'
@@ -60,6 +65,27 @@ function sendJsonError(
     ok: false,
     error: message,
   }))
+}
+
+async function sendFetchResponse(
+  res: {
+    statusCode: number
+    statusMessage?: string
+    end: (chunk?: string | Uint8Array) => void
+    setHeader: (name: string, value: string) => void
+  },
+  response: Response,
+): Promise<void> {
+  res.statusCode = response.status
+  if (response.statusText)
+    res.statusMessage = response.statusText
+
+  response.headers.forEach((value, key) => {
+    res.setHeader(key, value)
+  })
+
+  const buffer = Buffer.from(await response.arrayBuffer())
+  res.end(buffer)
 }
 
 // https://vite.dev/config/
@@ -198,6 +224,43 @@ export default defineConfig(({ mode }) => {
                 Readable.fromWeb(upstreamResponse.body as any),
                 res,
               )
+            }
+            catch {
+              if (!res.headersSent)
+                sendJsonError(res, 502, '上游服务请求失败')
+              else
+                res.end()
+            }
+          })
+        },
+      },
+      {
+        name: 'clippc-pexels-proxy-dev-middleware',
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const rawUrl = req.url
+            if (
+              !rawUrl
+              || (!rawUrl.startsWith('/api/pexels/random') && !rawUrl.startsWith('/api/pexels/list'))
+            ) {
+              return next()
+            }
+
+            try {
+              const inboundUrl = new URL(rawUrl, 'http://localhost')
+              const proxyEnv = {
+                PEXELS_API_KEY: env.PEXELS_API_KEY,
+                PEXELS_API_BASE: env.PEXELS_API_BASE,
+              }
+              const request = new Request(inboundUrl.toString(), {
+                method: req.method ?? 'GET',
+                headers: toFetchHeaders(req.headers),
+              })
+              const response = inboundUrl.pathname.startsWith('/api/pexels/list')
+                ? await handlePexelsListRequest(request, proxyEnv)
+                : await handlePexelsRandomRequest(request, proxyEnv)
+
+              await sendFetchResponse(res, response)
             }
             catch {
               if (!res.headersSent)

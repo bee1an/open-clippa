@@ -155,6 +155,26 @@ export interface MediaImportVideoFromUrlInput {
   name?: string
 }
 
+export type MediaRandomOrientation = 'landscape' | 'portrait' | 'square'
+
+export interface MediaImportRandomImageInput {
+  query?: string
+  orientation?: MediaRandomOrientation
+  name?: string
+}
+
+export interface MediaImportRandomVideoInput {
+  query?: string
+  orientation?: MediaRandomOrientation
+  minDurationSec?: number
+  maxDurationSec?: number
+  name?: string
+}
+
+export interface MediaPickRandomAssetInput {
+  type?: MediaAssetType | 'all'
+}
+
 export interface CreateTextElementInput {
   content?: string
   startMs?: number
@@ -303,6 +323,9 @@ export interface EditorControlRuntime {
 
   mediaAddAssetToTimeline: (input: MediaAddAssetToTimelineInput) => Promise<ActionResult<{ performerId: string, type: MediaAssetType }>> | ActionResult<{ performerId: string, type: MediaAssetType }>
   mediaImportVideoFromUrl: (input: MediaImportVideoFromUrlInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
+  mediaImportRandomImage: (input: MediaImportRandomImageInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
+  mediaImportRandomVideo: (input: MediaImportRandomVideoInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
+  mediaPickRandomAsset: (input: MediaPickRandomAssetInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
   mediaRemoveAsset: (input: MediaRemoveAssetInput) => Promise<ActionResult<{ assetId: string }>> | ActionResult<{ assetId: string }>
   mediaClearLibrary: (input: MediaClearLibraryInput) => Promise<ActionResult<{ type: MediaAssetType | 'all' }>> | ActionResult<{ type: MediaAssetType | 'all' }>
 

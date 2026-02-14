@@ -11,6 +11,10 @@ const CONTEXT_AWARE_SYSTEM_PROMPT = [
   'If the user asks about current canvas, timeline, selected elements, active transition, filters, media assets, or export status, call the relevant tools before answering.',
   'If the user asks to create or add text on canvas or timeline, call create_text_element first.',
   'If the user asks to import a video from URL, call media_import_video_from_url before subsequent editing steps.',
+  'If the user asks to import a random image, call media_import_random_image before follow-up editing steps.',
+  'If the user asks to import a random video, call media_import_random_video before follow-up editing steps.',
+  'If the user asks to randomly choose from media library, call media_pick_random_asset first.',
+  'If media should be placed on timeline, chain media_add_asset_to_timeline after import or random pick.',
   'Only use tool data as factual context. If a tool fails, explain the failure briefly and ask for a retry.',
 ].join(' ')
 

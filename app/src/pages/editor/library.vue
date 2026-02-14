@@ -1,0 +1,620 @@
+<script setup lang="ts">
+import { nextTick } from 'vue'
+import { Button } from '@/components/ui/button'
+import { useMediaStore } from '@/store/useMediaStore'
+
+type AssetKind = 'image' | 'video'
+
+interface LibraryAsset {
+  sourceUrl: string
+  previewUrl: string
+  width: number
+  height: number
+  durationMs?: number
+  name: string
+  authorName?: string
+  authorUrl?: string
+  externalId: string
+}
+
+interface LibraryResponse {
+  ok: boolean
+  error?: string
+  data?: {
+    provider: 'pexels'
+    kind: AssetKind
+    page: number
+    perPage: number
+    total: number | null
+    assets: LibraryAsset[]
+  }
+}
+
+const LOAD_MORE_THRESHOLD_PX = 300
+
+const mediaStore = useMediaStore()
+const router = useRouter()
+
+const query = ref('')
+const kind = ref<AssetKind>('video')
+const page = ref(1)
+const perPage = ref(24)
+const total = ref<number | null>(null)
+const assets = ref<LibraryAsset[]>([])
+const hasMore = ref(true)
+const isLoading = ref(false)
+const isLoadingMore = ref(false)
+const loadError = ref('')
+const importError = ref('')
+const isImporting = ref(false)
+const importingIds = ref<string[]>([])
+const selectedExternalIds = ref<string[]>([])
+const listContainerRef = ref<HTMLElement | null>(null)
+const skeletonItems = Array.from({ length: 8 }, (_, index) => index)
+
+const selectedCount = computed(() => selectedExternalIds.value.length)
+const allLoadedSelected = computed(() => {
+  return assets.value.length > 0
+    && assets.value.every(asset => selectedExternalIds.value.includes(asset.externalId))
+})
+const kindLabel = computed(() => (kind.value === 'video' ? '视频素材' : '图片素材'))
+const loadedSummary = computed(() => {
+  if (total.value === null)
+    return `已加载 ${assets.value.length}`
+  return `已加载 ${assets.value.length} / ${total.value}`
+})
+const loadProgressPercent = computed<number | null>(() => {
+  if (total.value === null || total.value <= 0)
+    return null
+  return Math.min(100, Math.round((assets.value.length / total.value) * 100))
+})
+
+function formatDuration(ms?: number): string {
+  if (!ms || ms <= 0)
+    return '--:--'
+
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function formatResolution(asset: LibraryAsset): string {
+  if (asset.width <= 0 || asset.height <= 0)
+    return '--'
+  return `${asset.width}x${asset.height}`
+}
+
+function buildRequestUrl(targetPage: number): string {
+  const params = new URLSearchParams({
+    kind: kind.value,
+    page: String(targetPage),
+    perPage: String(perPage.value),
+  })
+
+  if (query.value.trim().length > 0)
+    params.set('query', query.value.trim())
+
+  return `/api/pexels/list?${params.toString()}`
+}
+
+function mergeAssetsByExternalId(
+  current: LibraryAsset[],
+  incoming: LibraryAsset[],
+): LibraryAsset[] {
+  const deduped = new Map<string, LibraryAsset>()
+  current.forEach(asset => deduped.set(asset.externalId, asset))
+  incoming.forEach((asset) => {
+    if (!deduped.has(asset.externalId))
+      deduped.set(asset.externalId, asset)
+  })
+  return Array.from(deduped.values())
+}
+
+function updateHasMoreByResponse(incomingCount: number): void {
+  if (total.value !== null) {
+    hasMore.value = assets.value.length < total.value
+    return
+  }
+
+  hasMore.value = incomingCount >= perPage.value
+}
+
+function maybeLoadMoreOnScroll(): void {
+  const container = listContainerRef.value
+  if (!container || isLoading.value || isLoadingMore.value || !hasMore.value)
+    return
+
+  const remaining = container.scrollHeight - container.scrollTop - container.clientHeight
+  if (remaining > LOAD_MORE_THRESHOLD_PX)
+    return
+
+  void loadAssets()
+}
+
+async function loadAssets(options: { reset?: boolean } = {}): Promise<void> {
+  const isReset = options.reset === true
+  if (isLoading.value || isLoadingMore.value)
+    return
+  if (!isReset && !hasMore.value)
+    return
+
+  const targetPage = isReset ? 1 : page.value
+  if (isReset) {
+    isLoading.value = true
+    loadError.value = ''
+    assets.value = []
+    selectedExternalIds.value = []
+    total.value = null
+    hasMore.value = true
+    page.value = 1
+  }
+  else {
+    isLoadingMore.value = true
+  }
+
+  try {
+    const response = await fetch(buildRequestUrl(targetPage), { method: 'GET' })
+    const payload = await response.json() as LibraryResponse
+    if (!response.ok || !payload.ok || !payload.data) {
+      loadError.value = payload.error ?? `加载失败（HTTP ${response.status}）`
+      if (isReset) {
+        assets.value = []
+        total.value = null
+      }
+      hasMore.value = false
+      return
+    }
+
+    const incomingAssets = payload.data.assets
+    total.value = payload.data.total
+    assets.value = isReset
+      ? incomingAssets
+      : mergeAssetsByExternalId(assets.value, incomingAssets)
+
+    page.value = targetPage + 1
+    updateHasMoreByResponse(incomingAssets.length)
+  }
+  catch (error) {
+    loadError.value = error instanceof Error ? error.message : '素材加载失败'
+    if (isReset) {
+      assets.value = []
+      total.value = null
+    }
+    hasMore.value = false
+  }
+  finally {
+    if (isReset)
+      isLoading.value = false
+    else
+      isLoadingMore.value = false
+
+    await nextTick()
+    maybeLoadMoreOnScroll()
+  }
+}
+
+function isSelected(externalId: string): boolean {
+  return selectedExternalIds.value.includes(externalId)
+}
+
+function toggleSelected(externalId: string): void {
+  if (isImporting.value)
+    return
+
+  if (isSelected(externalId)) {
+    selectedExternalIds.value = selectedExternalIds.value.filter(id => id !== externalId)
+    return
+  }
+
+  selectedExternalIds.value = [...selectedExternalIds.value, externalId]
+}
+
+function toggleSelectLoaded(): void {
+  if (isImporting.value)
+    return
+
+  if (allLoadedSelected.value) {
+    selectedExternalIds.value = []
+    return
+  }
+
+  selectedExternalIds.value = assets.value.map(asset => asset.externalId)
+}
+
+function clearSelection(): void {
+  if (isImporting.value)
+    return
+  selectedExternalIds.value = []
+}
+
+async function importAssets(targetAssets: LibraryAsset[]): Promise<void> {
+  if (targetAssets.length === 0 || isImporting.value)
+    return
+
+  isImporting.value = true
+  importError.value = ''
+  importingIds.value = targetAssets.map(asset => asset.externalId)
+  try {
+    for (const asset of targetAssets) {
+      if (kind.value === 'image') {
+        mediaStore.addImageFromUrl(asset.sourceUrl, asset.name)
+        continue
+      }
+
+      const videoFile = mediaStore.addVideoFromUrl(asset.sourceUrl, asset.name)
+      if (typeof asset.durationMs === 'number' && asset.durationMs > 0)
+        videoFile.duration = asset.durationMs
+      if (asset.width > 0 && asset.height > 0)
+        videoFile.metadata.resolution = { width: asset.width, height: asset.height }
+    }
+
+    selectedExternalIds.value = []
+    await router.push('/editor/media')
+  }
+  catch (error) {
+    importError.value = error instanceof Error ? error.message : '导入素材失败'
+  }
+  finally {
+    importingIds.value = []
+    isImporting.value = false
+  }
+}
+
+async function importAsset(asset: LibraryAsset): Promise<void> {
+  await importAssets([asset])
+}
+
+async function importSelectedAssets(): Promise<void> {
+  const selected = assets.value.filter(asset => selectedExternalIds.value.includes(asset.externalId))
+  await importAssets(selected)
+}
+
+function onSearch(): void {
+  void loadAssets({ reset: true })
+}
+
+function clearQuery(): void {
+  if (query.value.trim().length === 0)
+    return
+  query.value = ''
+  void loadAssets({ reset: true })
+}
+
+watch(kind, () => {
+  void loadAssets({ reset: true })
+})
+
+onMounted(() => {
+  void loadAssets({ reset: true })
+})
+</script>
+
+<template>
+  <div class="library-shell hfull flex flex-col text-foreground">
+    <div class="library-header px-4 pt-4 pb-3">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-[11px] uppercase tracking-[0.16em] text-foreground-subtle">
+            Pexels Curated
+          </div>
+          <div class="mt-1 text-sm font-semibold text-foreground">
+            素材库
+          </div>
+          <div class="mt-1 text-xs leading-5 text-foreground-muted">
+            搜索并选择素材，支持多选导入到媒体库
+          </div>
+        </div>
+
+        <div class="shrink-0 rounded-md border border-border/70 bg-secondary/30 px-2 py-1 text-[11px] text-foreground-muted">
+          {{ kindLabel }}
+        </div>
+      </div>
+
+      <div class="mt-3 rounded-md border border-border/70 bg-background/70 px-3 py-2">
+        <div class="flex items-center justify-between gap-2 text-[11px] text-foreground-muted">
+          <span>{{ loadedSummary }}</span>
+          <span v-if="selectedCount > 0" class="text-foreground">
+            已选 {{ selectedCount }}
+          </span>
+        </div>
+        <div
+          v-if="loadProgressPercent !== null"
+          class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary/70"
+        >
+          <div class="h-full rounded-full bg-primary/75 transition-all duration-200" :style="{ width: `${loadProgressPercent}%` }" />
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-3 border-b border-border/70 px-4 pb-3">
+      <div class="group flex items-center gap-2 rounded-lg border border-border/80 bg-background/70 px-3 py-2 transition-colors focus-within:border-border-emphasis focus-within:bg-background">
+        <div i-carbon-search class="text-sm text-foreground-muted" />
+        <div class="min-w-0 flex-1">
+          <input
+            v-model="query"
+            type="text"
+            placeholder="搜索素材关键词..."
+            class="w-full border-none bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-subtle"
+            @keydown.enter.prevent="onSearch"
+          >
+        </div>
+        <Button
+          v-if="query.trim().length > 0"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="清空搜索关键词"
+          @click="clearQuery"
+        >
+          <div i-carbon-close />
+        </Button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label="搜索素材"
+          :disabled="isLoading || isLoadingMore"
+          @click="onSearch"
+        >
+          <div v-if="isLoading && assets.length === 0" i-carbon-circle-dash animate-spin />
+          <div v-else i-carbon-search />
+        </Button>
+
+        <div class="inline-flex items-center rounded-lg border border-border/70 bg-secondary/30 p-0.5">
+          <Button
+            size="sm"
+            :variant="kind === 'video' ? 'default' : 'ghost'"
+            class="min-w-14"
+            @click="kind = 'video'"
+          >
+            视频
+          </Button>
+          <Button
+            size="sm"
+            :variant="kind === 'image' ? 'default' : 'ghost'"
+            class="min-w-14"
+            @click="kind = 'image'"
+          >
+            图片
+          </Button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="assets.length === 0 || isImporting"
+          @click="toggleSelectLoaded"
+        >
+          {{ allLoadedSelected ? '取消全选' : '全选当前列表' }}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="selectedCount === 0 || isImporting"
+          @click="clearSelection"
+        >
+          清空选择
+        </Button>
+        <Button
+          size="sm"
+          class="ml-auto max-sm:w-full"
+          :disabled="selectedCount === 0 || isImporting"
+          @click="importSelectedAssets"
+        >
+          <div v-if="isImporting" i-carbon-circle-dash animate-spin mr-1 />
+          导入选中（{{ selectedCount }}）
+        </Button>
+      </div>
+
+      <div v-if="importError" class="flex items-start gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-2 text-xs text-destructive break-all">
+        <div i-carbon-warning-filled class="shrink-0" />
+        <span>{{ importError }}</span>
+      </div>
+    </div>
+
+    <div
+      ref="listContainerRef"
+      class="flex-1 overflow-y-auto px-3 pb-4 pt-3"
+      @scroll.passive="maybeLoadMoreOnScroll"
+    >
+      <div
+        v-if="isLoading && assets.length === 0"
+        class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]"
+      >
+        <div
+          v-for="item in skeletonItems"
+          :key="item"
+          class="rounded-xl border border-border/70 bg-secondary/20 p-2.5"
+        >
+          <div class="aspect-video w-full animate-pulse rounded-lg bg-secondary/70" />
+          <div class="mt-2 h-3 w-4/5 animate-pulse rounded bg-secondary/70" />
+          <div class="mt-1 h-3 w-2/3 animate-pulse rounded bg-secondary/70" />
+          <div class="mt-2 h-7 w-full animate-pulse rounded bg-secondary/70" />
+        </div>
+      </div>
+
+      <div v-else-if="loadError && assets.length === 0" class="py-8">
+        <div class="mx-auto max-w-72 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-4 text-center">
+          <div i-carbon-warning-filled class="mx-auto mb-2 text-xl text-destructive" />
+          <div class="text-sm text-destructive">
+            {{ loadError }}
+          </div>
+          <Button size="sm" variant="outline" class="mt-3" @click="onSearch">
+            重试加载
+          </Button>
+        </div>
+      </div>
+
+      <div v-else-if="assets.length === 0" class="py-8">
+        <div class="mx-auto max-w-72 rounded-xl border border-border/70 bg-secondary/20 px-4 py-5 text-center">
+          <div i-ph-image-square-bold class="mx-auto mb-2 text-xl text-foreground-muted" />
+          <div class="text-sm text-foreground">
+            暂无素材
+          </div>
+          <div class="mt-1 text-xs text-foreground-muted">
+            尝试更换关键词或切换素材类型
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-else
+        class="grid gap-3 sm:gap-4 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]"
+      >
+        <div
+          v-for="asset in assets"
+          :key="asset.externalId"
+          tabindex="0"
+          role="button"
+          :aria-pressed="isSelected(asset.externalId)"
+          :aria-label="`选择素材 ${asset.name}`"
+          class="library-card cursor-pointer rounded-xl border bg-background-elevated/90 p-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          :class="isSelected(asset.externalId)
+            ? 'border-primary/70 bg-secondary/30 shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]'
+            : 'border-border/80 hover:border-border-emphasis hover:bg-secondary/20'"
+          @click="toggleSelected(asset.externalId)"
+          @keydown.enter.prevent="toggleSelected(asset.externalId)"
+          @keydown.space.prevent="toggleSelected(asset.externalId)"
+        >
+          <div class="relative aspect-video overflow-hidden rounded-lg border border-border/60 bg-black/40">
+            <img
+              :src="asset.previewUrl"
+              :alt="asset.name"
+              loading="lazy"
+              class="library-media-image h-full w-full object-cover"
+            >
+            <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+
+            <div
+              v-if="kind === 'video'"
+              class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white"
+            >
+              {{ formatDuration(asset.durationMs) }}
+            </div>
+
+            <div
+              class="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-white/70 bg-black/50 transition-colors"
+              :class="isSelected(asset.externalId) ? 'bg-primary text-primary-foreground border-primary' : 'text-white'"
+            >
+              <div
+                v-if="isSelected(asset.externalId)"
+                i-ph-check-bold class="text-xs"
+              />
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <div class="truncate text-xs font-semibold text-foreground" :title="asset.name">
+              {{ asset.name }}
+            </div>
+            <div class="mt-1 flex items-center justify-between gap-2 text-[11px] text-foreground-muted">
+              <div class="truncate" :title="asset.authorName ?? 'Pexels'">
+                {{ asset.authorName ?? 'Pexels' }}
+              </div>
+              <div class="shrink-0">
+                {{ formatResolution(asset) }}
+              </div>
+            </div>
+          </div>
+
+          <Button
+            class="mt-2 w-full"
+            size="sm"
+            variant="outline"
+            :disabled="isImporting"
+            @click.stop="importAsset(asset)"
+          >
+            <div
+              v-if="importingIds.includes(asset.externalId)"
+              i-carbon-circle-dash animate-spin mr-1
+            />
+            导入并前往媒体库
+          </Button>
+        </div>
+      </div>
+
+      <div v-if="isLoadingMore" class="flex items-center justify-center gap-2 py-4 text-sm text-foreground-muted">
+        <div i-carbon-circle-dash animate-spin />
+        正在加载更多...
+      </div>
+      <div
+        v-else-if="!hasMore && assets.length > 0"
+        class="py-4 text-center text-xs text-foreground-muted"
+      >
+        已加载全部素材
+      </div>
+      <div
+        v-else-if="loadError && assets.length > 0"
+        class="py-4 text-center text-xs text-destructive"
+      >
+        <span>{{ loadError }}</span>
+        <button
+          type="button"
+          class="ml-2 cursor-pointer text-foreground underline underline-offset-2"
+          @click="onSearch"
+        >
+          重试
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.library-shell {
+  background:
+    radial-gradient(120% 70% at 100% 0%, hsl(var(--primary) / 0.12) 0%, transparent 52%),
+    radial-gradient(120% 70% at 0% 100%, hsl(var(--foreground) / 0.04) 0%, transparent 62%),
+    hsl(var(--background-elevated));
+}
+
+.library-header {
+  background: linear-gradient(180deg, hsl(var(--background-overlay) / 0.42) 0%, transparent 100%);
+}
+
+.library-card {
+  transition:
+    border-color 160ms var(--ease-out),
+    transform 180ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
+}
+
+.library-card:hover {
+  transform: translateY(-2px);
+}
+
+.library-media-image {
+  transition:
+    transform 220ms var(--ease-out),
+    filter 220ms var(--ease-out);
+}
+
+.library-card:hover .library-media-image {
+  transform: scale(1.03);
+  filter: saturate(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-card {
+    transition: none;
+  }
+
+  .library-card:hover {
+    transform: none;
+  }
+
+  .library-media-image {
+    transition: none;
+  }
+
+  .library-card:hover .library-media-image {
+    transform: none;
+    filter: none;
+  }
+}
+</style>

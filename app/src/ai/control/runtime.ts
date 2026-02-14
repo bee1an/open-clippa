@@ -11,7 +11,10 @@ import type {
   FilterLayerSnapshot,
   MediaAddAssetToTimelineInput,
   MediaAssetSnapshot,
+  MediaImportRandomImageInput,
+  MediaImportRandomVideoInput,
   MediaImportVideoFromUrlInput,
+  MediaPickRandomAssetInput,
   PerformerClearAnimationInput,
   PerformerRemoveInput,
   PerformerSelectInput,
@@ -63,7 +66,7 @@ import {
   cloneFilterConfig,
   useFilterStore,
 } from '@/store/useFilterStore'
-import { useMediaStore } from '@/store/useMediaStore'
+import { MediaStoreError, useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { useTransitionStore } from '@/store/useTransitionStore'
 import { loadVideoMetadata } from '@/utils/media'
@@ -73,6 +76,8 @@ const DEFAULT_IMAGE_DURATION_MS = 3000
 const DEFAULT_VIDEO_DURATION_MS = 5000
 const DEFAULT_CREATED_TEXT_DURATION_MS = 5000
 const DEFAULT_CREATED_TEXT_CONTENT = '双击编辑文本'
+const RANDOM_MEDIA_ORIENTATION_VALUES = ['landscape', 'portrait', 'square'] as const
+const RANDOM_MEDIA_ORIENTATION_SET = new Set<string>(RANDOM_MEDIA_ORIENTATION_VALUES)
 
 interface EditorControlRuntimeDependencies {
   editorStore?: ReturnType<typeof useEditorStore>
@@ -187,6 +192,23 @@ function clampTransitionDuration(
   return Math.min(limit.uiMax, Math.min(base, limit.maxMs))
 }
 
+function isMediaRandomOrientation(value: unknown): value is typeof RANDOM_MEDIA_ORIENTATION_VALUES[number] {
+  return typeof value === 'string' && RANDOM_MEDIA_ORIENTATION_SET.has(value)
+}
+
+function mapMediaImportFailure(error: unknown, fallbackMessage: string): ActionResult<never> {
+  if (error instanceof MediaStoreError) {
+    if (error.code === 'INVALID_ARGUMENT')
+      return failure('INVALID_ARGUMENT', error.message)
+    return failure('NOT_READY', error.message)
+  }
+
+  if (error instanceof Error && error.message.trim().length > 0)
+    return failure('NOT_READY', error.message.trim())
+
+  return failure('NOT_READY', fallbackMessage)
+}
+
 export function createEditorControlRuntime(
   dependencies: EditorControlRuntimeDependencies = {},
 ): EditorControlRuntime {
@@ -266,6 +288,42 @@ export function createEditorControlRuntime(
       version: layer.version,
       active: filterStore.activeLayerId === layer.id,
     }
+  }
+
+  const mapVideoAssetSnapshot = (file: (typeof mediaStore.videoFiles)[number]): MediaAssetSnapshot => {
+    return {
+      id: file.id,
+      type: 'video',
+      name: file.name,
+      url: file.url,
+      durationMs: file.duration,
+      size: file.size,
+      createdAt: file.createdAt?.getTime(),
+    }
+  }
+
+  const mapImageAssetSnapshot = (file: (typeof mediaStore.imageFiles)[number]): MediaAssetSnapshot => {
+    return {
+      id: file.id,
+      type: 'image',
+      name: file.name,
+      url: file.url,
+      size: file.size,
+      createdAt: file.createdAt?.getTime(),
+    }
+  }
+
+  const collectMediaAssetSnapshots = (type: QueryMediaAssetsInput['type']): MediaAssetSnapshot[] => {
+    const normalizedType = type ?? 'all'
+    const assets: MediaAssetSnapshot[] = []
+
+    if (normalizedType === 'all' || normalizedType === 'video')
+      assets.push(...mediaStore.videoFiles.map(mapVideoAssetSnapshot))
+
+    if (normalizedType === 'all' || normalizedType === 'image')
+      assets.push(...mediaStore.imageFiles.map(mapImageAssetSnapshot))
+
+    return assets
   }
 
   const resolveTransitionClip = (performerId: string) => {
@@ -397,34 +455,7 @@ export function createEditorControlRuntime(
     queryMediaAssets(input: QueryMediaAssetsInput) {
       const type = input.type ?? 'all'
       const limit = Math.max(1, Math.min(300, Math.floor(input.limit ?? 300)))
-
-      const assets: MediaAssetSnapshot[] = []
-      if (type === 'all' || type === 'video') {
-        mediaStore.videoFiles.forEach((file) => {
-          assets.push({
-            id: file.id,
-            type: 'video',
-            name: file.name,
-            url: file.url,
-            durationMs: file.duration,
-            size: file.size,
-            createdAt: file.createdAt?.getTime(),
-          })
-        })
-      }
-
-      if (type === 'all' || type === 'image') {
-        mediaStore.imageFiles.forEach((file) => {
-          assets.push({
-            id: file.id,
-            type: 'image',
-            name: file.name,
-            url: file.url,
-            size: file.size,
-            createdAt: file.createdAt?.getTime(),
-          })
-        })
-      }
+      const assets = collectMediaAssetSnapshots(type)
 
       return success({
         assets: assets.slice(0, limit),
@@ -770,7 +801,7 @@ export function createEditorControlRuntime(
       const performer = performerStore.addPerformer({
         id: generateId('image'),
         type: 'image',
-        src: imageAsset!.file,
+        src: imageAsset!.source,
         start: startMs,
         duration: isFiniteNumber(input.durationMs) && input.durationMs > 0
           ? input.durationMs
@@ -800,15 +831,7 @@ export function createEditorControlRuntime(
       try {
         const imported = mediaStore.addVideoFromUrl(url, asOptionalString(input.name))
         return success({
-          asset: {
-            id: imported.id,
-            type: 'video' as const,
-            name: imported.name,
-            url: imported.url,
-            durationMs: imported.duration,
-            size: imported.size,
-            createdAt: imported.createdAt?.getTime(),
-          },
+          asset: mapVideoAssetSnapshot(imported),
         })
       }
       catch (error) {
@@ -817,6 +840,97 @@ export function createEditorControlRuntime(
           : '视频 URL 导入失败'
         return failure('INVALID_ARGUMENT', message)
       }
+    },
+
+    async mediaImportRandomImage(input: MediaImportRandomImageInput) {
+      if (input.orientation !== undefined && !isMediaRandomOrientation(input.orientation)) {
+        return failure(
+          'INVALID_ARGUMENT',
+          `orientation must be one of: ${RANDOM_MEDIA_ORIENTATION_VALUES.join(', ')}`,
+        )
+      }
+
+      try {
+        const imported = await mediaStore.importRandomImageFromPexels({
+          query: asOptionalString(input.query),
+          orientation: input.orientation,
+          name: asOptionalString(input.name),
+        })
+
+        return success({
+          asset: mapImageAssetSnapshot(imported),
+        })
+      }
+      catch (error) {
+        return mapMediaImportFailure(error, '随机图片导入失败')
+      }
+    },
+
+    async mediaImportRandomVideo(input: MediaImportRandomVideoInput) {
+      if (input.orientation !== undefined && !isMediaRandomOrientation(input.orientation)) {
+        return failure(
+          'INVALID_ARGUMENT',
+          `orientation must be one of: ${RANDOM_MEDIA_ORIENTATION_VALUES.join(', ')}`,
+        )
+      }
+
+      if (input.minDurationSec !== undefined) {
+        if (!isFiniteNumber(input.minDurationSec))
+          return failure('INVALID_ARGUMENT', 'minDurationSec must be a finite number')
+        if (input.minDurationSec < 0)
+          return failure('INVALID_ARGUMENT', 'minDurationSec must be >= 0')
+      }
+
+      if (input.maxDurationSec !== undefined) {
+        if (!isFiniteNumber(input.maxDurationSec))
+          return failure('INVALID_ARGUMENT', 'maxDurationSec must be a finite number')
+        if (input.maxDurationSec < 0)
+          return failure('INVALID_ARGUMENT', 'maxDurationSec must be >= 0')
+      }
+
+      if (
+        input.minDurationSec !== undefined
+        && input.maxDurationSec !== undefined
+        && input.maxDurationSec < input.minDurationSec
+      ) {
+        return failure('INVALID_ARGUMENT', 'maxDurationSec must be >= minDurationSec')
+      }
+
+      try {
+        const imported = await mediaStore.importRandomVideoFromPexels({
+          query: asOptionalString(input.query),
+          orientation: input.orientation,
+          minDurationSec: input.minDurationSec,
+          maxDurationSec: input.maxDurationSec,
+          name: asOptionalString(input.name),
+        })
+
+        return success({
+          asset: mapVideoAssetSnapshot(imported),
+        })
+      }
+      catch (error) {
+        return mapMediaImportFailure(error, '随机视频导入失败')
+      }
+    },
+
+    mediaPickRandomAsset(input: MediaPickRandomAssetInput) {
+      const requestedType = input.type ?? 'all'
+      if (requestedType !== 'all' && requestedType !== 'video' && requestedType !== 'image')
+        return failure('INVALID_ARGUMENT', 'type must be one of: all, video, image')
+
+      const candidates = collectMediaAssetSnapshots(requestedType)
+      if (candidates.length === 0)
+        return failure('NOT_FOUND', 'No media assets available in library')
+
+      const randomIndex = Math.floor(Math.random() * candidates.length)
+      const pickedAsset = candidates[randomIndex]
+      if (!pickedAsset)
+        return failure('NOT_FOUND', 'No media assets available in library')
+
+      return success({
+        asset: pickedAsset,
+      })
     },
 
     mediaRemoveAsset(input) {
