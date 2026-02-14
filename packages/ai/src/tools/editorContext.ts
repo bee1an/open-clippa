@@ -84,8 +84,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
 function normalizeNumber(value: unknown, fallback: number): number {
-  if (typeof value !== 'number' || Number.isNaN(value))
+  if (!isFiniteNumber(value))
     return fallback
   return value
 }

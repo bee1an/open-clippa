@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
 import type { MetadataTags } from 'mediabunny'
-import { ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Mp4OutputFormat, Output } from 'mediabunny'
+import type { ExportedVideo } from '@/store/useExportStore'
 import { ms2TimeStr } from 'clippc'
+import { ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Mp4OutputFormat, Output } from 'mediabunny'
+import { storeToRefs } from 'pinia'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { useExportStore, type ExportedVideo } from '@/store/useExportStore'
+import { useExportStore } from '@/store/useExportStore'
 
 const router = useRouter()
 const exportStore = useExportStore()
@@ -241,7 +242,9 @@ function handleClearCover() {
   <div w-full h-full bg-background text-foreground flex="~ col">
     <header class="h-12 border-b border-border bg-background flex items-center px-4 gap-3">
       <AppLogo size="sm" />
-      <div class="text-sm text-foreground-muted">Export Preview</div>
+      <div class="text-sm text-foreground-muted">
+        Export Preview
+      </div>
       <div class="flex-1" />
       <Button size="sm" variant="ghost" @click="handleBack">
         Back to Editor
@@ -261,7 +264,9 @@ function handleClearCover() {
         class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
       >
         <section class="panel p-4 flex flex-col gap-4">
-          <div class="text-sm font-semibold">Video Preview</div>
+          <div class="text-sm font-semibold">
+            Video Preview
+          </div>
           <div class="w-full aspect-video rounded-md overflow-hidden bg-black/60 border border-border/50">
             <video
               ref="videoRef"
@@ -272,25 +277,47 @@ function handleClearCover() {
           </div>
 
           <div class="grid grid-cols-2 gap-3 text-sm">
-            <div class="text-foreground-muted">File</div>
-            <div class="text-foreground">{{ exportedVideo?.name }}</div>
+            <div class="text-foreground-muted">
+              File
+            </div>
+            <div class="text-foreground">
+              {{ exportedVideo?.name }}
+            </div>
 
-            <div class="text-foreground-muted">Size</div>
-            <div class="text-foreground">{{ fileSizeText }}</div>
+            <div class="text-foreground-muted">
+              Size
+            </div>
+            <div class="text-foreground">
+              {{ fileSizeText }}
+            </div>
 
-            <div class="text-foreground-muted">Duration</div>
-            <div class="text-foreground">{{ durationText }}</div>
+            <div class="text-foreground-muted">
+              Duration
+            </div>
+            <div class="text-foreground">
+              {{ durationText }}
+            </div>
 
-            <div class="text-foreground-muted">Frame Rate</div>
-            <div class="text-foreground">{{ frameRateText }}</div>
+            <div class="text-foreground-muted">
+              Frame Rate
+            </div>
+            <div class="text-foreground">
+              {{ frameRateText }}
+            </div>
 
-            <div class="text-foreground-muted">Created</div>
-            <div class="text-foreground">{{ createdAtText }}</div>
+            <div class="text-foreground-muted">
+              Created
+            </div>
+            <div class="text-foreground">
+              {{ createdAtText }}
+            </div>
           </div>
         </section>
 
         <section class="panel p-4 flex flex-col gap-4">
-          <div class="text-sm font-semibold">Cover</div>
+          <div class="text-sm font-semibold">
+            Cover
+          </div>
           <div class="aspect-video w-full rounded-md overflow-hidden border border-border/50 bg-black/30 flex items-center justify-center">
             <img
               v-if="exportedVideo?.coverUrl"
@@ -324,7 +351,9 @@ function handleClearCover() {
 
           <div class="divider-h" />
 
-          <div class="text-sm font-semibold">Info</div>
+          <div class="text-sm font-semibold">
+            Info
+          </div>
           <label class="text-xs text-foreground-muted" for="export-title">Title</label>
           <input
             id="export-title"
@@ -342,7 +371,6 @@ function handleClearCover() {
             rows="3"
             placeholder="Description"
           />
-
         </section>
       </div>
     </main>

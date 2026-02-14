@@ -141,7 +141,6 @@ export function useTimelineBinding(): void {
           nextStart = oldStart + clampedDelta
           nextDuration = oldDuration - clampedDelta
         }
-
       }
 
       // 按最小时长约束最小宽度

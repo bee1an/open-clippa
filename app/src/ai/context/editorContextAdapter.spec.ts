@@ -30,6 +30,11 @@ interface MockPerformerInput {
 }
 
 function createMockPerformer(input: MockPerformerInput) {
+  let x = input.x ?? 0
+  let y = input.y ?? 0
+  const width = input.width ?? 100
+  const height = input.height ?? 100
+
   return {
     id: input.id,
     start: input.start,
@@ -38,11 +43,17 @@ function createMockPerformer(input: MockPerformerInput) {
     sourceStart: input.sourceStart,
     sourceDuration: input.sourceDuration,
     getText: input.text ? () => input.text as string : undefined,
+    load: vi.fn(async () => {}),
+    update: vi.fn(),
+    setPosition: vi.fn((nextX: number, nextY: number) => {
+      x = nextX
+      y = nextY
+    }),
     getBaseBounds: () => ({
-      x: input.x ?? 0,
-      y: input.y ?? 0,
-      width: input.width ?? 100,
-      height: input.height ?? 100,
+      x,
+      y,
+      width,
+      height,
       rotation: input.rotation ?? 0,
     }),
     sprite: {
@@ -119,6 +130,28 @@ describe('createEditorContextAdapter', () => {
       type: 'crossfade',
       params: { strength: 0.5 },
     })
+  })
+
+  it('exposes only read-only editor context tools', () => {
+    const performer = createMockPerformer({ id: 'p1', start: 0, duration: 1000, text: 'hello' })
+    const adapter = createEditorContextAdapter({
+      editorStore: {
+        currentTime: 0,
+        duration: 1000,
+      },
+      performerStore: {
+        getAllPerformers: () => [performer],
+        getPerformerById: id => id === performer.id ? performer : undefined,
+        selectedPerformers: [],
+        getAnimation: () => null,
+      },
+      transitionStore: {
+        activeTransition: null,
+      },
+    })
+
+    const names = createEditorContextTools(adapter).map(tool => tool.name)
+    expect(names).toEqual(['get_current_scene', 'get_performer_detail'])
   })
 
   it('applies truncation and sanitization in get_current_scene tool', async () => {

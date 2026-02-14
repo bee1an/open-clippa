@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import type { SelectTriggerVariants } from './select.un'
-import { computed, ref } from 'vue'
 import {
   SelectContent,
   SelectIcon,
@@ -14,6 +13,7 @@ import {
   SelectValue,
   SelectViewport,
 } from 'radix-vue'
+import { computed, ref } from 'vue'
 import { cn } from '@/lib/utils'
 import {
   selectContentVariants,

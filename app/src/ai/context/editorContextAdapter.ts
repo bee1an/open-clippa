@@ -46,8 +46,8 @@ interface EditorStoreLike {
 }
 
 interface PerformerStoreLike {
-  getAllPerformers: () => PerformerLike[]
-  getPerformerById: (id: string) => PerformerLike | undefined
+  getAllPerformers: () => unknown[]
+  getPerformerById: (id: string) => unknown
   selectedPerformers: SelectedPerformer[]
   getAnimation: (id: string) => unknown
 }
@@ -63,6 +63,14 @@ interface CanvasFrameLike {
 }
 
 interface RendererLike {
+  width?: number
+  height?: number
+  extract?: {
+    canvas: (...args: any[]) => CanvasFrameLike
+  }
+}
+
+interface RendererWithExtract extends RendererLike {
   extract: {
     canvas: (...args: any[]) => CanvasFrameLike
   }
@@ -80,6 +88,17 @@ const DEFAULT_SCREENSHOT_QUALITY = 0.65
 
 function isVideoPerformer(performer: PerformerLike): boolean {
   return typeof performer.sourceDuration === 'number' || typeof performer.sourceStart === 'number'
+}
+
+function isPerformerLike(value: unknown): value is PerformerLike {
+  if (!value || typeof value !== 'object')
+    return false
+
+  const candidate = value as Partial<PerformerLike>
+  return typeof candidate.id === 'string'
+    && typeof candidate.start === 'number'
+    && typeof candidate.duration === 'number'
+    && typeof candidate.getBaseBounds === 'function'
 }
 
 function clampScreenshotQuality(quality: number): number {
@@ -117,7 +136,7 @@ function resolveAppCanvas(
   return candidate
 }
 
-function resolveExtractRenderer(editorStore: EditorStoreLike): RendererLike | null {
+function resolveExtractRenderer(editorStore: EditorStoreLike): RendererWithExtract | null {
   const candidate = editorStore.clippa?.stage?.app?.renderer
   if (!candidate)
     return null
@@ -125,7 +144,7 @@ function resolveExtractRenderer(editorStore: EditorStoreLike): RendererLike | nu
   if (!candidate.extract || typeof candidate.extract.canvas !== 'function')
     return null
 
-  return candidate
+  return candidate as RendererWithExtract
 }
 
 function resolveExtractTarget(editorStore: EditorStoreLike): unknown | null {
@@ -299,6 +318,7 @@ export function createEditorContextAdapter(
   const listVisiblePerformers = (timeMs: number): EditorContextPerformerSummary[] => {
     const performers = performerStore
       .getAllPerformers()
+      .filter((performer): performer is PerformerLike => isPerformerLike(performer))
       .filter(performer => performer.start <= timeMs && timeMs < performer.start + performer.duration)
       .map(mapPerformer)
 
@@ -308,7 +328,7 @@ export function createEditorContextAdapter(
   const listSelectedPerformers = (): EditorContextPerformerSummary[] => {
     const selected = performerStore.selectedPerformers
       .map(item => performerStore.getPerformerById(item.id))
-      .filter((performer): performer is PerformerLike => performer !== undefined)
+      .filter((performer): performer is PerformerLike => isPerformerLike(performer))
       .map(mapPerformer)
 
     return dedupeById(selected)
@@ -320,7 +340,7 @@ export function createEditorContextAdapter(
 
   const getPerformerDetail = (id: string): EditorContextPerformerSummary | null => {
     const performer = performerStore.getPerformerById(id)
-    if (!performer)
+    if (!isPerformerLike(performer))
       return null
 
     return mapPerformer(performer)

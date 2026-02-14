@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Video } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
+import { Video } from '@clippc/performer'
 
 interface Props {
   performer: CanvasPerformer
@@ -14,7 +14,8 @@ const videoPerformer = computed(() => {
 
 const sourceFileName = computed(() => {
   const p = videoPerformer.value
-  if (!p) return '-'
+  if (!p)
+    return '-'
   const src = (p as any).src
   if (typeof src === 'string') {
     return src.split('/').pop() ?? src
@@ -27,15 +28,18 @@ const sourceFileName = computed(() => {
 
 const sourceDuration = computed(() => {
   const p = videoPerformer.value
-  if (!p) return '-'
+  if (!p)
+    return '-'
   const dur = (p as any).sourceDuration
-  if (typeof dur !== 'number' || !Number.isFinite(dur)) return '-'
+  if (typeof dur !== 'number' || !Number.isFinite(dur))
+    return '-'
   return `${(dur / 1000).toFixed(1)}s`
 })
 
 const timelineDuration = computed(() => {
   const p = videoPerformer.value
-  if (!p) return '-'
+  if (!p)
+    return '-'
   return `${(p.duration / 1000).toFixed(1)}s`
 })
 </script>

@@ -124,6 +124,9 @@ describe('useMediaStore', () => {
     expect(store.videoFiles).toHaveLength(1)
     expect(video.id).toBe('id-0')
     expect(video.url).toBe('blob:mock-0')
+    expect(video.file).toBe(file)
+    expect(video.source).toBe(file)
+    expect(video.sourceType).toBe('file')
     expect(video.thumbnails.generating).toBe(true)
     expect(store.isGeneratingThumbnail).toBe(true)
 
@@ -139,6 +142,36 @@ describe('useMediaStore', () => {
     expect(video.processingStatus.metadataExtracted).toBe(true)
     expect(video.thumbnails.generating).toBe(false)
     expect(store.isGeneratingThumbnail).toBe(false)
+  })
+
+  it('adds remote video url and keeps external url without revoke', async () => {
+    generateThumbnailWithCodecMock.mockResolvedValue('blob:remote-thumb')
+    const store = useMediaStore()
+
+    const video = store.addVideoFromUrl('https://cdn.example.com/media/intro.mp4')
+
+    expect(video.name).toBe('intro.mp4')
+    expect(video.source).toBe('https://cdn.example.com/media/intro.mp4')
+    expect(video.sourceType).toBe('url')
+    expect(video.file).toBeUndefined()
+    expect(video.url).toBe('https://cdn.example.com/media/intro.mp4')
+
+    await vi.waitFor(() => {
+      expect(generateThumbnailWithCodecMock).toHaveBeenCalledWith(video)
+    })
+
+    store.removeVideoFile(video.id)
+
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:remote-thumb')
+    expect(revokeObjectURLSpy).not.toHaveBeenCalledWith('https://cdn.example.com/media/intro.mp4')
+  })
+
+  it('rejects invalid remote video url', () => {
+    const store = useMediaStore()
+
+    expect(() => store.addVideoFromUrl('')).toThrow('视频 URL 不能为空')
+    expect(() => store.addVideoFromUrl('not-a-url')).toThrow('视频 URL 格式无效')
+    expect(() => store.addVideoFromUrl('ftp://cdn.example.com/video.mp4')).toThrow('仅支持 http/https 视频 URL')
   })
 
   it('handles thumbnail generation failure and keeps state recoverable', async () => {

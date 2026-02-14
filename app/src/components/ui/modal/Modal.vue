@@ -23,7 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  close: []
+  'close': []
 }>()
 
 const sizeClass = computed(() => {

@@ -4,6 +4,7 @@ import type { VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEditorStore } from '@/store'
+import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { loadVideoMetadata } from '@/utils/media'
 import SelectionGroup from './SelectionGroup.vue'
@@ -17,6 +18,7 @@ const DEFAULT_TEST_VIDEOS = [
 const MAX_TIMELINE_SYNC_RETRIES = 24
 
 const editorStore = useEditorStore()
+const mediaStore = useMediaStore()
 const performerStore = usePerformerStore()
 const { currentTime, duration } = storeToRefs(editorStore)
 const { selectedPerformers, selectionRevision } = storeToRefs(performerStore)
@@ -193,6 +195,23 @@ function findTrainById(id: string): Train | null {
   return null
 }
 
+function resolveDefaultVideoUrl(src: string): string {
+  return new URL(src, window.location.href).toString()
+}
+
+function ensureDefaultVideoAssets() {
+  return DEFAULT_TEST_VIDEOS.map((video) => {
+    const sourceUrl = resolveDefaultVideoUrl(video.src)
+    const existingAsset = mediaStore.videoFiles.find(asset => asset.sourceType === 'url' && asset.url === sourceUrl)
+    const asset = existingAsset ?? mediaStore.addVideoFromUrl(sourceUrl)
+    return {
+      ...video,
+      sourceUrl,
+      source: asset.source,
+    }
+  })
+}
+
 function syncTimelineToSelection(train: Train | null) {
   if (isSyncingFromSelection.value)
     return
@@ -284,7 +303,8 @@ function trySyncSelectionToTimeline(selectedId: string, attempt: number) {
 }
 
 async function ensureDefaultVideoPerformer(): Promise<void> {
-  const defaultTestVideoIds = DEFAULT_TEST_VIDEOS.map(video => video.id)
+  const defaultVideos = ensureDefaultVideoAssets()
+  const defaultTestVideoIds = defaultVideos.map(video => video.id)
   const defaultTestVideoIdSet = new Set<string>(defaultTestVideoIds)
   if (performerStore.getAllPerformers().some(item => defaultTestVideoIdSet.has(item.id)))
     return
@@ -295,8 +315,8 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
   const layoutHeight = CANVAS_HEIGHT
   const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = []
 
-  for (const [index, defaultVideo] of DEFAULT_TEST_VIDEOS.entries()) {
-    const { duration, width, height } = await loadVideoMetadata(defaultVideo.src)
+  for (const [index, defaultVideo] of defaultVideos.entries()) {
+    const { duration, width, height } = await loadVideoMetadata(defaultVideo.sourceUrl)
     const sourceDuration = Math.max(1000, Math.round(duration || 5000))
 
     const sourceWidth = width > 0 ? width : layoutWidth
@@ -307,7 +327,7 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
 
     clipConfigs.push({
       id: defaultVideo.id,
-      src: defaultVideo.src,
+      src: defaultVideo.source,
       start: 0,
       duration: sourceDuration,
       sourceStart: 0,

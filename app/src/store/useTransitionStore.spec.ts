@@ -1,6 +1,6 @@
+import { buildTransitionPairKey } from '@clippc/transition'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { buildTransitionPairKey } from '@clippc/transition'
 import { useTransitionStore } from './useTransitionStore'
 
 describe('useTransitionStore', () => {

@@ -11,6 +11,7 @@
     "cleanup": "tsx scripts/cleanup.ts",
     "test": "pnpm test:all",
     "test:app": "vitest --config vitest.app.config.ts --run",
+    "test:ai:acceptance": "vitest --config vitest.app.config.ts --run app/src/ai/control/acceptance.e2e.spec.ts",
     "test:packages": "vitest --config vitest.packages.config.ts --run",
     "test:app:coverage": "vitest --config vitest.app.config.ts --run --coverage",
     "test:packages:coverage": "vitest --config vitest.packages.config.ts --run --coverage",

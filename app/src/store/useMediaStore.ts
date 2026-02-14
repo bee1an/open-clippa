@@ -1,6 +1,49 @@
 import { defineStore } from 'pinia'
 import { reactive, ref } from 'vue'
 
+const REMOTE_VIDEO_PROTOCOLS = new Set(['http:', 'https:'])
+
+function isBlobUrl(url: string): boolean {
+  return url.startsWith('blob:')
+}
+
+function revokeObjectUrlIfNeeded(url?: string): void {
+  if (!url || !isBlobUrl(url))
+    return
+  URL.revokeObjectURL(url)
+}
+
+function normalizeRemoteVideoUrl(rawUrl: string): string {
+  const value = rawUrl.trim()
+  if (value.length === 0)
+    throw new Error('视频 URL 不能为空')
+
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(value)
+  }
+  catch {
+    throw new Error('视频 URL 格式无效')
+  }
+
+  if (!REMOTE_VIDEO_PROTOCOLS.has(parsedUrl.protocol))
+    throw new Error('仅支持 http/https 视频 URL')
+
+  return parsedUrl.toString()
+}
+
+function inferVideoNameFromUrl(url: string): string {
+  try {
+    const parsedUrl = new URL(url)
+    const fileName = decodeURIComponent(parsedUrl.pathname.split('/').pop() ?? '')
+    if (fileName.trim().length > 0)
+      return fileName.trim()
+  }
+  catch {}
+
+  return `remote-video-${Date.now()}.mp4`
+}
+
 // Validation functions for new data structures
 export function createDefaultVideoMetadata(): VideoMetadata {
   return {
@@ -96,7 +139,9 @@ export interface ProcessingStatus {
 export interface VideoFile {
   id: string
   name: string
-  file: File
+  file?: File
+  source: string | File | Blob
+  sourceType: 'file' | 'url'
   url: string
   duration: number
   size: number
@@ -128,6 +173,8 @@ export const useMediaStore = defineStore('media', () => {
       id: crypto.randomUUID(),
       name: file.name,
       file,
+      source: file,
+      sourceType: 'file',
       url: URL.createObjectURL(file),
       duration: 0,
       size: file.size,
@@ -146,22 +193,46 @@ export const useMediaStore = defineStore('media', () => {
     return videoFile
   }
 
+  // 通过 URL 添加视频资源
+  function addVideoFromUrl(url: string, name?: string): VideoFile {
+    const normalizedUrl = normalizeRemoteVideoUrl(url)
+    const resolvedName = name?.trim().length ? name.trim() : inferVideoNameFromUrl(normalizedUrl)
+
+    const videoFile: VideoFile = reactive({
+      id: crypto.randomUUID(),
+      name: resolvedName,
+      source: normalizedUrl,
+      sourceType: 'url',
+      url: normalizedUrl,
+      duration: 0,
+      size: 0,
+      createdAt: new Date(),
+      metadata: createDefaultVideoMetadata(),
+      thumbnails: createDefaultThumbnailSet(),
+      processingStatus: createDefaultProcessingStatus(),
+    })
+
+    videoFiles.value.push(videoFile)
+    generateVideoInfo(videoFile)
+    return videoFile
+  }
+
   // 删除视频文件
   function removeVideoFile(id: string) {
     const index = videoFiles.value.findIndex(v => v.id === id)
     if (index > -1) {
       const videoFile = videoFiles.value[index]
       // 清理 URL 对象
-      URL.revokeObjectURL(videoFile.url)
+      revokeObjectUrlIfNeeded(videoFile.url)
       if (videoFile.thumbnail) {
-        URL.revokeObjectURL(videoFile.thumbnail)
+        revokeObjectUrlIfNeeded(videoFile.thumbnail)
       }
       // 清理新的缩略图结构
       if (videoFile.thumbnails.primary) {
-        URL.revokeObjectURL(videoFile.thumbnails.primary)
+        revokeObjectUrlIfNeeded(videoFile.thumbnails.primary)
       }
       videoFile.thumbnails.frames.forEach((frame) => {
-        URL.revokeObjectURL(frame.url)
+        revokeObjectUrlIfNeeded(frame.url)
       })
       videoFiles.value.splice(index, 1)
     }
@@ -170,16 +241,16 @@ export const useMediaStore = defineStore('media', () => {
   // 清空所有视频文件
   function clearVideoFiles() {
     videoFiles.value.forEach((videoFile) => {
-      URL.revokeObjectURL(videoFile.url)
+      revokeObjectUrlIfNeeded(videoFile.url)
       if (videoFile.thumbnail) {
-        URL.revokeObjectURL(videoFile.thumbnail)
+        revokeObjectUrlIfNeeded(videoFile.thumbnail)
       }
       // 清理新的缩略图结构
       if (videoFile.thumbnails.primary) {
-        URL.revokeObjectURL(videoFile.thumbnails.primary)
+        revokeObjectUrlIfNeeded(videoFile.thumbnails.primary)
       }
       videoFile.thumbnails.frames.forEach((frame) => {
-        URL.revokeObjectURL(frame.url)
+        revokeObjectUrlIfNeeded(frame.url)
       })
     })
     videoFiles.value = []
@@ -284,6 +355,7 @@ export const useMediaStore = defineStore('media', () => {
     imageFiles,
     isGeneratingThumbnail,
     addVideoFile,
+    addVideoFromUrl,
     removeVideoFile,
     clearVideoFiles,
     addImageFile,

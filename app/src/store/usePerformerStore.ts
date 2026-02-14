@@ -298,6 +298,14 @@ export const usePerformerStore = defineStore('performer', () => {
     return performer
   }
 
+  const clearAnimation = (performerId: string): void => {
+    const nextMap = { ...animationMap.value }
+    delete nextMap[performerId]
+
+    animationMap.value = nextMap
+    performerMap.get(performerId)?.setAnimation(null)
+  }
+
   // 移除 performer
   const removePerformer = (performerId: string) => {
     clearAnimation(performerId)
@@ -434,10 +442,6 @@ export const usePerformerStore = defineStore('performer', () => {
   const updateAnimation = (performerId: string, patch: PerformerAnimationPatch): void => {
     const nextSpec = mergeAnimationSpec(getAnimation(performerId), patch)
     setAnimation(performerId, nextSpec)
-  }
-
-  const clearAnimation = (performerId: string): void => {
-    setAnimation(performerId, null)
   }
 
   // 清理所有 performers

@@ -1,15 +1,15 @@
-import type { ComputedRef } from 'vue'
 import type {
   TransitionCandidate,
   TransitionCandidateSnapshot,
   TransitionClip,
 } from '@clippc/transition'
+import type { ComputedRef } from 'vue'
 import {
+  buildTransitionPairKey,
   DEFAULT_GL_TRANSITION_TYPE,
   getGlTransitionDefaultParams,
   TRANSITION_FEATURE_AVAILABLE,
   TransitionCandidateTracker,
-  buildTransitionPairKey,
 } from '@clippc/transition'
 import { Image, Video } from 'clippc'
 import { storeToRefs } from 'pinia'

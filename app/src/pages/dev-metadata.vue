@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
-import { storeToRefs } from 'pinia'
 import type { AttachedImage, MetadataTags } from 'mediabunny'
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny'
+import { storeToRefs } from 'pinia'
+import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useExportStore } from '@/store/useExportStore'
 
@@ -12,7 +12,7 @@ definePage({
   },
 })
 
-type VideoSummary = {
+interface VideoSummary {
   codec: string | null
   codedWidth: number
   codedHeight: number
@@ -21,13 +21,13 @@ type VideoSummary = {
   rotation: number
 }
 
-type AudioSummary = {
+interface AudioSummary {
   codec: string | null
   sampleRate: number
   channels: number
 }
 
-type MediaSummary = {
+interface MediaSummary {
   duration: number | null
   mimeType: string | null
   video: VideoSummary | null
@@ -215,7 +215,9 @@ onBeforeUnmount(() => {
   <div w-full h-full bg-background text-foreground flex="~ col">
     <header class="h-12 border-b border-border bg-background flex items-center px-4 gap-3">
       <AppLogo size="sm" />
-      <div class="text-sm text-foreground-muted">Metadata Inspector (Dev)</div>
+      <div class="text-sm text-foreground-muted">
+        Metadata Inspector (Dev)
+      </div>
       <div class="flex-1" />
       <Button size="sm" :disabled="isLoading || !hasExportedVideo" @click="handleUseExported">
         Use Exported Video
@@ -234,7 +236,9 @@ onBeforeUnmount(() => {
 
     <main class="flex-1 overflow-auto p-6 flex flex-col gap-6">
       <section class="panel p-4 flex flex-col gap-2">
-        <div class="text-sm font-semibold">Source</div>
+        <div class="text-sm font-semibold">
+          Source
+        </div>
         <div class="text-xs text-foreground-muted">
           Selected: {{ sourceLabel || 'None' }}
         </div>
@@ -248,18 +252,34 @@ onBeforeUnmount(() => {
 
       <section class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div class="panel p-4 flex flex-col gap-3">
-          <div class="text-sm font-semibold">Summary</div>
+          <div class="text-sm font-semibold">
+            Summary
+          </div>
           <div class="grid grid-cols-2 gap-2 text-sm">
-            <div class="text-foreground-muted">MIME Type</div>
-            <div class="text-foreground">{{ summary?.mimeType || '--' }}</div>
+            <div class="text-foreground-muted">
+              MIME Type
+            </div>
+            <div class="text-foreground">
+              {{ summary?.mimeType || '--' }}
+            </div>
 
-            <div class="text-foreground-muted">Duration</div>
-            <div class="text-foreground">{{ durationText }}</div>
+            <div class="text-foreground-muted">
+              Duration
+            </div>
+            <div class="text-foreground">
+              {{ durationText }}
+            </div>
 
-            <div class="text-foreground-muted">Video Codec</div>
-            <div class="text-foreground">{{ summary?.video?.codec || '--' }}</div>
+            <div class="text-foreground-muted">
+              Video Codec
+            </div>
+            <div class="text-foreground">
+              {{ summary?.video?.codec || '--' }}
+            </div>
 
-            <div class="text-foreground-muted">Display Size</div>
+            <div class="text-foreground-muted">
+              Display Size
+            </div>
             <div class="text-foreground">
               <span v-if="summary?.video">
                 {{ summary.video.displayWidth }} x {{ summary.video.displayHeight }}
@@ -267,7 +287,9 @@ onBeforeUnmount(() => {
               <span v-else>--</span>
             </div>
 
-            <div class="text-foreground-muted">Coded Size</div>
+            <div class="text-foreground-muted">
+              Coded Size
+            </div>
             <div class="text-foreground">
               <span v-if="summary?.video">
                 {{ summary.video.codedWidth }} x {{ summary.video.codedHeight }}
@@ -275,22 +297,32 @@ onBeforeUnmount(() => {
               <span v-else>--</span>
             </div>
 
-            <div class="text-foreground-muted">Rotation</div>
+            <div class="text-foreground-muted">
+              Rotation
+            </div>
             <div class="text-foreground">
               <span v-if="summary?.video">{{ summary.video.rotation }} deg</span>
               <span v-else>--</span>
             </div>
 
-            <div class="text-foreground-muted">Audio Codec</div>
-            <div class="text-foreground">{{ summary?.audio?.codec || '--' }}</div>
+            <div class="text-foreground-muted">
+              Audio Codec
+            </div>
+            <div class="text-foreground">
+              {{ summary?.audio?.codec || '--' }}
+            </div>
 
-            <div class="text-foreground-muted">Audio Channels</div>
+            <div class="text-foreground-muted">
+              Audio Channels
+            </div>
             <div class="text-foreground">
               <span v-if="summary?.audio">{{ summary.audio.channels }}</span>
               <span v-else>--</span>
             </div>
 
-            <div class="text-foreground-muted">Sample Rate</div>
+            <div class="text-foreground-muted">
+              Sample Rate
+            </div>
             <div class="text-foreground">
               <span v-if="summary?.audio">{{ summary.audio.sampleRate }} Hz</span>
               <span v-else>--</span>
@@ -299,7 +331,9 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="panel p-4 flex flex-col gap-3">
-          <div class="text-sm font-semibold">Cover</div>
+          <div class="text-sm font-semibold">
+            Cover
+          </div>
           <div class="aspect-video w-full rounded-md overflow-hidden border border-border/50 bg-black/30 flex items-center justify-center">
             <img
               v-if="hasCover"
@@ -315,14 +349,18 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="panel p-4 flex flex-col gap-3">
-        <div class="text-sm font-semibold">Metadata Tags</div>
+        <div class="text-sm font-semibold">
+          Metadata Tags
+        </div>
         <pre class="text-xs whitespace-pre-wrap rounded-md border border-border/50 bg-background/60 p-3 min-h-24">
 {{ tagsText || 'No tags available' }}
         </pre>
       </section>
 
       <section class="panel p-4 flex flex-col gap-3">
-        <div class="text-sm font-semibold">Raw Tags</div>
+        <div class="text-sm font-semibold">
+          Raw Tags
+        </div>
         <pre class="text-xs whitespace-pre-wrap rounded-md border border-border/50 bg-background/60 p-3 min-h-24">
 {{ rawText || 'No raw tags available' }}
         </pre>

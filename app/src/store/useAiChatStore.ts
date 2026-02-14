@@ -7,9 +7,14 @@ import { useAiSettingsStore } from './useAiSettingsStore'
 
 const CONTEXT_AWARE_SYSTEM_PROMPT = [
   'You are an assistant inside a video editor.',
-  'If the user asks about current canvas, timeline, selected elements, or active transition, call the available tools before answering.',
+  'For executable editing requests, prefer calling available tools to execute actions directly instead of only describing steps.',
+  'If the user asks about current canvas, timeline, selected elements, active transition, filters, media assets, or export status, call the relevant tools before answering.',
+  'If the user asks to create or add text on canvas or timeline, call create_text_element first.',
+  'If the user asks to import a video from URL, call media_import_video_from_url before subsequent editing steps.',
   'Only use tool data as factual context. If a tool fails, explain the failure briefly and ask for a retry.',
 ].join(' ')
+
+const ENABLE_AI_TOOL_DEBUG = import.meta.env.DEV
 
 function generateMessageId(prefix: string): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
@@ -197,8 +202,18 @@ export const useAiChatStore = defineStore('ai-chat', () => {
         },
         messages: requestMessages,
         tools: resolveAppAiTools(),
-        maxToolRounds: 4,
+        maxToolRounds: 12,
         signal: activeController.signal,
+        onToolStart: (toolCall) => {
+          if (!ENABLE_AI_TOOL_DEBUG)
+            return
+          console.warn('[ai-tool:start]', toolCall)
+        },
+        onToolResult: (result) => {
+          if (!ENABLE_AI_TOOL_DEBUG)
+            return
+          console.warn('[ai-tool:result]', result)
+        },
         onToken: delta => appendAssistantDelta(assistantMessage.id, delta),
         onDone: () => finalizeAssistantMessage(assistantMessage.id),
       })

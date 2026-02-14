@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/modal'
 
 interface Props {
   modelValue: boolean
-  status?: 'idle' | 'exporting' | 'error' | 'canceled'
+  status?: 'idle' | 'exporting' | 'error' | 'canceled' | 'done'
   currentFrame: number
   totalFrames: number
   previewUrl?: string
@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  cancel: []
+  'cancel': []
 }>()
 
 const progress = computed(() => {
@@ -38,6 +38,8 @@ const title = computed(() => {
     return '导出失败'
   if (props.status === 'canceled')
     return '导出已取消'
+  if (props.status === 'done')
+    return '导出完成'
   return '正在导出'
 })
 
@@ -89,6 +91,9 @@ function handleCancel() {
       </div>
       <div v-else-if="status === 'canceled'" class="text-sm text-foreground-muted">
         {{ errorMessage || '导出已取消。' }}
+      </div>
+      <div v-else-if="status === 'done'" class="text-sm text-foreground-muted">
+        导出已完成。
       </div>
     </div>
 

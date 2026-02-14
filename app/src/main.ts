@@ -1,5 +1,5 @@
-import { createPinia } from 'pinia'
 import type { RouteRecordRaw } from 'vue-router'
+import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 import App from './App.vue'

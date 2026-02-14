@@ -38,7 +38,7 @@ async function addToTimeline() {
   const performer = performerStore.addPerformer({
     id: `video-${crypto.randomUUID()}`,
     type: 'video',
-    src: props.videoFile.file,
+    src: props.videoFile.source,
     start: 0,
     duration: props.videoFile.duration || duration || 5000,
     sourceDuration: duration || props.videoFile.duration || 5000,

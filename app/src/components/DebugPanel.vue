@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
 import { useDraggable, useStorage } from '@vueuse/core'
+import { storeToRefs } from 'pinia'
 import { useEditorStore } from '@/store/useEditorStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
@@ -19,7 +19,8 @@ const collapsed = useStorage('debugPanelCollapsed', false)
 
 let dragged = false
 function onHandlePointerUp() {
-  if (!collapsed.value && !dragged) return
+  if (!collapsed.value && !dragged)
+    return
   if (!dragged) {
     collapsed.value = false
   }
@@ -167,22 +168,30 @@ function fmtMs(ms: number | null): string {
 
       <!-- ID mapping overview -->
       <div px-3 py-2 space-y-1 border-b border="white/10">
-        <div op-50 text-10px mb-1>performerMap IDs</div>
+        <div op-50 text-10px mb-1>
+          performerMap IDs
+        </div>
         <div v-for="pid in allPerformerIds" :key="pid" flex items-center gap-1>
           <span text-green-300>{{ pid }}</span>
           <span v-if="!allTrainIds.find((t: any) => t.id === pid)" text-red-400 text-10px>(no train match)</span>
         </div>
-        <div v-if="allPerformerIds.length === 0" op-30>empty</div>
+        <div v-if="allPerformerIds.length === 0" op-30>
+          empty
+        </div>
       </div>
 
       <div px-3 py-2 space-y-1 border-b border="white/10">
-        <div op-50 text-10px mb-1>train IDs</div>
+        <div op-50 text-10px mb-1>
+          train IDs
+        </div>
         <div v-for="t in allTrainIds" :key="t.id" flex items-center gap-1>
           <span text-blue-300>{{ t.id }}</span>
           <span op-30 text-10px>rail[{{ t.rail }}]</span>
           <span v-if="!allPerformerIds.includes(t.id)" text-red-400 text-10px>(no performer match)</span>
         </div>
-        <div v-if="allTrainIds.length === 0" op-30>empty</div>
+        <div v-if="allTrainIds.length === 0" op-30>
+          empty
+        </div>
       </div>
 
       <div v-if="selectedDetails.length === 0" px-3 py-3 text-center op-40>

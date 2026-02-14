@@ -63,7 +63,7 @@ function handleNavigate(path: string) {
           />
           <PropertyPanel
             v-else
-            @navigate:animation="siderPanel = 'animation'"
+            @navigate-animation="siderPanel = 'animation'"
           />
         </template>
         <RouterView v-else />

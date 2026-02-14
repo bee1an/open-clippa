@@ -1,14 +1,9 @@
 <script setup lang="ts">
+import { computeTransitionMaxMs, DEFAULT_TRANSITION_DURATION, GL_TRANSITION_PRESETS, TRANSITION_FEATURE_AVAILABLE } from '@clippc/transition'
 import { computed } from 'vue'
 import { Slider } from '@/components/ui/slider'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useTransitionStore } from '@/store/useTransitionStore'
-import { GL_TRANSITION_PRESETS } from '@clippc/transition'
-import {
-  computeTransitionMaxMs,
-  DEFAULT_TRANSITION_DURATION,
-  TRANSITION_FEATURE_AVAILABLE,
-} from '@clippc/transition'
 
 const transitionStore = useTransitionStore()
 const transitionFeatureAvailable = TRANSITION_FEATURE_AVAILABLE

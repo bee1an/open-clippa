@@ -351,7 +351,6 @@ onMounted(() => {
       >
         {{ modelCatalogHint }}
       </div>
-
     </div>
 
     <div

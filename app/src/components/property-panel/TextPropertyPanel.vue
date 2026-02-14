@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TextStyleOption } from '@clippc/performer'
-import { Slider } from '@/components/ui/slider'
 import { Select } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 
 interface Props {
   textContent: string
@@ -33,7 +33,8 @@ const fontWeightOptions = [
 
 const currentFontFamily = computed(() => {
   const ff = props.textStyle.fontFamily
-  if (Array.isArray(ff)) return ff[0] ?? 'Arial'
+  if (Array.isArray(ff))
+    return ff[0] ?? 'Arial'
   return ff ?? 'Arial'
 })
 
@@ -41,7 +42,8 @@ const currentFontSize = computed(() => props.textStyle.fontSize ?? 32)
 const currentFontWeight = computed(() => String(props.textStyle.fontWeight ?? 'normal'))
 const currentFill = computed(() => {
   const fill = props.textStyle.fill
-  if (typeof fill === 'number') return `#${fill.toString(16).padStart(6, '0')}`
+  if (typeof fill === 'number')
+    return `#${fill.toString(16).padStart(6, '0')}`
   return (fill as string) ?? '#ffffff'
 })
 const currentAlign = computed(() => props.textStyle.align ?? 'left')

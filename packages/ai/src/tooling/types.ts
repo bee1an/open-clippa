@@ -37,6 +37,8 @@ export interface ChatWithToolsOptions {
   tools: AiToolDefinition[]
   signal?: AbortSignal
   maxToolRounds?: number
+  onToolStart?: (toolCall: AiToolCall) => void
+  onToolResult?: (result: AiToolResult) => void
   onToken: (token: string) => void
   onDone?: () => void
 }

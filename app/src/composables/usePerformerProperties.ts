@@ -1,6 +1,6 @@
 import type { PerformerBounds, TextStyleOption } from '@clippc/performer'
-import { Image, Text, Video } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
+import { Image, Text, Video } from '@clippc/performer'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 export type PerformerType = 'video' | 'image' | 'text'
@@ -10,7 +10,8 @@ export type PerformerType = 'video' | 'image' | 'text'
  * Shared with SelectionGroup.vue's coordinate system.
  */
 function rotateVector(x: number, y: number, rotation: number): { x: number, y: number } {
-  if (!rotation) return { x, y }
+  if (!rotation)
+    return { x, y }
   const rad = rotation * Math.PI / 180
   const cos = Math.cos(rad)
   const sin = Math.sin(rad)
@@ -56,21 +57,28 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
 
   // revision counter to drive reactivity for non-reactive performer instances
   const revision = ref(0)
-  const bump = () => { revision.value += 1 }
+  const bump = () => {
+    revision.value += 1
+  }
 
   const performer = computed<CanvasPerformer | null>(() => {
     void revision.value
     const id = performerId.value
-    if (!id) return null
+    if (!id)
+      return null
     return performerStore.getPerformerById(id) ?? null
   })
 
   const performerType = computed<PerformerType | null>(() => {
     const p = performer.value
-    if (!p) return null
-    if (p instanceof Video) return 'video'
-    if (p instanceof Image) return 'image'
-    if (p instanceof Text) return 'text'
+    if (!p)
+      return null
+    if (p instanceof Video)
+      return 'video'
+    if (p instanceof Image)
+      return 'image'
+    if (p instanceof Text)
+      return 'text'
     return null
   })
 
@@ -82,7 +90,8 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
   // visual position in center-rotation coordinate system
   const visualPosition = computed<{ x: number, y: number } | null>(() => {
     const b = bounds.value
-    if (!b) return null
+    if (!b)
+      return null
     return toCenterRotationPosition(b)
   })
 
@@ -98,7 +107,8 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     cleanupListener?.()
     cleanupListener = null
 
-    if (!next) return
+    if (!next)
+      return
 
     const handler = () => bump()
     ;(next as any).on('positionUpdate', handler)
@@ -120,7 +130,8 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
   function updatePosition(visualX: number, visualY: number) {
     const id = performerId.value
     const b = bounds.value
-    if (!id || !b) return
+    if (!id || !b)
+      return
     const topLeft = toTopLeftPosition(visualX, visualY, b.width, b.height, b.rotation ?? 0)
     performerStore.updatePerformer(id, { x: topLeft.x, y: topLeft.y })
     bump()
@@ -134,7 +145,8 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
   function updateRotation(angle: number) {
     const id = performerId.value
     const b = bounds.value
-    if (!id || !b) return
+    if (!id || !b)
+      return
 
     const oldRotation = b.rotation ?? 0
     const hw = b.width / 2
@@ -158,7 +170,8 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
 
   function updateAlpha(alpha: number) {
     const id = performerId.value
-    if (!id) return
+    if (!id)
+      return
     performerStore.updatePerformer(id, { alpha } as any)
     bump()
   }
@@ -168,27 +181,31 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
   const textContent = computed<string>(() => {
     void revision.value
     const p = performer.value
-    if (!(p instanceof Text)) return ''
+    if (!(p instanceof Text))
+      return ''
     return p.getText()
   })
 
   const textStyle = computed<TextStyleOption>(() => {
     void revision.value
     const p = performer.value
-    if (!(p instanceof Text)) return {}
+    if (!(p instanceof Text))
+      return {}
     return p.getStyle()
   })
 
   function updateTextContent(content: string) {
     const p = performer.value
-    if (!(p instanceof Text)) return
+    if (!(p instanceof Text))
+      return
     p.setText(content)
     bump()
   }
 
   function updateTextStyle(style: TextStyleOption) {
     const p = performer.value
-    if (!(p instanceof Text)) return
+    if (!(p instanceof Text))
+      return
     p.setStyle(style)
     bump()
   }

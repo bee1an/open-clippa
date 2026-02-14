@@ -349,12 +349,15 @@ export async function chatWithTools(options: ChatWithToolsOptions): Promise<void
     conversation.push(toAssistantToolCallMessage(completion.content, completion.toolCalls))
 
     for (const toolCall of completion.toolCalls) {
+      const normalizedCall = toAiToolCall(toolCall)
+      options.onToolStart?.(normalizedCall)
       const result = await executeToolCall(
-        toAiToolCall(toolCall),
+        normalizedCall,
         toolsByName,
         round,
         options.signal,
       )
+      options.onToolResult?.(result)
       toolResults.push(result)
       conversation.push(toToolMessage(result))
     }

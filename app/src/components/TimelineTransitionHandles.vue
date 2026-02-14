@@ -57,7 +57,7 @@ async function openTransitionPanel(handle: TimelineTransitionHandle): Promise<vo
   await router.push('/editor/transition')
 }
 
-const handleTimelineTransitionClick = (handle: TimelineTransitionHandle): void => {
+function handleTimelineTransitionClick(handle: TimelineTransitionHandle): void {
   void openTransitionPanel(handle)
 }
 
@@ -103,4 +103,6 @@ onUnmounted(() => {
 })
 </script>
 
-<template></template>
+<template>
+  <div v-if="false" />
+</template>

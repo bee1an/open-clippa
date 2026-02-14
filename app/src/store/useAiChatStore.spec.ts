@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAiSettingsStore } from './useAiSettingsStore'
 import { useAiChatStore } from './useAiChatStore'
+import { useAiSettingsStore } from './useAiSettingsStore'
 
 const { chatWithToolsMock, resolveAppAiToolsMock } = vi.hoisted(() => {
   return {
@@ -80,6 +80,10 @@ describe('useAiChatStore', () => {
       model: 'moonshotai/kimi-k2.5',
     })
     expect(callOptions.messages[0].role).toBe('system')
+    expect(callOptions.messages[0].content).toContain('create_text_element')
+    expect(callOptions.maxToolRounds).toBe(12)
+    expect(typeof callOptions.onToolStart).toBe('function')
+    expect(typeof callOptions.onToolResult).toBe('function')
   })
 
   it('blocks send when byok api key is missing', async () => {
@@ -213,10 +217,22 @@ describe('useAiChatStore', () => {
     expect(store.lastError).toBeNull()
   })
 
-  it('passes context tools for context-aware prompts', async () => {
+  it('passes full tool set for executable requests', async () => {
     resolveAppAiToolsMock.mockReturnValue([
       {
         name: 'get_current_scene',
+        description: 'desc',
+        jsonSchema: { type: 'object' },
+        handler: vi.fn(),
+      },
+      {
+        name: 'media_add_asset_to_timeline',
+        description: 'desc',
+        jsonSchema: { type: 'object' },
+        handler: vi.fn(),
+      },
+      {
+        name: 'export_start',
         description: 'desc',
         jsonSchema: { type: 'object' },
         handler: vi.fn(),
@@ -241,7 +257,11 @@ describe('useAiChatStore', () => {
     await store.sendMessage()
 
     const callOptions = chatWithToolsMock.mock.calls[0][0]
-    expect(callOptions.tools).toHaveLength(1)
-    expect(callOptions.tools[0].name).toBe('get_current_scene')
+    expect(callOptions.tools).toHaveLength(3)
+    expect(callOptions.tools.map((item: { name: string }) => item.name)).toEqual(expect.arrayContaining([
+      'get_current_scene',
+      'media_add_asset_to_timeline',
+      'export_start',
+    ]))
   })
 })

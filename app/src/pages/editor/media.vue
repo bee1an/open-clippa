@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useVideoFiles } from '@/composables/useVideoFiles'
@@ -7,6 +8,10 @@ import { useMediaStore } from '@/store/useMediaStore'
 const mediaStore = useMediaStore()
 const { isVideoFile, isImageFile, filterMediaFiles, handleDroppedFiles } = useVideoFiles()
 const { isDragging, onDragEnter, onDragLeave, onDragOver, onDrop } = useDragDrop()
+const mediaUrl = ref('')
+const mediaUrlError = ref('')
+const isImportingByUrl = ref(false)
+const showUrlInput = ref(false)
 
 function fileSelected(event: Event) {
   const input = event.target as HTMLInputElement
@@ -51,6 +56,27 @@ async function handleDrop(event: DragEvent) {
 function onDragDrop(event: DragEvent) {
   onDrop(event, handleDrop)
 }
+
+function importVideoFromUrl() {
+  mediaUrlError.value = ''
+  const url = mediaUrl.value.trim()
+  if (!url) {
+    mediaUrlError.value = '请输入视频 URL'
+    return
+  }
+
+  isImportingByUrl.value = true
+  try {
+    mediaStore.addVideoFromUrl(url)
+    mediaUrl.value = ''
+  }
+  catch (error) {
+    mediaUrlError.value = error instanceof Error ? error.message : 'URL 导入失败'
+  }
+  finally {
+    isImportingByUrl.value = false
+  }
+}
 </script>
 
 <template>
@@ -78,18 +104,68 @@ function onDragDrop(event: DragEvent) {
         hidden
         @change="fileSelected"
       >
-      <label for="media-upload" wfull block cursor-pointer>
+      <div flex w-full isolate>
+        <label for="media-upload" class="flex-1 cursor-pointer relative z-0 hover:z-10">
+          <div
+            class="flex items-center justify-center w-full h-10 px-4 py-2 gap-2 whitespace-nowrap text-sm font-medium transition-all duration-150 ease-out border border-border rounded-l-md rounded-r-none bg-background text-foreground hover:bg-accent hover:text-accent-foreground select-none"
+            :class="isDragging ? 'border-primary bg-primary/20' : ''"
+          >
+            <div i-carbon-add text-lg />
+            <span>导入媒体</span>
+          </div>
+        </label>
+
         <Button
           variant="outline"
-          class="w-full pointer-events-none bg-white text-black"
-          :class="{
-            'border-primary bg-primary/20': isDragging,
-          }"
+          class="shrink-0 px-3 rounded-l-none -ml-px relative z-0 hover:z-10 bg-background"
+          :class="{ '!bg-secondary !border-primary/50 text-primary z-20': showUrlInput }"
+          title="通过 URL 导入"
+          @click="showUrlInput = !showUrlInput"
         >
-          <div i-carbon-add text-lg mr-2 />
-          <span>导入媒体</span>
+          <div i-carbon-link text-lg />
         </Button>
-      </label>
+      </div>
+
+      <div v-if="showUrlInput" mt-3 class="animate-in slide-in-from-top-2 fade-in duration-200">
+        <div flex items-center gap-2>
+          <div
+            class="group flex-1 flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded-md focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all min-w-0"
+          >
+            <input
+              v-model="mediaUrl"
+              type="text"
+              placeholder="粘贴视频链接..."
+              class="flex-1 bg-transparent border-none text-sm text-foreground outline-none placeholder:text-muted min-w-0"
+              @keydown.enter.prevent="importVideoFromUrl"
+            >
+            <Button
+              v-if="mediaUrl"
+              variant="ghost"
+              size="icon-xs"
+              class="opacity-0 group-hover:opacity-100 transition-opacity text-muted hover:text-foreground shrink-0"
+              @click="mediaUrl = ''"
+            >
+              <div i-carbon-close />
+            </Button>
+          </div>
+
+          <Button
+            variant="secondary"
+            size="icon"
+            class="shrink-0"
+            :disabled="!mediaUrl || isImportingByUrl"
+            @click="importVideoFromUrl"
+          >
+            <div v-if="isImportingByUrl" i-carbon-circle-dash animate-spin />
+            <div v-else i-carbon-arrow-right />
+          </Button>
+        </div>
+
+        <div v-if="mediaUrlError" class="mt-2 text-xs text-red-500 flex items-center gap-1 animate-fade-in break-all">
+          <div i-carbon-warning-filled class="shrink-0" />
+          <span>{{ mediaUrlError }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- 视频预览列表 -->

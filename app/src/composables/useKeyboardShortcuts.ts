@@ -1,11 +1,12 @@
-import { Image, Text, Video } from '@clippc/performer'
-import { getPxByMs } from '@clippc/utils'
-import { storeToRefs } from 'pinia'
+import type { Image } from '@clippc/performer'
 import type { Rail, Train } from 'clippc'
+import type { PerformerConfig } from '@/store/usePerformerStore'
+import { Text, Video } from '@clippc/performer'
+import { getPxByMs } from '@clippc/utils'
 import { VideoTrain } from 'clippc'
+import { storeToRefs } from 'pinia'
 import { useEditorStore } from '@/store'
 import { useFilterStore } from '@/store/useFilterStore'
-import type { PerformerConfig } from '@/store/usePerformerStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 export function useKeyboardShortcuts() {
@@ -68,8 +69,7 @@ export function useKeyboardShortcuts() {
   }
 
   const canSplitAtCurrentTime = computed(() => {
-    splitRevision.value
-    return listSplittableTrains(currentTime.value).length > 0
+    return splitRevision.value >= 0 && listSplittableTrains(currentTime.value).length > 0
   })
 
   const handleDurationChanged = () => {

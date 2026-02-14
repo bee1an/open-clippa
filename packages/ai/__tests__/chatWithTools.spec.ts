@@ -116,6 +116,63 @@ describe('chatWithTools', () => {
     expect(streamChatCompletionMock).toHaveBeenCalledTimes(1)
   })
 
+  it('emits onToolStart and onToolResult for successful execution', async () => {
+    createChatCompletionMock
+      .mockResolvedValueOnce({
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call-success',
+            type: 'function',
+            function: {
+              name: 'get_current_scene',
+              arguments: '{"detailLevel":"brief"}',
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        role: 'assistant',
+        content: '',
+        toolCalls: [],
+      })
+    streamChatCompletionMock.mockResolvedValue(undefined)
+
+    const onToolStart = vi.fn()
+    const onToolResult = vi.fn()
+
+    await chatWithTools({
+      settings: defaultSettings,
+      messages: [{ role: 'user', content: 'scene?' }],
+      tools: [
+        {
+          name: 'get_current_scene',
+          description: 'Read current scene',
+          jsonSchema: { type: 'object' },
+          handler: async () => ({ ok: true }),
+        },
+      ],
+      onToolStart,
+      onToolResult,
+      onToken: vi.fn(),
+    })
+
+    expect(onToolStart).toHaveBeenCalledTimes(1)
+    expect(onToolStart).toHaveBeenCalledWith({
+      id: 'call-success',
+      name: 'get_current_scene',
+      arguments: '{"detailLevel":"brief"}',
+    })
+
+    expect(onToolResult).toHaveBeenCalledTimes(1)
+    expect(onToolResult).toHaveBeenCalledWith(expect.objectContaining({
+      toolCallId: 'call-success',
+      toolName: 'get_current_scene',
+      data: { ok: true },
+    }))
+  })
+
   it('returns direct completion when tools are available but no tool call is emitted', async () => {
     createChatCompletionMock.mockResolvedValue({
       role: 'assistant',
@@ -237,6 +294,57 @@ describe('chatWithTools', () => {
     const toolMessage = secondCallMessages.find((item: any) => item.role === 'tool')
     expect(toolMessage.content).toContain('"ok":false')
     expect(toolMessage.content).toContain('tool failed')
+  })
+
+  it('emits onToolResult for failed execution', async () => {
+    createChatCompletionMock
+      .mockResolvedValueOnce({
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call-failed',
+            type: 'function',
+            function: {
+              name: 'get_current_scene',
+              arguments: '{"detailLevel":',
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        role: 'assistant',
+        content: '',
+        toolCalls: [],
+      })
+    streamChatCompletionMock.mockResolvedValue(undefined)
+
+    const onToolStart = vi.fn()
+    const onToolResult = vi.fn()
+
+    await chatWithTools({
+      settings: defaultSettings,
+      messages: [{ role: 'user', content: 'scene?' }],
+      tools: [
+        {
+          name: 'get_current_scene',
+          description: 'Read current scene',
+          jsonSchema: { type: 'object' },
+          handler: vi.fn(),
+        },
+      ],
+      onToolStart,
+      onToolResult,
+      onToken: vi.fn(),
+    })
+
+    expect(onToolStart).toHaveBeenCalledTimes(1)
+    expect(onToolResult).toHaveBeenCalledTimes(1)
+    expect(onToolResult).toHaveBeenCalledWith(expect.objectContaining({
+      toolCallId: 'call-failed',
+      toolName: 'get_current_scene',
+      isError: true,
+    }))
   })
 
   it('propagates abort signal to final streaming stage', async () => {

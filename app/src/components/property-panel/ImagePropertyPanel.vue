@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Image } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
+import { Image } from '@clippc/performer'
 
 interface Props {
   performer: CanvasPerformer
@@ -14,7 +14,8 @@ const imagePerformer = computed(() => {
 
 const sourceFileName = computed(() => {
   const p = imagePerformer.value
-  if (!p) return '-'
+  if (!p)
+    return '-'
   const src = (p as any).src
   if (typeof src === 'string') {
     return src.split('/').pop() ?? src

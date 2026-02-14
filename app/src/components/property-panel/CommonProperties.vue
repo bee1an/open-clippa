@@ -29,7 +29,8 @@ const alphaPercent = computed(() => Math.round((props.alpha ?? 1) * 100))
 
 function handlePositionChange(axis: 'x' | 'y', raw: string) {
   const value = Number.parseInt(raw, 10)
-  if (!Number.isFinite(value)) return
+  if (!Number.isFinite(value))
+    return
   const x = axis === 'x' ? value : posX.value
   const y = axis === 'y' ? value : posY.value
   emit('update:position', x, y)
