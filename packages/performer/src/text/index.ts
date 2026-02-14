@@ -138,7 +138,7 @@ export class Text extends EventBus<TextEvents> implements Performer {
     return new TextStyle({
       fontFamily: option.fontFamily || 'Arial',
       fontSize: option.fontSize || 26,
-      fontWeight: option.fontWeight as any,
+      fontWeight: option.fontWeight?.toString() as any ?? 'normal',
       fontStyle: option.fontStyle ?? 'normal',
       fill: option.fill ?? '#fff',
       stroke: option.stroke,
