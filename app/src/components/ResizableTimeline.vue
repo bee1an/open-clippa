@@ -1,11 +1,29 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
+import { useLayoutStore } from '@/store/useLayoutStore'
+
 // 默认高度和限制
 const DEFAULT_HEIGHT = 250
 const MIN_HEIGHT = 100
 const MAX_HEIGHT = 500
 
+const layoutStore = useLayoutStore()
+const { timelineHidden } = storeToRefs(layoutStore)
+
 // 使用VueUse的useStorage来管理高度状态
 const timelineHeight = useStorage('timelineHeight', DEFAULT_HEIGHT)
+const resizeHandleStyle = computed(() => {
+  return {
+    height: timelineHidden.value ? '0px' : '6px',
+    opacity: timelineHidden.value ? 0 : 1,
+  }
+})
+const timelineBodyStyle = computed(() => {
+  return {
+    height: timelineHidden.value ? '0px' : `${timelineHeight.value}px`,
+    opacity: timelineHidden.value ? 0 : 1,
+  }
+})
 
 // 拖动状态
 const isDragging = ref(false)
@@ -81,7 +99,9 @@ onMounted(() => {
     <!-- Resize Handle -->
     <div
       h-1.5 w-full cursor-row-resize flex items-center justify-center group relative z-20 bg-background-elevated transition-colors
-      class="hover:bg-muted/50"
+      class="hover:bg-muted/50 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden"
+      :class="timelineHidden ? 'pointer-events-none' : ''"
+      :style="resizeHandleStyle"
       @mousedown="startDrag"
     >
       <!-- Visual cue for dragging -->
@@ -91,15 +111,34 @@ onMounted(() => {
       />
     </div>
 
-    <PlaybackControls border-t border="border/50" />
+    <Transition name="timeline-controls" mode="out-in">
+      <PlaybackControls :key="timelineHidden ? 'compact' : 'full'" :compact="timelineHidden" border-t border="border/50" />
+    </Transition>
 
     <div
       w-full
       overflow-hidden
       bg-background-elevated
-      :style="{ height: `${timelineHeight}px` }"
+      class="transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+      :class="timelineHidden ? 'pointer-events-none' : ''"
+      :style="timelineBodyStyle"
     >
       <TimelineWrapper />
     </div>
   </div>
 </template>
+
+<style scoped>
+.timeline-controls-enter-active,
+.timeline-controls-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.timeline-controls-enter-from,
+.timeline-controls-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+</style>
