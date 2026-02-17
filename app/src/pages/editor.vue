@@ -85,7 +85,7 @@ watch(exportStatus, (nextStatus) => {
 <template>
   <div w-full h-full bg-background text-foreground flex="~ col">
     <!-- Header - Minimalist Compact -->
-    <header h-12 border-b border-border bg-background flex items-center px-4 z-50 shrink-0 gap-4>
+    <header h-12 bg-background flex items-center px-4 z-50 shrink-0 gap-4>
       <div flex items-center gap-3>
         <AppLogo size="sm" />
       </div>
@@ -129,31 +129,43 @@ watch(exportStatus, (nextStatus) => {
     <div flex flex-1 w-full overflow-hidden relative>
       <!-- Left Chat Panel -->
       <aside
-        :style="{ width: chatPanelOpen ? '360px' : '0px' }"
-        class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-        :class="chatPanelOpen ? 'border-r' : 'border-r-0'"
+        :style="{
+          width: chatPanelOpen ? '360px' : '0px',
+          marginLeft: chatPanelOpen ? '1rem' : '0px',
+          marginRight: chatPanelOpen ? '1rem' : '0px',
+        }"
+        class="shrink-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] my-4 rounded-2xl bg-background-elevated shadow-sm flex flex-col"
+        :class="chatPanelOpen ? 'border' : 'border-0'"
         border="border/50"
       >
         <ChatPanel v-if="chatPanelOpen" />
       </aside>
 
-      <!-- Center Stage -->
-      <main flex-1 flex flex-col min-w-0 bg-background relative z-0>
-        <div flex-1 relative overflow-hidden flex items-center justify-center bg-background>
-          <!-- Canvas Container with subtle pattern or shadow -->
-          <Canvas />
-        </div>
-        <ResizableTimeline />
-      </main>
+      <!-- Right Column Group -->
+      <div flex flex-col flex-1 min-w-0 relative h-full overflow-hidden>
+        <!-- Top Row: Canvas + Right Side -->
+        <div flex flex-1 min-h-0 relative w-full>
+          <!-- Center Stage -->
+          <main flex-1 flex flex-col min-w-0 bg-background relative z-0>
+            <div flex-1 relative overflow-hidden flex items-center justify-center bg-background>
+              <!-- Canvas Container with subtle pattern or shadow -->
+              <Canvas />
+            </div>
+          </main>
 
-      <!-- Right Sider -->
-      <aside
-        :style="{ width: siderCollapsed ? '56px' : '320px' }"
-        class="h-full shrink-0 bg-background-elevated border-l transition-[width] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] z-40 flex flex-col relative group overflow-hidden"
-        border="border/50"
-      >
-        <Sider />
-      </aside>
+          <!-- Right Sider -->
+          <aside
+            :style="{ width: siderCollapsed ? '56px' : '320px' }"
+            class="shrink-0 bg-background-elevated border transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] z-40 flex flex-col relative group overflow-hidden my-4 ml-4 mr-4 rounded-2xl shadow-sm"
+            border="border/50"
+          >
+            <Sider />
+          </aside>
+        </div>
+
+        <!-- Bottom Timeline -->
+        <ResizableTimeline />
+      </div>
     </div>
 
     <DebugPanel v-if="showDebugPanel" />

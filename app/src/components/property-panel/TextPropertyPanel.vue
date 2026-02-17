@@ -72,55 +72,55 @@ function handleFillChange(e: Event) {
 </script>
 
 <template>
-  <div space-y-3>
-    <div text-xs uppercase tracking-widest text-foreground-subtle>
+  <div space-y-2>
+    <div text="[10px]" uppercase tracking-wider text-foreground-subtle>
       文本
     </div>
 
     <!-- Content -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>内容</span>
+      <span text="[10px]" text-foreground-muted>内容</span>
       <textarea
         :value="textContent"
         rows="3"
         data-preserve-canvas-selection="true"
-        class="w-full resize-none rounded-md border border-border/70 bg-secondary/40 px-2 py-1.5 text-xs text-foreground outline-none focus:border-foreground/40"
+        class="w-full resize-none rounded-md border border-border/70 bg-secondary/40 px-2 py-1.5 text-[10px] text-foreground outline-none focus:border-foreground/40"
         @change="handleContentChange"
       />
     </div>
 
     <!-- Font Family -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>字体</span>
+      <span text="[10px]" text-foreground-muted>字体</span>
       <Select
         :model-value="currentFontFamily"
         :options="fontFamilyOptions"
-        size="sm"
+        size="xs"
         @update:model-value="(v: string) => updateStyle({ fontFamily: v })"
       />
     </div>
 
     <!-- Font Size -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>字号</span>
+      <span text="[10px]" text-foreground-muted>字号</span>
       <input
         type="number"
         :value="currentFontSize"
         :min="1"
         :max="999"
         data-preserve-canvas-selection="true"
-        class="w-full rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-xs tabular-nums text-foreground outline-none focus:border-foreground/40"
+        class="w-full rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-[10px] tabular-nums text-foreground outline-none focus:border-foreground/40"
         @change="handleFontSizeChange"
       >
     </div>
 
     <!-- Font Weight -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>字重</span>
+      <span text="[10px]" text-foreground-muted>字重</span>
       <Select
         :model-value="currentFontWeight"
         :options="fontWeightOptions"
-        size="sm"
+        size="xs"
         @update:model-value="(v: string) => updateStyle({ fontWeight: v as 'normal' | 'bold' })"
       />
     </div>
@@ -128,34 +128,34 @@ function handleFillChange(e: Event) {
     <!-- Fill Color -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>填充颜色</span>
-        <span class="text-[11px] font-mono text-foreground-subtle">{{ currentFill }}</span>
+        <span text="[10px]" text-foreground-muted>填充颜色</span>
+        <span class="text-[10px] font-mono text-foreground-subtle">{{ currentFill }}</span>
       </div>
       <input
         type="color"
         :value="currentFill"
         data-preserve-canvas-selection="true"
-        class="h-7 w-full cursor-pointer rounded-md border border-border/70 bg-secondary/40 px-0.5"
+        class="h-6 w-full cursor-pointer rounded-md border border-border/70 bg-secondary/40 px-0.5"
         @input="handleFillChange"
       >
     </div>
 
     <!-- Text Align -->
     <div space-y-1>
-      <span text-xs text-foreground-muted>对齐方式</span>
+      <span text="[10px]" text-foreground-muted>对齐方式</span>
       <div class="flex gap-1">
         <button
           v-for="align in (['left', 'center', 'right'] as const)"
           :key="align"
           data-preserve-canvas-selection="true"
-          class="flex-1 rounded-md border px-2 py-1.5 text-xs transition-colors"
+          class="flex-1 rounded-md border px-2 py-1 text-[10px] transition-colors"
           :class="currentAlign === align
             ? 'border-foreground/50 bg-foreground/8 text-foreground font-medium'
             : 'border-border/70 bg-background text-foreground-muted hover:bg-secondary/40 hover:text-foreground'"
           @click="updateStyle({ align })"
         >
           <div
-            class="mx-auto"
+            class="mx-auto text-xs"
             :class="{
               'i-ph-text-align-left-bold': align === 'left',
               'i-ph-text-align-center-bold': align === 'center',
@@ -169,8 +169,8 @@ function handleFillChange(e: Event) {
     <!-- Letter Spacing -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>字间距</span>
-        <span class="text-[11px] font-mono tabular-nums text-foreground-subtle">
+        <span text="[10px]" text-foreground-muted>字间距</span>
+        <span class="text-[10px] font-mono tabular-nums text-foreground-subtle">
           {{ currentLetterSpacing }}<span class="ml-0.5 text-[9px] opacity-60">px</span>
         </span>
       </div>

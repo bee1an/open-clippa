@@ -46,46 +46,46 @@ function handleAlphaChange(value: number) {
 </script>
 
 <template>
-  <div space-y-3>
-    <div text-xs uppercase tracking-widest text-foreground-subtle>
+  <div space-y-2>
+    <div text="[10px]" uppercase tracking-wider text-foreground-subtle>
       变换
     </div>
 
     <!-- Position -->
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-2 gap-1.5">
       <label class="space-y-1">
-        <span text-xs text-foreground-muted>X</span>
+        <span text="[10px]" text-foreground-muted>X</span>
         <input
           type="number"
           :value="posX"
           data-preserve-canvas-selection="true"
-          class="w-full rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-xs tabular-nums text-foreground outline-none focus:border-foreground/40"
+          class="w-full rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-[10px] tabular-nums text-foreground outline-none focus:border-foreground/40"
           @change="(e: Event) => handlePositionChange('x', (e.target as HTMLInputElement).value)"
         >
       </label>
       <label class="space-y-1">
-        <span text-xs text-foreground-muted>Y</span>
+        <span text="[10px]" text-foreground-muted>Y</span>
         <input
           type="number"
           :value="posY"
           data-preserve-canvas-selection="true"
-          class="w-full rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-xs tabular-nums text-foreground outline-none focus:border-foreground/40"
+          class="w-full rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-[10px] tabular-nums text-foreground outline-none focus:border-foreground/40"
           @change="(e: Event) => handlePositionChange('y', (e.target as HTMLInputElement).value)"
         >
       </label>
     </div>
 
     <!-- Size (read-only) -->
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-2 gap-1.5">
       <label class="space-y-1">
-        <span text-xs text-foreground-muted>W</span>
-        <div class="rounded-md border border-border/40 bg-secondary/20 px-2 py-1 text-xs tabular-nums text-foreground-subtle">
+        <span text="[10px]" text-foreground-muted>W</span>
+        <div class="rounded-md border border-border/40 bg-secondary/20 px-2 py-1 text-[10px] tabular-nums text-foreground-subtle">
           {{ width }}
         </div>
       </label>
       <label class="space-y-1">
-        <span text-xs text-foreground-muted>H</span>
-        <div class="rounded-md border border-border/40 bg-secondary/20 px-2 py-1 text-xs tabular-nums text-foreground-subtle">
+        <span text="[10px]" text-foreground-muted>H</span>
+        <div class="rounded-md border border-border/40 bg-secondary/20 px-2 py-1 text-[10px] tabular-nums text-foreground-subtle">
           {{ height }}
         </div>
       </label>
@@ -94,8 +94,8 @@ function handleAlphaChange(value: number) {
     <!-- Rotation -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>旋转</span>
-        <span class="text-[11px] font-mono tabular-nums text-foreground-subtle">
+        <span text="[10px]" text-foreground-muted>旋转</span>
+        <span class="text-[10px] font-mono tabular-nums text-foreground-subtle">
           {{ rotation }}<span class="ml-0.5 text-[9px] opacity-60">°</span>
         </span>
       </div>
@@ -112,8 +112,8 @@ function handleAlphaChange(value: number) {
     <!-- Opacity -->
     <div space-y-1>
       <div flex items-center justify-between>
-        <span text-xs text-foreground-muted>透明度</span>
-        <span class="text-[11px] font-mono tabular-nums text-foreground-subtle">
+        <span text="[10px]" text-foreground-muted>透明度</span>
+        <span class="text-[10px] font-mono tabular-nums text-foreground-subtle">
           {{ alphaPercent }}<span class="ml-0.5 text-[9px] opacity-60">%</span>
         </span>
       </div>

@@ -97,45 +97,40 @@ const hintConfig = computed(() => {
 
 <template>
   <div h-full flex="~ col" overflow-hidden data-preserve-canvas-selection="true">
-    <div p-4 border-b border-border>
-      <div text-sm font-medium text-foreground>
-        滤镜
-      </div>
-      <div text-xs text-foreground-muted mt-1>
-        选择预设创建滤镜，点击时间轴上的滤镜可编辑参数
-      </div>
+    <div class="p-3 border-b border-border/70">
+      <div class="text-sm font-medium text-foreground">滤镜</div>
     </div>
 
-    <div flex-1 overflow-y-auto p-4 space-y-4>
+    <div flex-1 overflow-y-auto p-3 space-y-3>
       <!-- Preset Grid -->
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-3 gap-1.5">
         <Button
           v-for="preset in FILTER_PRESETS"
           :key="preset.value"
           variant="outline"
-          size="sm"
-          class="justify-start font-normal"
+          size="xs"
+          class="justify-start font-normal h-8 px-2 text-[10px]"
           @click="handleCreateFromPreset(preset)"
         >
-          <div :class="preset.icon" class="mr-2 h-4 w-4 shrink-0" />
+          <div :class="preset.icon" class="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
           {{ preset.label }}
         </Button>
       </div>
 
       <!-- Divider + Edit Area -->
       <template v-if="activeLayer">
-        <div class="border-t border-border" />
+        <div class="h-px bg-border/30" />
 
-        <div class="space-y-4">
+        <div class="space-y-3">
           <div class="flex items-center justify-between">
             <div class="flex flex-col">
-              <span class="text-sm text-foreground font-medium">{{ activeLayer.name }}</span>
-              <span class="text-xs text-foreground-muted">
+              <span class="text-xs text-foreground font-medium">{{ activeLayer.name }}</span>
+              <span class="text-[10px] text-foreground-muted tabular-nums">
                 {{ Math.round(activeLayer.duration / 100) / 10 }}s
               </span>
             </div>
             <span
-              class="text-xs"
+              class="text-[10px] bg-secondary/50 px-1.5 py-0.5 rounded"
               :class="isConfigDefault ? 'text-foreground-muted' : 'text-primary'"
             >
               {{ isConfigDefault ? '默认' : '已调整' }}

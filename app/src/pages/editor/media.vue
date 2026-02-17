@@ -90,12 +90,12 @@ function importVideoFromUrl() {
     @dragenter="onDragEnter"
     @dragleave="onDragLeave"
   >
-    <div p-4 p-b-0 text-foreground>
-      你的媒体
-    </div>
+    <!-- Header & Upload -->
+    <div class="p-3 border-b border-border/70 space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-medium text-foreground">你的媒体</span>
+      </div>
 
-    <!-- 上传区域 -->
-    <div p-4 border-b border-border>
       <input
         id="media-upload"
         type="file"
@@ -107,22 +107,22 @@ function importVideoFromUrl() {
       <div flex w-full isolate>
         <label for="media-upload" class="flex-1 cursor-pointer relative z-0 hover:z-10">
           <div
-            class="flex items-center justify-center w-full h-10 px-4 py-2 gap-2 whitespace-nowrap text-sm font-medium transition-all duration-150 ease-out border border-border rounded-l-md rounded-r-none bg-background text-foreground hover:bg-accent hover:text-accent-foreground select-none"
+            class="flex items-center justify-center w-full h-8 px-3 gap-1.5 whitespace-nowrap text-xs font-medium transition-all duration-150 ease-out border border-border rounded-l-md rounded-r-none bg-background text-foreground hover:bg-accent hover:text-accent-foreground select-none"
             :class="isDragging ? 'border-primary bg-primary/20' : ''"
           >
-            <div i-carbon-add text-lg />
+            <div i-carbon-add text-base />
             <span>导入媒体</span>
           </div>
         </label>
 
         <Button
           variant="outline"
-          class="shrink-0 px-3 rounded-l-none -ml-px relative z-0 hover:z-10 bg-background"
+          class="shrink-0 h-8 px-2.5 rounded-l-none -ml-px relative z-0 hover:z-10 bg-background"
           :class="{ '!bg-secondary !border-primary/50 text-primary z-20': showUrlInput }"
           title="通过 URL 导入"
           @click="showUrlInput = !showUrlInput"
         >
-          <div i-carbon-link text-lg />
+          <div i-carbon-link text-base />
         </Button>
       </div>
 

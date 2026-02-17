@@ -292,127 +292,95 @@ onMounted(() => {
 
 <template>
   <div class="library-shell hfull flex flex-col text-foreground">
-    <div class="library-header px-4 pt-4 pb-3">
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="text-[11px] uppercase tracking-[0.16em] text-foreground-subtle">
-            Pexels Curated
-          </div>
-          <div class="mt-1 text-sm font-semibold text-foreground">
-            素材库
-          </div>
-          <div class="mt-1 text-xs leading-5 text-foreground-muted">
-            搜索并选择素材，支持多选导入到媒体库
-          </div>
-        </div>
-
-        <div class="shrink-0 rounded-md border border-border/70 bg-secondary/30 px-2 py-1 text-[11px] text-foreground-muted">
-          {{ kindLabel }}
-        </div>
-      </div>
-
-      <div class="mt-3 rounded-md border border-border/70 bg-background/70 px-3 py-2">
-        <div class="flex items-center justify-between gap-2 text-[11px] text-foreground-muted">
+    <div class="flex flex-col gap-3 p-3 border-b border-border/70">
+      <!-- Header Row: Title & Stats -->
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium text-foreground">素材库</div>
+        <div class="flex items-center gap-2 text-[10px] text-foreground-muted">
           <span>{{ loadedSummary }}</span>
-          <span v-if="selectedCount > 0" class="text-foreground">
+          <span v-if="selectedCount > 0" class="text-primary font-medium">
             已选 {{ selectedCount }}
           </span>
         </div>
-        <div
-          v-if="loadProgressPercent !== null"
-          class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary/70"
-        >
-          <div class="h-full rounded-full bg-primary/75 transition-all duration-200" :style="{ width: `${loadProgressPercent}%` }" />
-        </div>
       </div>
-    </div>
 
-    <div class="space-y-3 border-b border-border/70 px-4 pb-3">
-      <div class="group flex items-center gap-2 rounded-lg border border-border/80 bg-background/70 px-3 py-2 transition-colors focus-within:border-border-emphasis focus-within:bg-background">
-        <div i-carbon-search class="text-sm text-foreground-muted" />
-        <div class="min-w-0 flex-1">
+      <!-- Search & Kind Toggle -->
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1 group">
+          <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted i-carbon-search text-xs" />
           <input
             v-model="query"
             type="text"
-            placeholder="搜索素材关键词..."
-            class="w-full border-none bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-subtle"
+            placeholder="搜索..."
+            class="w-full h-8 rounded-md border border-border/70 bg-secondary/30 pl-8 pr-7 text-xs text-foreground outline-none focus:border-border-emphasis focus:bg-background transition-all placeholder:text-foreground-subtle"
             @keydown.enter.prevent="onSearch"
           >
+          <button
+            v-if="query.trim().length > 0"
+            class="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
+            @click="clearQuery"
+          >
+            <div i-carbon-close text-xs />
+          </button>
         </div>
-        <Button
-          v-if="query.trim().length > 0"
-          variant="ghost"
-          size="icon-xs"
-          aria-label="清空搜索关键词"
-          @click="clearQuery"
-        >
-          <div i-carbon-close />
-        </Button>
-      </div>
 
-      <div class="flex items-center gap-2">
-        <Button
-          variant="secondary"
-          size="icon"
-          aria-label="搜索素材"
-          :disabled="isLoading || isLoadingMore"
-          @click="onSearch"
-        >
-          <div v-if="isLoading && assets.length === 0" i-carbon-circle-dash animate-spin />
-          <div v-else i-carbon-search />
-        </Button>
-
-        <div class="inline-flex items-center rounded-lg border border-border/70 bg-secondary/30 p-0.5">
-          <Button
-            size="sm"
-            :variant="kind === 'video' ? 'default' : 'ghost'"
-            class="min-w-14"
-            @click="kind = 'video'"
+        <div class="flex items-center rounded-md border border-border/70 bg-secondary/30 p-0.5 shrink-0">
+          <button
+            v-for="k in ['video', 'image'] as const"
+            :key="k"
+            class="px-2 py-1 text-[10px] rounded-[3px] transition-all"
+            :class="kind === k ? 'bg-background shadow-sm text-foreground font-medium' : 'text-foreground-muted hover:text-foreground'"
+            @click="kind = k"
           >
-            视频
-          </Button>
-          <Button
-            size="sm"
-            :variant="kind === 'image' ? 'default' : 'ghost'"
-            class="min-w-14"
-            @click="kind = 'image'"
-          >
-            图片
-          </Button>
+            {{ k === 'video' ? '视频' : '图片' }}
+          </button>
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
+      <!-- Action Buttons -->
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-1">
+          <Button
+            size="xs"
+            variant="ghost"
+            class="h-7 px-2 text-[10px]"
+            :disabled="assets.length === 0 || isImporting"
+            @click="toggleSelectLoaded"
+          >
+            {{ allLoadedSelected ? '取消全选' : '全选' }}
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            class="h-7 px-2 text-[10px]"
+            :disabled="selectedCount === 0 || isImporting"
+            @click="clearSelection"
+          >
+            清空
+          </Button>
+        </div>
         <Button
-          size="sm"
-          variant="outline"
-          :disabled="assets.length === 0 || isImporting"
-          @click="toggleSelectLoaded"
-        >
-          {{ allLoadedSelected ? '取消全选' : '全选当前列表' }}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          :disabled="selectedCount === 0 || isImporting"
-          @click="clearSelection"
-        >
-          清空选择
-        </Button>
-        <Button
-          size="sm"
-          class="ml-auto max-sm:w-full"
+          size="xs"
+          class="h-7 px-3 text-[10px]"
           :disabled="selectedCount === 0 || isImporting"
           @click="importSelectedAssets"
         >
           <div v-if="isImporting" i-carbon-circle-dash animate-spin mr-1 />
-          导入选中（{{ selectedCount }}）
+          导入 ({{ selectedCount }})
         </Button>
       </div>
 
-      <div v-if="importError" class="flex items-start gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-2 text-xs text-destructive break-all">
-        <div i-carbon-warning-filled class="shrink-0" />
+      <div v-if="importError" class="flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-1.5 text-[10px] text-destructive break-all">
+        <div i-carbon-warning-filled class="shrink-0 text-xs" />
         <span>{{ importError }}</span>
+      </div>
+
+      <!-- Progress Bar (Subtle) -->
+      <div
+        v-if="loadProgressPercent !== null && loadProgressPercent < 100"
+        class="h-0.5 w-full overflow-hidden rounded-full bg-secondary/70 mt-1"
+      >
+        <div class="h-full rounded-full bg-primary/75 transition-all duration-200" :style="{ width: `${loadProgressPercent}%` }" />
       </div>
     </div>
 
@@ -566,10 +534,7 @@ onMounted(() => {
 
 <style scoped>
 .library-shell {
-  background:
-    radial-gradient(120% 70% at 100% 0%, hsl(var(--primary) / 0.12) 0%, transparent 52%),
-    radial-gradient(120% 70% at 0% 100%, hsl(var(--foreground) / 0.04) 0%, transparent 62%),
-    hsl(var(--background-elevated));
+  background: hsl(var(--background-elevated));
 }
 
 .library-header {

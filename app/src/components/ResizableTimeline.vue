@@ -75,19 +75,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div w-full flex flex-col bg-background-elevated border-t border-border z-10>
+  <div
+    class="flex flex-col z-10 mx-4 mb-4 rounded-2xl border border-border shadow-sm bg-background-elevated overflow-hidden isolate"
+  >
     <!-- Resize Handle -->
     <div
-      h-1 w-full cursor-row-resize flex items-center justify-center group relative z-20 bg-background class="hover:bg-primary/10" transition-colors
+      h-1.5 w-full cursor-row-resize flex items-center justify-center group relative z-20 bg-background-elevated transition-colors
+      class="hover:bg-muted/50"
       @mousedown="startDrag"
     >
       <!-- Visual cue for dragging -->
       <div
-        w-8 h-0.5 rounded-full bg-border class="group-hover:bg-primary/50 transition-colors"
+        w-12 h-1 rounded-full bg="border/50"
+        class="group-hover:bg-primary/50 transition-colors"
       />
     </div>
 
-    <PlaybackControls />
+    <PlaybackControls border-t border="border/50" />
 
     <div
       w-full

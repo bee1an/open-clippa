@@ -204,7 +204,6 @@ onMounted(() => {
 <template>
   <section
     h-full flex="~ col"
-    border-r border="border/50" bg-background-elevated
     data-preserve-canvas-selection="true"
   >
     <header h-12 shrink-0 border-b border="border/50" px-3 flex items-center justify-between gap-2>

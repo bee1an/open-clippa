@@ -7,6 +7,38 @@ import {
 } from 'unocss'
 import presetAnimations from 'unocss-preset-animations'
 
+const DYNAMIC_ICON_SAFE_LIST = [
+  'i-ph-film-strip-bold',
+  'i-ph-film-strip-fill',
+  'i-ph-magic-wand-bold',
+  'i-ph-magic-wand-fill',
+  'i-ph-text-t-bold',
+  'i-ph-text-t-fill',
+  'i-ph-arrow-bend-up-right-bold',
+  'i-ph-arrow-bend-up-right-fill',
+  'i-ph-images-bold',
+  'i-ph-images-fill',
+  'i-ph-sun-bold',
+  'i-ph-snowflake-bold',
+  'i-ph-circle-half-bold',
+  'i-ph-palette-bold',
+  'i-ph-drop-bold',
+  'i-ph-lightning-bold',
+  'i-ph-coffee-bold',
+  'i-ph-drop-half-bottom-bold',
+  'i-ph-arrow-up-bold',
+  'i-ph-arrow-down-bold',
+  'i-ph-arrow-left-bold',
+  'i-ph-arrow-right-bold',
+  'i-ph-magnifying-glass-plus-bold',
+  'i-ph-magnifying-glass-minus-bold',
+  'i-ph-arrow-counter-clockwise-bold',
+  'i-ph-arrow-clockwise-bold',
+  'i-ph-cloud-bold',
+  'i-ph-heartbeat-bold',
+  'i-ph-spinner-bold',
+] as const
+
 export default defineConfig({
   content: {
     pipeline: {
@@ -16,6 +48,7 @@ export default defineConfig({
       ],
     },
   },
+  safelist: [...DYNAMIC_ICON_SAFE_LIST],
 
   presets: [
     presetWind4(),
@@ -27,14 +60,33 @@ export default defineConfig({
     presetAnimations(),
   ],
 
-  transformers: [
-    transformerDirectives(),
-  ],
+  transformers: [transformerDirectives()],
 
   theme: {
     fontFamily: {
-      sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
-      mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
+      sans: [
+        'Inter',
+        'ui-sans-serif',
+        'system-ui',
+        '-apple-system',
+        'BlinkMacSystemFont',
+        'Segoe UI',
+        'Roboto',
+        'Helvetica Neue',
+        'Arial',
+        'sans-serif',
+      ],
+      mono: [
+        'JetBrains Mono',
+        'ui-monospace',
+        'SFMono-Regular',
+        'Menlo',
+        'Monaco',
+        'Consolas',
+        'Liberation Mono',
+        'Courier New',
+        'monospace',
+      ],
     },
     colors: {
       border: {
@@ -136,26 +188,47 @@ export default defineConfig({
 
     // 面板与容器
     ['panel', 'bg-background-elevated border border-border-subtle rounded-lg'],
-    ['panel-elevated', 'bg-background-overlay border border-border rounded-lg shadow-lg'],
+    [
+      'panel-elevated',
+      'bg-background-overlay border border-border rounded-lg shadow-lg',
+    ],
 
     // 交互基础
     ['interactive', 'transition-all duration-150 ease-out cursor-pointer'],
-    ['btn-base', 'interactive inline-flex items-center justify-center whitespace-nowrap font-medium select-none'],
+    [
+      'btn-base',
+      'interactive inline-flex items-center justify-center whitespace-nowrap font-medium select-none',
+    ],
 
     // 焦点环
-    ['focus-ring', 'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'],
+    [
+      'focus-ring',
+      'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    ],
 
     // 文字层级
     ['text-muted', 'text-foreground-muted'],
     ['text-subtle', 'text-foreground-subtle'],
 
     // 编辑器布局
-    ['editor-sider', 'bg-background-elevated border-border-subtle h-full overflow-hidden'],
-    ['editor-header', 'h-14 bg-background-elevated border-b border-border-subtle flex items-center px-4 shadow-sm'],
-    ['editor-toolbar', 'h-10 bg-background-elevated border-b border-border-subtle flex items-center px-3 gap-1'],
+    [
+      'editor-sider',
+      'bg-background-elevated border-border-subtle h-full overflow-hidden',
+    ],
+    [
+      'editor-header',
+      'h-14 bg-background-elevated border-b border-border-subtle flex items-center px-4 shadow-sm',
+    ],
+    [
+      'editor-toolbar',
+      'h-10 bg-background-elevated border-b border-border-subtle flex items-center px-3 gap-1',
+    ],
 
     // 图标按钮
-    ['icon-btn', 'interactive center rounded-md text-foreground-muted hover:text-foreground hover:bg-accent'],
+    [
+      'icon-btn',
+      'interactive center rounded-md text-foreground-muted hover:text-foreground hover:bg-accent',
+    ],
     ['icon-btn-sm', 'icon-btn w-8 h-8'],
     ['icon-btn-md', 'icon-btn w-10 h-10'],
 

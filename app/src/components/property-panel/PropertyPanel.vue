@@ -44,19 +44,7 @@ const typeComponents = {
     h-full flex="~ col" overflow-hidden
     data-preserve-canvas-selection="true"
   >
-    <div p-4 pb-0 text-foreground font-medium>
-      属性
-    </div>
-
-    <div flex-1 overflow-y-auto p-4 space-y-3>
-      <!-- Target Info -->
-      <div flex items-center justify-between gap-3>
-        <span text-xs uppercase tracking-widest text-foreground-subtle>目标</span>
-        <span class="max-w-44 truncate rounded-md border border-border/70 bg-secondary/40 px-2 py-1 text-xs font-medium text-foreground">
-          {{ selectedId }}
-        </span>
-      </div>
-
+    <div flex-1 overflow-y-auto p-3 space-y-2>
       <!-- Type-specific panel -->
       <component
         :is="typeComponents[performerType]"
@@ -67,21 +55,21 @@ const typeComponents = {
         @update:style="updateTextStyle"
       />
 
-      <div class="h-px bg-border/50" />
+      <div class="h-px bg-border/30" />
 
       <!-- Animation entry -->
       <button
-        class="w-full flex items-center justify-between rounded-md border border-border/70 px-3 py-2.5 text-xs text-foreground-muted transition-colors hover:bg-secondary/40 hover:text-foreground"
+        class="w-full flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-foreground-muted transition-colors hover:bg-secondary/50 hover:text-foreground group"
         @click="emit('navigateAnimation')"
       >
         <span flex items-center gap-2>
-          <div class="i-ph-sparkle-bold" text-sm />
+          <div class="i-ph-sparkle-bold text-primary/70 group-hover:text-primary transition-colors" text-xs />
           动画
         </span>
-        <div class="i-ph-caret-left-bold" text-xs opacity-50 />
+        <div class="i-ph-caret-right-bold" text-xs opacity-50 />
       </button>
 
-      <div class="h-px bg-border/50" />
+      <div class="h-px bg-border/30" />
 
       <!-- Common transform properties -->
       <CommonProperties

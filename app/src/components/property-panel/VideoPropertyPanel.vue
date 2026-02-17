@@ -45,25 +45,25 @@ const timelineDuration = computed(() => {
 </script>
 
 <template>
-  <div space-y-3>
-    <div text-xs uppercase tracking-widest text-foreground-subtle>
+  <div space-y-2>
+    <div text="[10px]" uppercase tracking-wider text-foreground-subtle>
       视频
     </div>
 
     <div space-y-2>
       <div flex items-center justify-between gap-2>
-        <span text-xs text-foreground-muted>素材</span>
-        <span class="max-w-40 truncate text-xs text-foreground">{{ sourceFileName }}</span>
+        <span text="[10px]" text-foreground-muted>素材</span>
+        <span class="max-w-40 truncate text-[10px] text-foreground">{{ sourceFileName }}</span>
       </div>
 
       <div flex items-center justify-between gap-2>
-        <span text-xs text-foreground-muted>素材时长</span>
-        <span class="font-mono text-xs tabular-nums text-foreground">{{ sourceDuration }}</span>
+        <span text="[10px]" text-foreground-muted>素材时长</span>
+        <span class="font-mono text-[10px] tabular-nums text-foreground">{{ sourceDuration }}</span>
       </div>
 
       <div flex items-center justify-between gap-2>
-        <span text-xs text-foreground-muted>片段时长</span>
-        <span class="font-mono text-xs tabular-nums text-foreground">{{ timelineDuration }}</span>
+        <span text="[10px]" text-foreground-muted>片段时长</span>
+        <span class="font-mono text-[10px] tabular-nums text-foreground">{{ timelineDuration }}</span>
       </div>
     </div>
   </div>
