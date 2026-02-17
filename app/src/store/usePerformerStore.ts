@@ -313,6 +313,7 @@ export const usePerformerStore = defineStore('performer', () => {
     const performer = performerMap.get(performerId)
     if (performer) {
       removeTimelineTrainById(performerId)
+      editorStore.clippa.fire(performer)
 
       // 清理 performer 资源
       performer.destroy()
@@ -446,7 +447,10 @@ export const usePerformerStore = defineStore('performer', () => {
 
   // 清理所有 performers
   const clearAllPerformers = () => {
-    performerMap.forEach(performer => performer.destroy())
+    performerMap.forEach((performer) => {
+      editorStore.clippa.fire(performer)
+      performer.destroy()
+    })
     performerMap.clear()
 
     if (selectedPerformers.value.length > 0) {

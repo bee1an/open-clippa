@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import type { Train } from 'clippc'
+import type { CanvasSize, Train } from 'clippc'
 import type { VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Select } from '@/components/ui/select'
 import { useEditorStore } from '@/store'
 import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { loadVideoMetadata } from '@/utils/media'
 import SelectionGroup from './SelectionGroup.vue'
 
-const CANVAS_WIDTH = 996
-const CANVAS_HEIGHT = CANVAS_WIDTH / 16 * 9
 const DEFAULT_TEST_VIDEOS = [
   { id: 'video-test-legacy', src: 'https://pixijs.com/assets/video.mp4' },
   { id: 'video-test-bunny', src: '/bunny.mp4' },
@@ -20,10 +19,16 @@ const MAX_TIMELINE_SYNC_RETRIES = 24
 const editorStore = useEditorStore()
 const mediaStore = useMediaStore()
 const performerStore = usePerformerStore()
-const { currentTime, duration } = storeToRefs(editorStore)
+const { currentTime, duration, canvasPresetId, canvasSize } = storeToRefs(editorStore)
 const { selectedPerformers, selectionRevision } = storeToRefs(performerStore)
 const { clippa } = editorStore
-clippa.stage.init({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, antialias: true })
+clippa.stage.init({ width: canvasSize.value.width, height: canvasSize.value.height, antialias: true })
+const canvasPresetOptions = computed(() => {
+  return editorStore.canvasPresets.map(item => ({
+    label: item.id,
+    value: item.id,
+  }))
+})
 
 const sliderValue = ref(0)
 const isSyncingFromTimeline = ref(false)
@@ -38,10 +43,10 @@ const PRESERVE_SELECTION_ATTR = 'data-preserve-canvas-selection'
 
 // Canvas 缩放率
 const canvasScaleRatio = ref(1)
-const canvasDisplaySize = ref({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })
-const CANVAS_RATIO = CANVAS_WIDTH / CANVAS_HEIGHT
+const canvasDisplaySize = ref({ width: canvasSize.value.width, height: canvasSize.value.height })
 const CANVAS_MAX_WIDTH_FACTOR = 0.95
-const CANVAS_MAX_HEIGHT_FACTOR = 0.85
+const CANVAS_MAX_HEIGHT_FACTOR = 0.9
+const CANVAS_CONTROLS_RESERVED_HEIGHT = 38
 const canvasWrapperStyle = computed(() => ({
   width: `${canvasDisplaySize.value.width}px`,
   height: `${canvasDisplaySize.value.height}px`,
@@ -53,16 +58,17 @@ function calculateCanvasDisplaySize() {
     return
 
   const availableWidth = containerElement.clientWidth * CANVAS_MAX_WIDTH_FACTOR
-  const availableHeight = containerElement.clientHeight * CANVAS_MAX_HEIGHT_FACTOR
+  const availableHeight = containerElement.clientHeight * CANVAS_MAX_HEIGHT_FACTOR - CANVAS_CONTROLS_RESERVED_HEIGHT
   if (availableWidth <= 0 || availableHeight <= 0)
     return
 
+  const ratio = canvasSize.value.width / canvasSize.value.height
   let width = availableWidth
-  let height = width / CANVAS_RATIO
+  let height = width / ratio
 
   if (height > availableHeight) {
     height = availableHeight
-    width = height * CANVAS_RATIO
+    width = height * ratio
   }
 
   canvasDisplaySize.value = {
@@ -185,6 +191,28 @@ watch(currentTime, () => {
   sliderValue.value = currentTime.value / duration.value
 })
 
+function isSameCanvasSize(left: CanvasSize, right: CanvasSize): boolean {
+  return left.width === right.width && left.height === right.height
+}
+
+async function handleCanvasSizeChange(nextSize: CanvasSize, previousSize: CanvasSize): Promise<void> {
+  if (isSameCanvasSize(nextSize, previousSize))
+    return
+
+  await clippa.ready
+  clippa.resizeCanvas(nextSize, true)
+  calculateCanvasDisplaySize()
+}
+
+watch(
+  canvasSize,
+  (nextSize, previousSize) => {
+    if (!previousSize)
+      return
+    void handleCanvasSizeChange(nextSize, previousSize)
+  },
+)
+
 function findTrainById(id: string): Train | null {
   const rails = clippa.timeline.rails?.rails ?? []
   for (const rail of rails) {
@@ -197,6 +225,13 @@ function findTrainById(id: string): Train | null {
 
 function resolveDefaultVideoUrl(src: string): string {
   return new URL(src, window.location.href).toString()
+}
+
+function handleCanvasPresetChange(value: string): void {
+  if (value === canvasPresetId.value)
+    return
+
+  editorStore.setCanvasPreset(value)
 }
 
 function ensureDefaultVideoAssets() {
@@ -311,8 +346,8 @@ async function ensureDefaultVideoPerformer(): Promise<void> {
   if (defaultTestVideoIds.some(id => Boolean(findTrainById(id))))
     return
 
-  const layoutWidth = CANVAS_WIDTH / DEFAULT_TEST_VIDEOS.length
-  const layoutHeight = CANVAS_HEIGHT
+  const layoutWidth = canvasSize.value.width / DEFAULT_TEST_VIDEOS.length
+  const layoutHeight = canvasSize.value.height
   const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = []
 
   for (const [index, defaultVideo] of defaultVideos.entries()) {
@@ -412,15 +447,38 @@ onUnmounted(() => {
 
 <template>
   <div h-full w-full flex flex-col items-center justify-center bg-background relative overflow-hidden>
-    <div ref="canvasContainerRef" h-full w-full flex items-center justify-center overflow-hidden>
-      <div
-        id="canvas"
-        ref="canvasWrapperRef"
-        rounded-sm overflow-visible border="white/5" relative bg-black shrink-0
-        :style="canvasWrapperStyle"
-        @pointerdown="handleCanvasPointerDown"
-      >
-        <SelectionGroup :scale-ratio="canvasScaleRatio" />
+    <div ref="canvasContainerRef" flex-1 w-full flex items-center justify-center overflow-hidden>
+      <div class="flex shrink-0 flex-col items-center gap-2">
+        <div
+          class="inline-flex max-w-full items-center gap-1 rounded-full border border-border/60 bg-background-elevated/90 px-1.5 py-1 shadow-sm backdrop-blur-sm"
+          data-preserve-canvas-selection="true"
+        >
+          <div
+            i-ph-corners-out-bold
+            text="[12px]"
+            text-foreground-muted
+            class="ml-1 shrink-0"
+            aria-hidden="true"
+          />
+          <Select
+            :model-value="canvasPresetId"
+            :options="canvasPresetOptions"
+            size="xs"
+            class="min-w-22 rounded-full border-0 bg-secondary/60"
+            data-preserve-canvas-selection="true"
+            @update:model-value="handleCanvasPresetChange"
+          />
+        </div>
+
+        <div
+          id="canvas"
+          ref="canvasWrapperRef"
+          rounded-sm overflow-visible border="white/5" relative bg-black
+          :style="canvasWrapperStyle"
+          @pointerdown="handleCanvasPointerDown"
+        >
+          <SelectionGroup :scale-ratio="canvasScaleRatio" />
+        </div>
       </div>
     </div>
   </div>

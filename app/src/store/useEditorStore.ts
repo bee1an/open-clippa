@@ -1,10 +1,19 @@
-import { Clippa } from 'clippc'
+import type { CanvasSize } from 'clippc'
+import {
+  CANVAS_PRESETS,
+  Clippa,
+  DEFAULT_CANVAS_PRESET_ID,
+  resolveCanvasSizeByPresetId,
+} from 'clippc'
 import { defineStore } from 'pinia'
 
 type TransitionFrameSyncer = () => Promise<void> | void
 
 export const useEditorStore = defineStore('editor', () => {
   const clippa = markRaw(new Clippa())
+  const canvasPresets = CANVAS_PRESETS
+  const canvasPresetId = ref(DEFAULT_CANVAS_PRESET_ID)
+  const canvasSize = ref<CanvasSize>(resolveCanvasSizeByPresetId(canvasPresetId.value))
 
   const currentTime = ref(0)
   clippa.director.on('updateCurrentTime', (time) => {
@@ -41,13 +50,24 @@ export const useEditorStore = defineStore('editor', () => {
     await transitionFrameSyncer()
   }
 
+  function setCanvasPreset(presetId: string): void {
+    const nextSize = resolveCanvasSizeByPresetId(presetId)
+    const normalizedPresetId = canvasPresets.find(item => item.id === presetId)?.id ?? DEFAULT_CANVAS_PRESET_ID
+    canvasPresetId.value = normalizedPresetId
+    canvasSize.value = nextSize
+  }
+
   return {
     clippa,
+    canvasPresets,
+    canvasPresetId,
+    canvasSize,
     currentTime,
     duration,
     isPlaying,
     selectedVideo,
     registerTransitionFrameSyncer,
     syncTransitionFrame,
+    setCanvasPreset,
   }
 })

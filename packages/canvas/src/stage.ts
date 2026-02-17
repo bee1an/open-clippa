@@ -1,7 +1,9 @@
 import type { Performer } from '@clippc/performer'
 import type { MaybeArray } from 'type-aide'
+import type { CanvasSize } from './layout'
 import { EventBus } from '@clippc/utils'
 import { Application } from 'pixi.js'
+import { normalizeCanvasSize } from './layout'
 
 export interface InitialOption {
   width?: number
@@ -23,12 +25,17 @@ export type StageEvents = {
 export class Stage extends EventBus<StageEvents> {
   private _app!: Application
   private _pendingLoads: Set<Performer> = new Set()
+  private _size: CanvasSize = { width: 0, height: 0 }
 
   /**
    * 获取PIXI应用实例
    */
   get app(): Application {
     return this._app
+  }
+
+  get size(): CanvasSize {
+    return { ...this._size }
   }
 
   /**
@@ -59,6 +66,10 @@ export class Stage extends EventBus<StageEvents> {
 
     await app.init(option)
     app.stage.sortableChildren = true
+    this._size = normalizeCanvasSize({
+      width: app.renderer.width,
+      height: app.renderer.height,
+    })
     this._readyResolve()
 
     return app
@@ -76,6 +87,16 @@ export class Stage extends EventBus<StageEvents> {
     }
 
     element.appendChild(this._app.canvas)
+  }
+
+  resize(size: CanvasSize): void {
+    if (!this._app) {
+      throw new Error('app not found')
+    }
+
+    const nextSize = normalizeCanvasSize(size)
+    this._app.renderer.resize(nextSize.width, nextSize.height)
+    this._size = nextSize
   }
 
   /**

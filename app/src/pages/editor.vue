@@ -34,6 +34,36 @@ const {
   errorMessage: exportErrorMessage,
 } = storeToRefs(exportTaskStore)
 const isExporting = computed(() => exportStatus.value === 'exporting')
+const SIDER_MAIN_ICON = {
+  expanded: 'i-ph-sidebar-simple-fill [transform:scaleX(-1)]',
+  collapsed: 'i-ph-sidebar-simple-bold [transform:scaleX(-1)]',
+} as const
+const CHAT_MAIN_ICON = {
+  expanded: 'i-ph-chat-circle-text-fill',
+  collapsed: 'i-ph-chat-circle-text-bold',
+} as const
+const rightPanelMainIcon = computed(() => {
+  return siderCollapsed.value ? SIDER_MAIN_ICON.collapsed : SIDER_MAIN_ICON.expanded
+})
+const leftPanelMainIcon = computed(() => {
+  return chatPanelOpen.value ? CHAT_MAIN_ICON.expanded : CHAT_MAIN_ICON.collapsed
+})
+const leftPanelToggleClass = computed(() => {
+  return chatPanelOpen.value
+    ? 'bg-secondary text-foreground ring-1 ring-border/60 shadow-sm'
+    : 'text-foreground-muted hover:bg-secondary hover:text-foreground'
+})
+const rightPanelToggleClass = computed(() => {
+  return siderCollapsed.value
+    ? 'text-foreground-muted hover:bg-secondary hover:text-foreground'
+    : 'bg-secondary text-foreground ring-1 ring-border/60 shadow-sm'
+})
+const rightPanelArrowIcon = computed(() => {
+  return siderCollapsed.value ? 'i-ph-caret-left-bold' : 'i-ph-caret-right-bold'
+})
+const leftPanelArrowIcon = computed(() => {
+  return chatPanelOpen.value ? 'i-ph-caret-left-bold' : 'i-ph-caret-right-bold'
+})
 
 useFilterEngine()
 useTimelineBinding()
@@ -93,23 +123,40 @@ watch(exportStatus, (nextStatus) => {
       <div flex-1 />
 
       <div flex items-center gap-1>
-        <!-- Right Sidebar Toggle -->
+        <!-- Left AI Toggle -->
         <button
-          w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
-          title="切换右侧栏"
-          @click="layoutStore.toggleSiderCollapsed()"
+          relative w-8 h-8 rounded flex items-center justify-center transition-colors
+          :class="leftPanelToggleClass"
+          :title="chatPanelOpen ? '收起左侧 AI 面板' : '展开左侧 AI 面板'"
+          :aria-pressed="chatPanelOpen"
+          aria-label="左侧 AI 面板开关"
+          @click="toggleChatPanel"
         >
-          <div :class="!siderCollapsed ? 'i-ph-sidebar-simple-fill' : 'i-ph-sidebar-simple-bold'" text-lg />
+          <div :class="leftPanelMainIcon" text="[18px]" />
+          <!-- <div class="absolute left-1 top-1/2 h-3 w-[1.5px] -translate-y-1/2 rounded-full bg-current/45" /> -->
+          <div
+            class="absolute -left-1 top-1/2 -translate-y-1/2 rounded-full bg-background p-0.5 text-[10px] leading-none shadow-sm"
+            :class="leftPanelArrowIcon"
+          />
         </button>
 
         <div w-px h-4 bg-border mx-2 />
 
+        <!-- Right Sidebar Toggle -->
         <button
-          w-8 h-8 rounded hover:bg-secondary flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors
-          :title="chatPanelOpen ? '隐藏 AI 助手' : '显示 AI 助手'"
-          @click="toggleChatPanel"
+          relative w-8 h-8 rounded flex items-center justify-center transition-colors
+          :class="rightPanelToggleClass"
+          :title="siderCollapsed ? '展开右侧面板' : '收起右侧面板'"
+          :aria-pressed="!siderCollapsed"
+          aria-label="右侧面板开关"
+          @click="layoutStore.toggleSiderCollapsed()"
         >
-          <div :class="chatPanelOpen ? 'i-ph-chat-circle-text-fill' : 'i-ph-chat-circle-text-bold'" text-lg />
+          <div :class="rightPanelMainIcon" text="[18px]" />
+          <!-- <div class="absolute right-1 top-1/2 h-3 w-[1.5px] -translate-y-1/2 rounded-full bg-current/45" /> -->
+          <div
+            class="absolute -right-1 top-1/2 -translate-y-1/2 rounded-full bg-background p-0.5 text-[10px] leading-none shadow-sm"
+            :class="rightPanelArrowIcon"
+          />
         </button>
 
         <div w-px h-4 bg-border mx-2 />

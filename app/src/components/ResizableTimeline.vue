@@ -12,6 +12,12 @@ const { timelineHidden } = storeToRefs(layoutStore)
 
 // 使用VueUse的useStorage来管理高度状态
 const timelineHeight = useStorage('timelineHeight', DEFAULT_HEIGHT)
+
+// 拖动状态
+const isDragging = ref(false)
+const dragStartY = ref(0)
+const dragStartHeight = ref(0)
+
 const resizeHandleStyle = computed(() => {
   return {
     height: timelineHidden.value ? '0px' : '6px',
@@ -24,11 +30,16 @@ const timelineBodyStyle = computed(() => {
     opacity: timelineHidden.value ? 0 : 1,
   }
 })
-
-// 拖动状态
-const isDragging = ref(false)
-const dragStartY = ref(0)
-const dragStartHeight = ref(0)
+const resizeHandleClass = computed(() => {
+  return isDragging.value
+    ? 'hover:bg-muted/50 overflow-hidden'
+    : 'hover:bg-muted/50 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden'
+})
+const timelineBodyClass = computed(() => {
+  return isDragging.value
+    ? ''
+    : 'transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]'
+})
 
 // 开始拖动
 function startDrag(e: MouseEvent) {
@@ -99,8 +110,7 @@ onMounted(() => {
     <!-- Resize Handle -->
     <div
       h-1.5 w-full cursor-row-resize flex items-center justify-center group relative z-20 bg-background-elevated transition-colors
-      class="hover:bg-muted/50 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden"
-      :class="timelineHidden ? 'pointer-events-none' : ''"
+      :class="[resizeHandleClass, timelineHidden ? 'pointer-events-none' : '']"
       :style="resizeHandleStyle"
       @mousedown="startDrag"
     >
@@ -119,8 +129,7 @@ onMounted(() => {
       w-full
       overflow-hidden
       bg-background-elevated
-      class="transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-      :class="timelineHidden ? 'pointer-events-none' : ''"
+      :class="[timelineBodyClass, timelineHidden ? 'pointer-events-none' : '']"
       :style="timelineBodyStyle"
     >
       <TimelineWrapper />
