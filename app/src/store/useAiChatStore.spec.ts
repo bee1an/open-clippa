@@ -69,6 +69,8 @@ describe('useAiChatStore', () => {
     expect(store.messages[1].content).toBe('hello world')
     expect(store.messages[1].status).toBe('done')
     expect(store.isStreaming).toBe(false)
+    expect(store.assistantActivityPhase).toBe('idle')
+    expect(store.hasAssistantActivity).toBe(false)
     expect(store.lastError).toBeNull()
     expect(chatWithToolsMock).toHaveBeenCalledTimes(1)
 
@@ -87,6 +89,96 @@ describe('useAiChatStore', () => {
     expect(callOptions.maxToolRounds).toBe(12)
     expect(typeof callOptions.onToolStart).toBe('function')
     expect(typeof callOptions.onToolResult).toBe('function')
+  })
+
+  it('shows assistant activity before assistant bubble is appended', async () => {
+    let releaseResponse!: () => void
+    chatWithToolsMock.mockImplementation(async (options: any) => {
+      options.onToolStart({
+        id: 'tool-1',
+        name: 'get_current_scene',
+        arguments: '{}',
+      })
+
+      await new Promise<void>((resolve) => {
+        releaseResponse = () => {
+          options.onToolResult({
+            toolCallId: 'tool-1',
+            toolName: 'get_current_scene',
+            content: '{"scene":"ok"}',
+          })
+          options.onToken('final reply')
+          resolve()
+        }
+      })
+    })
+
+    const settingsStore = useAiSettingsStore()
+    settingsStore.updateSettings({
+      apiKeySource: 'byok',
+      apiKey: 'test-key',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      model: 'moonshotai/kimi-k2.5',
+    })
+
+    const store = useAiChatStore()
+    store.draft = '当前画面内容是什么'
+
+    const sending = store.sendMessage()
+    expect(store.messages).toHaveLength(1)
+    expect(store.messages[0].role).toBe('user')
+    expect(store.assistantActivityPhase).toBe('calling_tool')
+    expect(store.hasAssistantActivity).toBe(true)
+    expect(store.assistantActivityText).toBe('tools:get_current_scene')
+
+    releaseResponse()
+    await sending
+
+    expect(store.messages).toHaveLength(2)
+    expect(store.messages[1].role).toBe('assistant')
+    expect(store.messages[1].content).toBe('final reply')
+    expect(store.assistantActivityPhase).toBe('idle')
+    expect(store.hasAssistantActivity).toBe(false)
+    expect(store.assistantActivityText).toBe('')
+  })
+
+  it('hides assistant activity while assistant bubble is streaming', async () => {
+    let finishStreaming!: () => void
+    chatWithToolsMock.mockImplementation(async (options: any) => {
+      options.onToken('partial')
+      await new Promise<void>((resolve) => {
+        finishStreaming = () => {
+          options.onDone?.()
+          resolve()
+        }
+      })
+    })
+
+    const settingsStore = useAiSettingsStore()
+    settingsStore.updateSettings({
+      apiKeySource: 'byok',
+      apiKey: 'test-key',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      model: 'moonshotai/kimi-k2.5',
+    })
+
+    const store = useAiChatStore()
+    store.draft = 'stream please'
+
+    const sending = store.sendMessage()
+    expect(store.messages).toHaveLength(2)
+    expect(store.messages[1].role).toBe('assistant')
+    expect(store.messages[1].status).toBe('streaming')
+    expect(store.messages[1].content).toBe('partial')
+    expect(store.assistantActivityPhase).toBe('responding')
+    expect(store.hasAssistantActivity).toBe(false)
+    expect(store.assistantActivityText).toBe('')
+
+    finishStreaming()
+    await sending
+
+    expect(store.messages[1].status).toBe('done')
+    expect(store.assistantActivityPhase).toBe('idle')
   })
 
   it('blocks send when byok api key is missing', async () => {
@@ -189,10 +281,11 @@ describe('useAiChatStore', () => {
     store.stopStreaming()
     await sending
 
-    expect(store.messages).toHaveLength(2)
-    expect(store.messages[1].status).toBe('done')
-    expect(store.messages[1].error).toBeUndefined()
+    expect(store.messages).toHaveLength(1)
+    expect(store.messages[0].role).toBe('user')
     expect(store.isStreaming).toBe(false)
+    expect(store.assistantActivityPhase).toBe('idle')
+    expect(store.hasAssistantActivity).toBe(false)
     expect(store.lastError).toBeNull()
   })
 
@@ -217,6 +310,8 @@ describe('useAiChatStore', () => {
 
     store.clearMessages()
     expect(store.messages).toHaveLength(0)
+    expect(store.assistantActivityPhase).toBe('idle')
+    expect(store.hasAssistantActivity).toBe(false)
     expect(store.lastError).toBeNull()
   })
 

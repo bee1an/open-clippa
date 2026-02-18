@@ -1,7 +1,7 @@
 import type { AiApiKeySource, ChatMessage, ChatRequestMessage } from '@clippc/ai'
 import { chatWithTools } from '@clippc/ai'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { resolveAppAiTools } from '@/ai/context/tools'
 import { useAiSettingsStore } from './useAiSettingsStore'
 
@@ -19,6 +19,7 @@ const CONTEXT_AWARE_SYSTEM_PROMPT = [
 ].join(' ')
 
 const ENABLE_AI_TOOL_DEBUG = import.meta.env.DEV
+type AssistantActivityPhase = 'idle' | 'thinking' | 'calling_tool' | 'responding'
 
 function generateMessageId(prefix: string): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
@@ -106,6 +107,8 @@ export const useAiChatStore = defineStore('ai-chat', () => {
   const isStreaming = ref(false)
   const activeRequestId = ref<string | null>(null)
   const lastError = ref<string | null>(null)
+  const assistantActivityPhase = ref<AssistantActivityPhase>('idle')
+  const activeToolName = ref<string | null>(null)
 
   let activeController: AbortController | null = null
 
@@ -121,14 +124,16 @@ export const useAiChatStore = defineStore('ai-chat', () => {
     return message
   }
 
-  function appendAssistantPlaceholder(): ChatMessage {
+  function appendAssistantMessage(content: string, status: ChatMessage['status'], error?: string): ChatMessage {
     const message: ChatMessage = {
       id: generateMessageId('assistant'),
       role: 'assistant',
-      content: '',
+      content,
       createdAt: Date.now(),
-      status: 'streaming',
+      status,
     }
+    if (error)
+      message.error = error
     messages.value.push(message)
     return message
   }
@@ -138,7 +143,7 @@ export const useAiChatStore = defineStore('ai-chat', () => {
       return
 
     const message = messages.value.find(item => item.id === messageId)
-    if (!message)
+    if (!message || message.role !== 'assistant')
       return
 
     message.content += delta
@@ -153,13 +158,28 @@ export const useAiChatStore = defineStore('ai-chat', () => {
       message.status = 'done'
   }
 
-  function markAssistantError(messageId: string, errorMessage: string): void {
-    const message = messages.value.find(item => item.id === messageId)
-    if (!message || message.role !== 'assistant')
-      return
+  function markAssistantThinking(): void {
+    assistantActivityPhase.value = 'thinking'
+    activeToolName.value = null
+  }
 
-    message.status = 'error'
-    message.error = errorMessage
+  function markAssistantCallingTool(toolName: string): void {
+    assistantActivityPhase.value = 'calling_tool'
+    activeToolName.value = toolName
+  }
+
+  function markAssistantResponding(): void {
+    assistantActivityPhase.value = 'responding'
+    activeToolName.value = null
+  }
+
+  function resetAssistantActivity(): void {
+    assistantActivityPhase.value = 'idle'
+    activeToolName.value = null
+  }
+
+  function isRequestStillActive(requestId: string): boolean {
+    return activeRequestId.value === requestId
   }
 
   async function sendMessage(input?: string): Promise<void> {
@@ -190,10 +210,13 @@ export const useAiChatStore = defineStore('ai-chat', () => {
     draft.value = ''
 
     const requestMessages = buildRequestMessages(messages.value)
-    const assistantMessage = appendAssistantPlaceholder()
+    const requestId = generateMessageId('request')
+    let assistantMessageId: string | null = null
 
     isStreaming.value = true
-    activeRequestId.value = assistantMessage.id
+    activeRequestId.value = requestId
+    resetAssistantActivity()
+    markAssistantThinking()
     activeController = new AbortController()
 
     try {
@@ -209,33 +232,68 @@ export const useAiChatStore = defineStore('ai-chat', () => {
         maxToolRounds: 12,
         signal: activeController.signal,
         onToolStart: (toolCall) => {
+          if (!isRequestStillActive(requestId))
+            return
+          markAssistantCallingTool(toolCall.name)
           if (!ENABLE_AI_TOOL_DEBUG)
             return
           console.warn('[ai-tool:start]', toolCall)
         },
         onToolResult: (result) => {
+          if (!isRequestStillActive(requestId))
+            return
+          markAssistantThinking()
           if (!ENABLE_AI_TOOL_DEBUG)
             return
           console.warn('[ai-tool:result]', result)
         },
-        onToken: delta => appendAssistantDelta(assistantMessage.id, delta),
-        onDone: () => finalizeAssistantMessage(assistantMessage.id),
+        onToken: (delta) => {
+          if (!isRequestStillActive(requestId))
+            return
+          if (delta.length === 0)
+            return
+          if (!assistantMessageId) {
+            const assistantMessage = appendAssistantMessage('', 'streaming')
+            assistantMessageId = assistantMessage.id
+          }
+          appendAssistantDelta(assistantMessageId, delta)
+          markAssistantResponding()
+        },
       })
+      if (isRequestStillActive(requestId) && assistantMessageId)
+        finalizeAssistantMessage(assistantMessageId)
     }
     catch (error) {
+      if (!isRequestStillActive(requestId))
+        return
+
       if (isAbortError(error)) {
-        finalizeAssistantMessage(assistantMessage.id)
+        if (assistantMessageId)
+          finalizeAssistantMessage(assistantMessageId)
       }
       else {
         const errorMessage = resolveErrorMessage(error)
         lastError.value = errorMessage
-        markAssistantError(assistantMessage.id, errorMessage)
+        if (assistantMessageId) {
+          const message = messages.value.find(item => item.id === assistantMessageId)
+          if (message && message.role === 'assistant') {
+            message.status = 'error'
+            message.error = errorMessage
+          }
+        }
+        else {
+          appendAssistantMessage('', 'error', errorMessage)
+        }
       }
     }
     finally {
+      if (!isRequestStillActive(requestId))
+        return
+
       activeController = null
       isStreaming.value = false
       activeRequestId.value = null
+      resetAssistantActivity()
     }
   }
 
@@ -247,9 +305,31 @@ export const useAiChatStore = defineStore('ai-chat', () => {
     if (isStreaming.value)
       stopStreaming()
 
+    activeController = null
+    isStreaming.value = false
+    activeRequestId.value = null
     messages.value = []
     lastError.value = null
+    resetAssistantActivity()
   }
+
+  const hasAssistantActivity = computed(() => {
+    return assistantActivityPhase.value === 'thinking'
+      || assistantActivityPhase.value === 'calling_tool'
+  })
+
+  const assistantActivityText = computed(() => {
+    if (assistantActivityPhase.value === 'thinking')
+      return 'reasoning'
+
+    if (assistantActivityPhase.value === 'calling_tool') {
+      if (activeToolName.value)
+        return `tools:${activeToolName.value}`
+      return 'tools'
+    }
+
+    return ''
+  })
 
   return {
     messages,
@@ -257,12 +337,12 @@ export const useAiChatStore = defineStore('ai-chat', () => {
     isStreaming,
     activeRequestId,
     lastError,
+    assistantActivityPhase,
+    hasAssistantActivity,
+    assistantActivityText,
     sendMessage,
     stopStreaming,
     clearMessages,
     appendUserMessage,
-    appendAssistantDelta,
-    finalizeAssistantMessage,
-    markAssistantError,
   }
 })

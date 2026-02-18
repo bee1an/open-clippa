@@ -15,7 +15,14 @@ const aiChatStore = useAiChatStore()
 const aiModelCatalogStore = useAiModelCatalogStore()
 
 const { apiKeySource, apiKey, baseUrl, model } = storeToRefs(aiSettingsStore)
-const { messages, isStreaming, lastError, draft } = storeToRefs(aiChatStore)
+const {
+  messages,
+  isStreaming,
+  lastError,
+  draft,
+  hasAssistantActivity,
+  assistantActivityText,
+} = storeToRefs(aiChatStore)
 const {
   items: modelItems,
   loading: isModelLoading,
@@ -181,6 +188,10 @@ watch(messages, () => {
 }, { deep: true })
 
 watch(isStreaming, () => {
+  void scrollToBottom(true)
+})
+
+watch(assistantActivityText, () => {
   void scrollToBottom(true)
 })
 
@@ -358,7 +369,7 @@ onMounted(() => {
       @scroll="handleScroll"
     >
       <div
-        v-if="messages.length === 0"
+        v-if="messages.length === 0 && !hasAssistantActivity"
         class="h-full min-h-24 flex items-center justify-center text-center text-xs text-foreground-muted"
       >
         开始与 {{ AI_DISPLAY_NAME }} 对话。
@@ -369,6 +380,15 @@ onMounted(() => {
         :key="message.id"
         :message="message"
       />
+
+      <div
+        v-if="hasAssistantActivity"
+        class="px-0.5 py-0.5 text-[10px] leading-none tracking-wide lowercase"
+      >
+        <span class="ai-activity-text">
+          {{ assistantActivityText }}
+        </span>
+      </div>
     </div>
 
     <footer class="shrink-0 border-t p-3 space-y-2" border="border/50" data-preserve-canvas-selection="true">
@@ -386,33 +406,92 @@ onMounted(() => {
         {{ lastError }}
       </div>
 
-      <textarea
-        v-model="draft"
-        rows="3"
-        class="w-full resize-none rounded-md border border-border/70 bg-secondary/30 px-2 py-2 text-xs text-foreground outline-none focus:border-foreground/40"
-        placeholder="输入你的问题..."
-        @keydown="handleComposerKeydown"
-      />
+      <div
+        class="relative flex flex-col rounded-xl border border-border/50 bg-secondary/30 transition-all focus-within:border-primary/50 focus-within:bg-secondary/50 focus-within:ring-1 focus-within:ring-primary/20 hover:border-border/80"
+      >
+        <textarea
+          v-model="draft"
+          rows="3"
+          class="w-full resize-none bg-transparent px-3 py-3 text-xs leading-relaxed text-foreground placeholder:text-foreground-muted outline-none scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted"
+          placeholder="输入你的问题..."
+          @keydown="handleComposerKeydown"
+        />
 
-      <div class="flex items-center justify-end gap-2">
-        <Button
-          v-if="isStreaming"
-          size="sm"
-          variant="outline"
-          @click="handleStop"
-        >
-          停止
-        </Button>
+        <div class="flex items-center justify-end px-2 pb-2">
+          <Button
+            v-if="isStreaming"
+            size="icon-xs"
+            variant="outline"
+            class="h-7 w-7 rounded-lg"
+            title="停止生成"
+            aria-label="停止生成"
+            @click="handleStop"
+          >
+            <div class="i-ph-stop-fill text-[11px]" />
+          </Button>
 
-        <Button
-          v-else
-          size="sm"
-          :disabled="!canSend"
-          @click="handleSend"
-        >
-          发送
-        </Button>
+          <Button
+            v-else
+            size="icon-xs"
+            :variant="draft.trim().length > 0 ? 'default' : 'ghost'"
+            class="h-7 w-7 rounded-lg transition-all"
+            :disabled="!canSend"
+            title="发送"
+            aria-label="发送"
+            @click="handleSend"
+          >
+            <div class="i-ph-arrow-up-bold text-[13px]" />
+          </Button>
+        </div>
       </div>
     </footer>
   </section>
 </template>
+
+<style scoped>
+.ai-activity-text {
+  display: inline-block;
+  background-image: repeating-linear-gradient(
+    110deg,
+    rgb(148 163 184 / 62%) 0%,
+    rgb(148 163 184 / 62%) 14%,
+    rgb(241 245 249 / 97%) 20%,
+    rgb(148 163 184 / 62%) 28%,
+    rgb(148 163 184 / 62%) 42%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-activity-shimmer 2.4s linear infinite;
+}
+
+.ai-activity-text::selection {
+  background: rgb(186 230 253 / 85%);
+  color: rgb(15 23 42);
+  -webkit-text-fill-color: rgb(15 23 42);
+}
+
+.ai-activity-text::-moz-selection {
+  background: rgb(186 230 253 / 85%);
+  color: rgb(15 23 42);
+}
+
+@keyframes ai-activity-shimmer {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-activity-text {
+    animation: none;
+    background-image: none;
+    color: rgb(148 163 184 / 90%);
+  }
+}
+</style>

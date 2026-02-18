@@ -19,6 +19,8 @@
     "@vueuse/core": "catalog:app",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dompurify": "catalog:app",
+    "markdown-it": "catalog:app",
     "pinia": "catalog:app",
     "radix-vue": "^1.9.17",
     "tailwind-merge": "^2.6.0",
@@ -28,6 +30,7 @@
     "vue-router": "catalog:app"
   },
   "devDependencies": {
+    "@types/markdown-it": "catalog:app",
     "@vitejs/plugin-vue": "catalog:app",
     "@vue/tsconfig": "catalog:app",
     "unplugin-auto-import": "catalog:app",
