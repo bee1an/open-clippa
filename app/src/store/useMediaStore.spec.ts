@@ -186,6 +186,19 @@ describe('useMediaStore', () => {
     expect(duplicate.id).toBe(first.id)
   })
 
+  it('moves duplicated remote video to top of media list', () => {
+    const store = useMediaStore()
+
+    const first = store.addVideoFromUrl('https://cdn.example.com/media/intro.mp4')
+    const second = store.addVideoFromUrl('https://cdn.example.com/media/scene.mp4')
+    const duplicatedFirst = store.addVideoFromUrl('https://cdn.example.com/media/intro.mp4')
+
+    expect(duplicatedFirst.id).toBe(first.id)
+    expect(store.videoFiles).toHaveLength(2)
+    expect(store.videoFiles[0]?.id).toBe(first.id)
+    expect(store.videoFiles[1]?.id).toBe(second.id)
+  })
+
   it('rejects invalid remote video url', () => {
     const store = useMediaStore()
 
@@ -298,6 +311,19 @@ describe('useMediaStore', () => {
     expect(store.formatFileSize(1536)).toBe('1.5 KB')
     expect(store.formatDuration(61000)).toBe('1:01')
     expect(store.formatDuration(3599000)).toBe('59:59')
+  })
+
+  it('moves duplicated remote image to top of media list', () => {
+    const store = useMediaStore()
+
+    const first = store.addImageFromUrl('https://cdn.example.com/a.jpg')
+    const second = store.addImageFromUrl('https://cdn.example.com/b.jpg')
+    const duplicatedFirst = store.addImageFromUrl('https://cdn.example.com/a.jpg')
+
+    expect(duplicatedFirst.id).toBe(first.id)
+    expect(store.imageFiles).toHaveLength(2)
+    expect(store.imageFiles[0]?.id).toBe(first.id)
+    expect(store.imageFiles[1]?.id).toBe(second.id)
   })
 
   it('imports random image from pexels', async () => {

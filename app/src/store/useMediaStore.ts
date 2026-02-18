@@ -404,6 +404,26 @@ export const useMediaStore = defineStore('media', () => {
   const imageFiles = ref<ImageFile[]>([])
   const isGeneratingThumbnail = ref(false)
 
+  function moveVideoFileToTop(targetId: string): void {
+    const index = videoFiles.value.findIndex(file => file.id === targetId)
+    if (index <= 0)
+      return
+
+    const [file] = videoFiles.value.splice(index, 1)
+    if (file)
+      videoFiles.value.unshift(file)
+  }
+
+  function moveImageFileToTop(targetId: string): void {
+    const index = imageFiles.value.findIndex(file => file.id === targetId)
+    if (index <= 0)
+      return
+
+    const [file] = imageFiles.value.splice(index, 1)
+    if (file)
+      imageFiles.value.unshift(file)
+  }
+
   function findRemoteVideoByUrl(url: string): VideoFile | undefined {
     return videoFiles.value.find((file) => {
       if (file.sourceType !== 'url')
@@ -442,7 +462,7 @@ export const useMediaStore = defineStore('media', () => {
       processingStatus: createDefaultProcessingStatus(),
     })
 
-    videoFiles.value.push(videoFile)
+    videoFiles.value.unshift(videoFile)
 
     // 异步生成缩略图和获取视频信息
     generateVideoInfo(videoFile)
@@ -454,8 +474,10 @@ export const useMediaStore = defineStore('media', () => {
   function addVideoFromUrl(url: string, name?: string): VideoFile {
     const normalizedUrl = normalizeRemoteVideoUrl(url)
     const existing = findRemoteVideoByUrl(normalizedUrl)
-    if (existing)
+    if (existing) {
+      moveVideoFileToTop(existing.id)
       return existing
+    }
 
     const resolvedName = name?.trim().length ? name.trim() : inferVideoNameFromUrl(normalizedUrl)
 
@@ -473,7 +495,7 @@ export const useMediaStore = defineStore('media', () => {
       processingStatus: createDefaultProcessingStatus(),
     })
 
-    videoFiles.value.push(videoFile)
+    videoFiles.value.unshift(videoFile)
     generateVideoInfo(videoFile)
     return videoFile
   }
@@ -530,7 +552,7 @@ export const useMediaStore = defineStore('media', () => {
       createdAt: new Date(),
     })
 
-    imageFiles.value.push(imageFile)
+    imageFiles.value.unshift(imageFile)
     return imageFile
   }
 
@@ -538,8 +560,10 @@ export const useMediaStore = defineStore('media', () => {
   function addImageFromUrl(url: string, name?: string): ImageFile {
     const normalizedUrl = normalizeRemoteImageUrl(url)
     const existing = findRemoteImageByUrl(normalizedUrl)
-    if (existing)
+    if (existing) {
+      moveImageFileToTop(existing.id)
       return existing
+    }
 
     const resolvedName = name?.trim().length ? name.trim() : inferImageNameFromUrl(normalizedUrl)
 
@@ -553,7 +577,7 @@ export const useMediaStore = defineStore('media', () => {
       createdAt: new Date(),
     })
 
-    imageFiles.value.push(imageFile)
+    imageFiles.value.unshift(imageFile)
     return imageFile
   }
 

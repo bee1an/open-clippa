@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import type { ImageFile, VideoFile } from '@/store/useMediaStore'
 import { nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
+import { useEditorStore } from '@/store'
 import { useMediaStore } from '@/store/useMediaStore'
+import { usePerformerStore } from '@/store/usePerformerStore'
 
 type AssetKind = 'image' | 'video'
 
@@ -31,13 +34,16 @@ interface LibraryResponse {
 }
 
 const LOAD_MORE_THRESHOLD_PX = 300
+const DEFAULT_IMAGE_DURATION_MS = 3000
+const DEFAULT_VIDEO_DURATION_MS = 5000
 
 const props = defineProps<{
   kind: AssetKind
 }>()
 
 const mediaStore = useMediaStore()
-const router = useRouter()
+const editorStore = useEditorStore()
+const performerStore = usePerformerStore()
 
 const query = ref('')
 const page = ref(1)
@@ -51,6 +57,7 @@ const loadError = ref('')
 const importError = ref('')
 const isImporting = ref(false)
 const importingIds = ref<string[]>([])
+const addingToCanvasIds = ref<string[]>([])
 const selectedExternalIds = ref<string[]>([])
 const listContainerRef = ref<HTMLElement | null>(null)
 const skeletonItems = Array.from({ length: 8 }, (_, index) => index)
@@ -62,6 +69,7 @@ const allLoadedSelected = computed(() => {
 })
 const libraryTitle = computed(() => (props.kind === 'video' ? '视频库' : '图片库'))
 const libraryHint = computed(() => (props.kind === 'video' ? '视频素材' : '图片素材'))
+const importLibraryLabel = computed(() => '导入媒体库')
 const loadedSummary = computed(() => {
   if (total.value === null)
     return `已加载 ${assets.value.length}`
@@ -232,46 +240,110 @@ function clearSelection(): void {
   selectedExternalIds.value = []
 }
 
-async function importAssets(targetAssets: LibraryAsset[]): Promise<void> {
+function importAssetToMediaLibrary(asset: LibraryAsset): ImageFile | VideoFile {
+  if (props.kind === 'image')
+    return mediaStore.addImageFromUrl(asset.sourceUrl, asset.name)
+
+  const videoFile = mediaStore.addVideoFromUrl(asset.sourceUrl, asset.name)
+  if (typeof asset.durationMs === 'number' && asset.durationMs > 0)
+    videoFile.duration = asset.durationMs
+  if (asset.width > 0 && asset.height > 0)
+    videoFile.metadata.resolution = { width: asset.width, height: asset.height }
+  return videoFile
+}
+
+async function addAssetToCanvas(asset: LibraryAsset): Promise<void> {
+  if (isImporting.value)
+    return
+
+  isImporting.value = true
+  importError.value = ''
+  importingIds.value = [asset.externalId]
+  addingToCanvasIds.value = [asset.externalId]
+  try {
+    await editorStore.clippa.ready
+    const startMs = editorStore.currentTime
+    const stageWidth = editorStore.clippa.stage.app?.renderer.width ?? 0
+    const stageHeight = editorStore.clippa.stage.app?.renderer.height ?? 0
+
+    if (props.kind === 'image') {
+      const imageFile = importAssetToMediaLibrary(asset) as ImageFile
+      const performer = performerStore.addPerformer({
+        id: `image-${crypto.randomUUID()}`,
+        type: 'image',
+        src: imageFile.source,
+        start: startMs,
+        duration: DEFAULT_IMAGE_DURATION_MS,
+        x: 0,
+        y: 0,
+        zIndex: Math.max(1, (editorStore.clippa.timeline.rails?.maxZIndex ?? 0) + 1),
+      })
+      await editorStore.clippa.hire(performer)
+      if (!editorStore.clippa.stage.performers.has(performer))
+        editorStore.clippa.show(performer)
+      performerStore.selectPerformer(performer.id)
+      return
+    }
+
+    const videoFile = importAssetToMediaLibrary(asset) as VideoFile
+    const resolvedDuration = videoFile.duration > 0 ? videoFile.duration : DEFAULT_VIDEO_DURATION_MS
+    const performer = performerStore.addPerformer({
+      id: `video-${crypto.randomUUID()}`,
+      type: 'video',
+      src: videoFile.source,
+      start: startMs,
+      duration: resolvedDuration,
+      sourceDuration: resolvedDuration,
+      width: asset.width > 0 ? asset.width : stageWidth,
+      height: asset.height > 0 ? asset.height : stageHeight,
+      x: 0,
+      y: 0,
+      zIndex: Math.max(1, (editorStore.clippa.timeline.rails?.maxZIndex ?? 0) + 1),
+    })
+    await editorStore.clippa.hire(performer)
+    if (!editorStore.clippa.stage.performers.has(performer))
+      editorStore.clippa.show(performer)
+    performerStore.selectPerformer(performer.id)
+  }
+  catch (error) {
+    importError.value = error instanceof Error ? error.message : '添加到画布失败'
+  }
+  finally {
+    importingIds.value = []
+    addingToCanvasIds.value = []
+    isImporting.value = false
+  }
+}
+
+async function importAssetsToMediaLibrary(targetAssets: LibraryAsset[]): Promise<void> {
   if (targetAssets.length === 0 || isImporting.value)
     return
 
   isImporting.value = true
   importError.value = ''
   importingIds.value = targetAssets.map(asset => asset.externalId)
+  addingToCanvasIds.value = []
   try {
-    for (const asset of targetAssets) {
-      if (props.kind === 'image') {
-        mediaStore.addImageFromUrl(asset.sourceUrl, asset.name)
-        continue
-      }
-
-      const videoFile = mediaStore.addVideoFromUrl(asset.sourceUrl, asset.name)
-      if (typeof asset.durationMs === 'number' && asset.durationMs > 0)
-        videoFile.duration = asset.durationMs
-      if (asset.width > 0 && asset.height > 0)
-        videoFile.metadata.resolution = { width: asset.width, height: asset.height }
-    }
-
+    targetAssets.forEach(asset => importAssetToMediaLibrary(asset))
     selectedExternalIds.value = []
-    await router.push('/editor/media')
   }
   catch (error) {
     importError.value = error instanceof Error ? error.message : '导入素材失败'
   }
   finally {
     importingIds.value = []
+    addingToCanvasIds.value = []
     isImporting.value = false
   }
 }
 
 async function importAsset(asset: LibraryAsset): Promise<void> {
-  await importAssets([asset])
+  await importAssetsToMediaLibrary([asset])
 }
 
 async function importSelectedAssets(): Promise<void> {
   const selected = assets.value.filter(asset => selectedExternalIds.value.includes(asset.externalId))
-  await importAssets(selected)
+  await importAssetsToMediaLibrary(selected)
 }
 
 function onSearch(): void {
@@ -353,8 +425,8 @@ watch(() => props.kind, () => {
           :disabled="selectedCount === 0 || isImporting"
           @click="importSelectedAssets"
         >
-          <div v-if="isImporting" i-carbon-circle-dash animate-spin mr-1 />
-          导入 ({{ selectedCount }})
+          <div v-if="isImporting && addingToCanvasIds.length === 0" i-carbon-circle-dash animate-spin mr-1 />
+          {{ importLibraryLabel }} ({{ selectedCount }})
         </Button>
       </div>
 
@@ -477,19 +549,33 @@ watch(() => props.kind, () => {
             </div>
           </div>
 
-          <Button
-            class="mt-2 w-full"
-            size="sm"
-            variant="outline"
-            :disabled="isImporting"
-            @click.stop="importAsset(asset)"
-          >
-            <div
-              v-if="importingIds.includes(asset.externalId)"
-              i-carbon-circle-dash animate-spin mr-1
-            />
-            导入并前往媒体库
-          </Button>
+          <div class="mt-2 grid grid-cols-2 gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              class="w-full px-2 text-[11px]"
+              :disabled="isImporting"
+              @click.stop="importAsset(asset)"
+            >
+              <div
+                v-if="importingIds.includes(asset.externalId) && !addingToCanvasIds.includes(asset.externalId)"
+                i-carbon-circle-dash animate-spin mr-1
+              />
+              {{ importLibraryLabel }}
+            </Button>
+            <Button
+              size="sm"
+              class="w-full px-2 text-[11px]"
+              :disabled="isImporting"
+              @click.stop="addAssetToCanvas(asset)"
+            >
+              <div
+                v-if="addingToCanvasIds.includes(asset.externalId)"
+                i-carbon-circle-dash animate-spin mr-1
+              />
+              添加到画布
+            </Button>
+          </div>
         </div>
       </div>
 
