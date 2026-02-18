@@ -50,19 +50,13 @@ const leftPanelMainIcon = computed(() => {
 })
 const leftPanelToggleClass = computed(() => {
   return chatPanelOpen.value
-    ? 'bg-secondary text-foreground ring-1 ring-border/60 shadow-sm'
-    : 'text-foreground-muted hover:bg-secondary hover:text-foreground'
+    ? 'bg-secondary text-foreground'
+    : 'text-foreground-muted hover:text-foreground'
 })
 const rightPanelToggleClass = computed(() => {
   return siderCollapsed.value
-    ? 'text-foreground-muted hover:bg-secondary hover:text-foreground'
-    : 'bg-secondary text-foreground ring-1 ring-border/60 shadow-sm'
-})
-const rightPanelArrowIcon = computed(() => {
-  return siderCollapsed.value ? 'i-ph-caret-left-bold' : 'i-ph-caret-right-bold'
-})
-const leftPanelArrowIcon = computed(() => {
-  return chatPanelOpen.value ? 'i-ph-caret-left-bold' : 'i-ph-caret-right-bold'
+    ? 'text-foreground-muted hover:text-foreground'
+    : 'bg-secondary text-foreground'
 })
 
 useFilterEngine()
@@ -125,7 +119,7 @@ watch(exportStatus, (nextStatus) => {
       <div flex items-center gap-1>
         <!-- Left AI Toggle -->
         <button
-          relative w-8 h-8 rounded flex items-center justify-center transition-colors
+          w-8 h-8 rounded flex items-center justify-center transition-colors
           :class="leftPanelToggleClass"
           :title="chatPanelOpen ? '收起左侧 AI 面板' : '展开左侧 AI 面板'"
           :aria-pressed="chatPanelOpen"
@@ -133,18 +127,13 @@ watch(exportStatus, (nextStatus) => {
           @click="toggleChatPanel"
         >
           <div :class="leftPanelMainIcon" text="[18px]" />
-          <!-- <div class="absolute left-1 top-1/2 h-3 w-[1.5px] -translate-y-1/2 rounded-full bg-current/45" /> -->
-          <div
-            class="absolute -left-1 top-1/2 -translate-y-1/2 rounded-full bg-background p-0.5 text-[10px] leading-none shadow-sm"
-            :class="leftPanelArrowIcon"
-          />
         </button>
 
         <div w-px h-4 bg-border mx-2 />
 
         <!-- Right Sidebar Toggle -->
         <button
-          relative w-8 h-8 rounded flex items-center justify-center transition-colors
+          w-8 h-8 rounded flex items-center justify-center transition-colors
           :class="rightPanelToggleClass"
           :title="siderCollapsed ? '展开右侧面板' : '收起右侧面板'"
           :aria-pressed="!siderCollapsed"
@@ -152,11 +141,6 @@ watch(exportStatus, (nextStatus) => {
           @click="layoutStore.toggleSiderCollapsed()"
         >
           <div :class="rightPanelMainIcon" text="[18px]" />
-          <!-- <div class="absolute right-1 top-1/2 h-3 w-[1.5px] -translate-y-1/2 rounded-full bg-current/45" /> -->
-          <div
-            class="absolute -right-1 top-1/2 -translate-y-1/2 rounded-full bg-background p-0.5 text-[10px] leading-none shadow-sm"
-            :class="rightPanelArrowIcon"
-          />
         </button>
 
         <div w-px h-4 bg-border mx-2 />
