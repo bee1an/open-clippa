@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ResizeDirection, SelectionItem } from '@clippc/selection'
+import { Image, Video } from '@clippc/performer'
 import { Selection } from '@clippc/selection'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -26,6 +27,7 @@ interface SelectionExpose {
 
 const { selectedPerformers, pendingSelectionDrag } = storeToRefs(performerStore)
 const selectionRef = ref<SelectionExpose | null>(null)
+const activeResizeDirection = ref<ResizeDirection | null>(null)
 
 const selectionCustomStyle = {
   'border': '1.5px solid hsl(var(--foreground) / 0.92)',
@@ -87,6 +89,14 @@ function toTopLeftRotationBounds(item: BoundsLike): BoundsLike {
   }
 }
 
+function isSideResizeDirection(direction: ResizeDirection): direction is 'top' | 'right' | 'bottom' | 'left' {
+  return direction === 'top' || direction === 'right' || direction === 'bottom' || direction === 'left'
+}
+
+function isCroppablePerformer(performer: unknown): performer is Image | Video {
+  return performer instanceof Image || performer instanceof Video
+}
+
 // 计算当前选中的 performer 信息（包含响应式 bounds）
 const currentSelectionInfo = computed(() => {
   return selectedPerformers.value.length > 0 ? selectedPerformers.value[0] : null
@@ -133,7 +143,8 @@ const selectionItem = computed<SelectionItem | null>(() => {
 
 // Selection组件事件处理函数
 function handleSelectionUpdate(item: SelectionItem) {
-  if (!currentSelection.value)
+  const performer = currentSelection.value
+  if (!performer)
     return
 
   const canvasItem: BoundsLike = {
@@ -146,40 +157,68 @@ function handleSelectionUpdate(item: SelectionItem) {
 
   const topLeftBounds = toTopLeftRotationBounds(canvasItem)
 
-  // 更新 performer 属性
-  const performer = performerStore.getAllPerformers().find(p => p.id === currentSelection.value?.id)
-  if (performer) {
-    const currentBounds = performer.getBaseBounds()
-    const currentScaleX = performer.sprite?.scale.x ?? 1
-    const currentScaleY = performer.sprite?.scale.y ?? 1
+  if (
+    activeResizeDirection.value
+    && isSideResizeDirection(activeResizeDirection.value)
+    && isCroppablePerformer(performer)
+  ) {
+    performer.applySideCropResize({
+      direction: activeResizeDirection.value,
+      targetVisibleWidth: topLeftBounds.width,
+      targetVisibleHeight: topLeftBounds.height,
+    })
 
-    const widthRatio = currentBounds.width ? topLeftBounds.width / currentBounds.width : 1
-    const heightRatio = currentBounds.height ? topLeftBounds.height / currentBounds.height : 1
-
-    if (currentBounds.width && currentBounds.height && (Math.abs(widthRatio - 1) > 1e-3 || Math.abs(heightRatio - 1) > 1e-3)) {
-      performer.setScale(currentScaleX * widthRatio, currentScaleY * heightRatio)
-    }
-
-    if (topLeftBounds.x !== currentBounds.x || topLeftBounds.y !== currentBounds.y) {
+    const nextBounds = performer.getBaseBounds()
+    if (Math.abs(topLeftBounds.x - nextBounds.x) > 1e-3 || Math.abs(topLeftBounds.y - nextBounds.y) > 1e-3) {
       performer.setPosition(topLeftBounds.x, topLeftBounds.y)
     }
 
-    // 更新旋转
-    if (item.rotation !== undefined) {
+    if (item.rotation !== undefined && Math.abs((nextBounds.rotation ?? 0) - item.rotation) > 1e-3) {
       performer.setRotation(item.rotation)
     }
+
+    return
+  }
+
+  // 更新 performer 属性
+  const currentBounds = performer.getBaseBounds()
+  const currentScaleX = performer.sprite?.scale.x ?? 1
+  const currentScaleY = performer.sprite?.scale.y ?? 1
+
+  const widthRatio = currentBounds.width ? topLeftBounds.width / currentBounds.width : 1
+  const heightRatio = currentBounds.height ? topLeftBounds.height / currentBounds.height : 1
+
+  if (currentBounds.width && currentBounds.height && (Math.abs(widthRatio - 1) > 1e-3 || Math.abs(heightRatio - 1) > 1e-3)) {
+    performer.setScale(currentScaleX * widthRatio, currentScaleY * heightRatio)
+  }
+
+  if (topLeftBounds.x !== currentBounds.x || topLeftBounds.y !== currentBounds.y) {
+    performer.setPosition(topLeftBounds.x, topLeftBounds.y)
+  }
+
+  // 更新旋转
+  if (item.rotation !== undefined) {
+    performer.setRotation(item.rotation)
   }
 }
 
-function handleSelectionResize(_id: string, _direction: ResizeDirection, item: SelectionItem) {
-  // resizing 过程中也会触发 update 事件，这里只需要转发给统一的处理函数
-  // 或者如果 Selection.vue 在 resize 过程中不仅 emit resize 还 emit update，
-  // 那么这里其实可以留空，或者为了实时响应性 specifically handle it.
-  // Selection.vue's useResize emits 'update' onEnd.
-  // During resize (onUpdate), it emits 'resize' AND 'update'.
-  // So handleSelectionUpdate is sufficient for both realtime and final updates.
-  handleSelectionUpdate(item)
+function handleSelectionResizeStart(_id: string, direction: ResizeDirection) {
+  activeResizeDirection.value = direction
 }
+
+function handleSelectionResizeEnd() {
+  activeResizeDirection.value = null
+}
+
+watch(currentSelection, (value) => {
+  if (!value)
+    activeResizeDirection.value = null
+})
+
+watch(selectionItem, (value) => {
+  if (!value)
+    activeResizeDirection.value = null
+})
 
 function handleSelectionSelect(id: string) {
   performerStore.selectPerformer(id)
@@ -222,7 +261,8 @@ watch(
       :min-width="20"
       :min-height="20"
       @update="handleSelectionUpdate"
-      @resize="handleSelectionResize"
+      @resize-start="handleSelectionResizeStart"
+      @resize-end="handleSelectionResizeEnd"
       @select="handleSelectionSelect"
       @delete="handleSelectionDelete"
     />

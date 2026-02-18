@@ -3,11 +3,19 @@ import type { Sprite } from 'pixi.js'
 import type { TransitionCandidate, TransitionSpec } from './transition'
 import { buildTransitionCandidates, buildTransitionPairKey } from './transition'
 
+export interface TransitionMaskRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export interface TransitionRenderablePerformer {
   id: string
   start: number
   duration: number
   sprite?: Sprite
+  getMaskRect?: () => TransitionMaskRect | null
 }
 
 export interface TransitionVideoPerformer extends TransitionRenderablePerformer {

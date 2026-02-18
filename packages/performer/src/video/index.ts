@@ -4,7 +4,14 @@ import type {
 } from 'mediabunny'
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
 import type { AnimationLayout, PerformerAnimationSpec, TransformState } from '../animation'
-import type { Performer, PerformerOption } from '../performer'
+import type {
+  CropInsets,
+  CropMaskRect,
+  Performer,
+  PerformerOption,
+  SideCropResizeInput,
+  SideCropResizeResult,
+} from '../performer'
 import { EventBus, transformSrc } from '@clippc/utils'
 import {
   ALL_FORMATS,
@@ -12,8 +19,9 @@ import {
   UrlSource,
   VideoSampleSink,
 } from 'mediabunny'
-import { Sprite, Texture } from 'pixi.js'
+import { Graphics, Sprite, Texture } from 'pixi.js'
 import { AnimationController, DEFAULT_TRANSFORM_STATE } from '../animation'
+import { applySideCropResize, cloneCrop, EMPTY_CROP, normalizeCropInsets, resolveVisibleLocalSize } from '../mediaCrop'
 import { PlayState, ShowState } from '../performer'
 
 export interface PerformerClickEvent {
@@ -53,6 +61,7 @@ export interface VideoOption extends PerformerOption {
   x?: number
 
   y?: number
+  crop?: Partial<CropInsets> | null
 }
 
 export class Video extends EventBus<PerformerEvents> implements Performer {
@@ -112,6 +121,8 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   private _loader?: Promise<void>
   private _pendingFilters: Filter[] | null = null
   private _animationController?: AnimationController
+  private _cropInsets: CropInsets = { ...EMPTY_CROP }
+  private _cropMask?: Graphics
 
   private _frameIntervalMs: number = Video._DEFAULT_FRAME_INTERVAL_MS
 
@@ -129,7 +140,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     if (this._loader)
       return this._loader
 
-    const { height, width, x, y } = option || {}
+    const { height, width, x, y, crop } = option || {}
 
     const { promise, reject, resolve } = Promise.withResolvers<void>()
 
@@ -157,6 +168,20 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         if (y !== undefined)
           this._sprite.y = y
 
+        this._cropInsets = cloneCrop(crop)
+        this._syncCropState()
+
+        if (width !== undefined || height !== undefined) {
+          const bounds = this.getBounds()
+          if (width !== undefined && bounds.width > Video._SCALE_EPSILON) {
+            this._sprite.scale.x *= width / bounds.width
+          }
+          if (height !== undefined && bounds.height > Video._SCALE_EPSILON) {
+            this._sprite.scale.y *= height / bounds.height
+          }
+        }
+
+        this._syncCropState()
         this.valid = true
         this._updateBaseTransform()
         this._applyAnimationForCurrentTime()
@@ -414,6 +439,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         sprite.width = preservedSize.width
       if (preservedSize.height > 0)
         sprite.height = preservedSize.height
+      this._syncCropState()
 
       this._lastRenderedTime = normalizedTime
     }
@@ -525,11 +551,12 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       }
     }
 
+    const visibleLocal = this._resolveVisibleLocalSize()
     return {
       x: this._sprite.x,
       y: this._sprite.y,
-      width: this._sprite.width,
-      height: this._sprite.height,
+      width: Math.max(0, visibleLocal.width * Math.abs(this._sprite.scale.x)),
+      height: Math.max(0, visibleLocal.height * Math.abs(this._sprite.scale.y)),
       rotation: this._sprite.angle || 0,
     }
   }
@@ -626,6 +653,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     this._sprite.scale.x = scaleX
     this._sprite.scale.y = scaleY
+    this._syncCropState()
     this.notifyPositionUpdate()
 
     if (!this._animationController?.isApplying)
@@ -654,6 +682,72 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this._pendingFilters = filters
   }
 
+  getCropInsets(): CropInsets {
+    return { ...this._cropInsets }
+  }
+
+  hasCrop(): boolean {
+    return this._cropInsets.left > Video._SCALE_EPSILON
+      || this._cropInsets.top > Video._SCALE_EPSILON
+      || this._cropInsets.right > Video._SCALE_EPSILON
+      || this._cropInsets.bottom > Video._SCALE_EPSILON
+  }
+
+  setCropInsets(crop: Partial<CropInsets> | null): CropInsets {
+    const nextCrop = crop ? { ...this._cropInsets, ...crop } : { ...EMPTY_CROP }
+
+    if (!this._sprite) {
+      this._cropInsets = cloneCrop(nextCrop)
+      return this.getCropInsets()
+    }
+
+    const localSize = this._resolveRawLocalSize()
+    this._cropInsets = normalizeCropInsets(nextCrop, localSize.width, localSize.height)
+    this._syncCropState()
+    this.notifyPositionUpdate()
+
+    return this.getCropInsets()
+  }
+
+  clearCrop(): CropInsets {
+    return this.setCropInsets(null)
+  }
+
+  getMaskRect(): CropMaskRect | null {
+    if (!this._sprite || !this.hasCrop())
+      return null
+
+    const localSize = this._resolveRawLocalSize()
+    const visible = resolveVisibleLocalSize(localSize.width, localSize.height, this._cropInsets)
+    return {
+      x: this._cropInsets.left,
+      y: this._cropInsets.top,
+      width: visible.width,
+      height: visible.height,
+    }
+  }
+
+  applySideCropResize(input: SideCropResizeInput): SideCropResizeResult | null {
+    if (!this._sprite)
+      return null
+
+    const localSize = this._resolveRawLocalSize()
+    const result = applySideCropResize({
+      direction: input.direction,
+      localWidth: localSize.width,
+      localHeight: localSize.height,
+      scaleX: this._sprite.scale.x,
+      scaleY: this._sprite.scale.y,
+      crop: this._cropInsets,
+      targetVisibleWidth: input.targetVisibleWidth,
+      targetVisibleHeight: input.targetVisibleHeight,
+    })
+
+    this.setScale(result.scaleX, result.scaleY)
+    this.setCropInsets(result.crop)
+    return result
+  }
+
   destroy(): void {
     this._animationController?.destroy()
     this._animationController = undefined
@@ -675,12 +769,20 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     // 清理 Sprite
     if (this._sprite) {
+      if (this._cropMask && this._sprite.mask === this._cropMask) {
+        this._sprite.mask = null
+      }
       this._sprite.removeAllListeners()
       if (this._sprite.texture && this._sprite.texture !== Texture.EMPTY) {
         this._sprite.texture.destroy(true)
       }
       this._sprite.destroy()
       this._sprite = undefined
+    }
+
+    if (this._cropMask) {
+      this._cropMask.destroy({ children: true })
+      this._cropMask = undefined
     }
 
     // 重置状态
@@ -713,21 +815,11 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   }
 
   private _resolveBaseSize(baseTransform: TransformState): { width: number, height: number } {
-    if (!this._sprite)
-      return { width: 0, height: 0 }
-
-    const currentScaleX = this._sprite.scale.x
-    const currentScaleY = this._sprite.scale.y
-    const localWidth = Math.abs(currentScaleX) > Video._SCALE_EPSILON
-      ? this._sprite.width / Math.abs(currentScaleX)
-      : this._sprite.width
-    const localHeight = Math.abs(currentScaleY) > Video._SCALE_EPSILON
-      ? this._sprite.height / Math.abs(currentScaleY)
-      : this._sprite.height
+    const localSize = this._resolveVisibleLocalSize()
 
     return {
-      width: Math.max(0, Math.abs(localWidth * baseTransform.scaleX)),
-      height: Math.max(0, Math.abs(localHeight * baseTransform.scaleY)),
+      width: Math.max(0, Math.abs(localSize.width * baseTransform.scaleX)),
+      height: Math.max(0, Math.abs(localSize.height * baseTransform.scaleY)),
     }
   }
 
@@ -735,14 +827,9 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     if (!this._sprite)
       return undefined
 
-    const currentScaleX = this._sprite.scale.x
-    const currentScaleY = this._sprite.scale.y
-    const localWidth = Math.abs(currentScaleX) > Video._SCALE_EPSILON
-      ? this._sprite.width / Math.abs(currentScaleX)
-      : this._sprite.width
-    const localHeight = Math.abs(currentScaleY) > Video._SCALE_EPSILON
-      ? this._sprite.height / Math.abs(currentScaleY)
-      : this._sprite.height
+    const localSize = this._resolveVisibleLocalSize()
+    const localWidth = localSize.width
+    const localHeight = localSize.height
 
     if (
       !Number.isFinite(localWidth) || !Number.isFinite(localHeight)
@@ -787,6 +874,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this._sprite.scale.y = transform.scaleY
     this._sprite.angle = transform.rotation
     this._sprite.alpha = transform.alpha
+    this._syncCropState()
   }
 
   private _updateBaseTransform(): void {
@@ -823,5 +911,71 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       },
       layout,
     )
+  }
+
+  private _resolveRawLocalSize(): { width: number, height: number } {
+    if (!this._sprite)
+      return { width: 0.5, height: 0.5 }
+
+    const currentScaleX = this._sprite.scale.x
+    const currentScaleY = this._sprite.scale.y
+    const textureWidth = this._sprite.texture?.width ?? 0
+    const textureHeight = this._sprite.texture?.height ?? 0
+    const localWidth = Math.abs(currentScaleX) > Video._SCALE_EPSILON
+      ? this._sprite.width / Math.abs(currentScaleX)
+      : (textureWidth || this._sprite.width)
+    const localHeight = Math.abs(currentScaleY) > Video._SCALE_EPSILON
+      ? this._sprite.height / Math.abs(currentScaleY)
+      : (textureHeight || this._sprite.height)
+
+    return {
+      width: Math.max(0.5, localWidth),
+      height: Math.max(0.5, localHeight),
+    }
+  }
+
+  private _resolveVisibleLocalSize(): { width: number, height: number } {
+    const localSize = this._resolveRawLocalSize()
+    return resolveVisibleLocalSize(localSize.width, localSize.height, this._cropInsets)
+  }
+
+  private _syncCropState(): void {
+    if (!this._sprite)
+      return
+
+    const sprite = this._sprite as Sprite & {
+      pivot?: { set?: (x: number, y: number) => void }
+      addChild?: (child: Graphics) => void
+      removeChild?: (child: Graphics) => void
+      mask?: unknown
+    }
+    const localSize = this._resolveRawLocalSize()
+    this._cropInsets = normalizeCropInsets(this._cropInsets, localSize.width, localSize.height)
+
+    if (!this.hasCrop()) {
+      if (this._cropMask) {
+        this._cropMask.clear()
+        if (sprite.mask === this._cropMask)
+          sprite.mask = null
+        if (this._cropMask.parent === sprite && typeof sprite.removeChild === 'function')
+          sprite.removeChild(this._cropMask)
+      }
+      sprite.pivot?.set?.(0, 0)
+      return
+    }
+
+    if (!this._cropMask) {
+      this._cropMask = new Graphics({ label: 'video-crop-mask' })
+    }
+
+    const visible = resolveVisibleLocalSize(localSize.width, localSize.height, this._cropInsets)
+    this._cropMask.clear()
+      .rect(this._cropInsets.left, this._cropInsets.top, visible.width, visible.height)
+      .fill('#ffffff')
+    if (this._cropMask.parent !== sprite && typeof sprite.addChild === 'function')
+      sprite.addChild(this._cropMask)
+    if (sprite.mask !== this._cropMask)
+      sprite.mask = this._cropMask
+    sprite.pivot?.set?.(this._cropInsets.left, this._cropInsets.top)
   }
 }

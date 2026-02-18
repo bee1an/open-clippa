@@ -229,4 +229,42 @@ describe('transitionRuntime', () => {
 
     runtime.stop()
   })
+
+  it('reads mask rect from performers when capturing transition snapshots', async () => {
+    const { adapter, from, to } = createHarness()
+    const fromMaskRect = vi.fn(() => ({ x: 10, y: 8, width: 70, height: 50 }))
+    const toMaskRect = vi.fn(() => ({ x: 4, y: 6, width: 60, height: 48 }))
+
+    ;(from as any).getMaskRect = fromMaskRect
+    ;(to as any).getMaskRect = toMaskRect
+
+    const runtime = new TransitionRuntime(adapter, {
+      createFilter: () => {
+        return {
+          resources: {
+            uProgress: { uniforms: { uProgress: 0 } },
+            uRatio: { uniforms: { uRatio: 1 } },
+          },
+          destroy: vi.fn(),
+        } as any
+      },
+      createRenderTexture: ({ width, height, resolution }) => {
+        return {
+          destroyed: false,
+          width,
+          height,
+          source: { resolution, destroyed: false, alphaMode: 'premultiply-alpha-on-upload' },
+          resize: vi.fn(),
+          destroy: vi.fn(),
+        } as any
+      },
+    })
+
+    await runtime.start()
+    await runtime.syncFrame()
+
+    expect(fromMaskRect).toHaveBeenCalledTimes(1)
+    expect(toMaskRect).toHaveBeenCalledTimes(1)
+    runtime.stop()
+  })
 })

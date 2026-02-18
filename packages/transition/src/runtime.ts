@@ -1,9 +1,9 @@
 import type { Rail, Timeline } from 'clippc'
 import type { Application, Filter, RenderTexture, Texture } from 'pixi.js'
 import type { GlTransitionParamValue } from './glTransitions'
-import type { ActiveTransitionContext, TransitionRenderablePerformer } from './runtimeCore'
+import type { ActiveTransitionContext, TransitionMaskRect, TransitionRenderablePerformer } from './runtimeCore'
 import type { TransitionSpec } from './transition'
-import { Container, Filter as PixiFilter, RenderTexture as PixiRenderTexture, Texture as PixiTexture, Sprite } from 'pixi.js'
+import { Container, Graphics, Filter as PixiFilter, RenderTexture as PixiRenderTexture, Texture as PixiTexture, Sprite } from 'pixi.js'
 import {
   buildGlTransitionFragment,
   getGlTransitionPresetByType,
@@ -151,6 +151,32 @@ function isRenderableTexture(texture: Texture | undefined): texture is Texture {
   return source.alphaMode !== null && source.alphaMode !== undefined
 }
 
+function normalizeTransitionMaskRect(maskRect: TransitionMaskRect | null | undefined): TransitionMaskRect | null {
+  if (!maskRect)
+    return null
+
+  if (
+    !Number.isFinite(maskRect.x)
+    || !Number.isFinite(maskRect.y)
+    || !Number.isFinite(maskRect.width)
+    || !Number.isFinite(maskRect.height)
+  ) {
+    return null
+  }
+
+  const width = Math.max(0, maskRect.width)
+  const height = Math.max(0, maskRect.height)
+  if (!(width > 0) || !(height > 0))
+    return null
+
+  return {
+    x: maskRect.x,
+    y: maskRect.y,
+    width,
+    height,
+  }
+}
+
 function roundDebugNumber(value: number): number {
   if (!Number.isFinite(value))
     return value
@@ -213,6 +239,7 @@ export class TransitionRuntime {
   private transitionToSnapshotTexture: RenderTexture | null = null
   private snapshotCaptureContainer: Container | null = null
   private snapshotCaptureSprite: Sprite | null = null
+  private snapshotCaptureMask: Graphics | null = null
 
   private readonly transitionFilterCache = new Map<string, Filter>()
   private readonly railDisposers = new Map<Rail, () => void>()
@@ -323,6 +350,7 @@ export class TransitionRuntime {
       this.snapshotCaptureContainer = null
     }
     this.snapshotCaptureSprite = null
+    this.snapshotCaptureMask = null
 
     this.transitionFilterCache.forEach((filter) => {
       (filter as any).destroy?.()
@@ -614,21 +642,33 @@ export class TransitionRuntime {
   }
 
   private ensureSnapshotCaptureLayer(): boolean {
-    if (this.snapshotCaptureContainer && this.snapshotCaptureSprite)
+    if (this.snapshotCaptureContainer && this.snapshotCaptureSprite && this.snapshotCaptureMask)
       return true
 
     this.snapshotCaptureContainer = new Container({ label: 'transition-snapshot-capture', visible: true })
     this.snapshotCaptureSprite = new Sprite()
+    this.snapshotCaptureMask = new Graphics({ label: 'transition-snapshot-capture-mask' })
     this.snapshotCaptureContainer.addChild(this.snapshotCaptureSprite)
+    this.snapshotCaptureContainer.addChild(this.snapshotCaptureMask)
     return true
   }
 
-  private captureSpriteSnapshot(source: Sprite, targetTexture: RenderTexture): boolean {
+  private captureSpriteSnapshot(
+    source: Sprite,
+    targetTexture: RenderTexture,
+    rawMaskRect?: TransitionMaskRect | null,
+  ): boolean {
     if (!isRenderableTexture(source.texture))
       return false
 
-    if (!this.ensureSnapshotCaptureLayer() || !this.snapshotCaptureContainer || !this.snapshotCaptureSprite)
+    if (
+      !this.ensureSnapshotCaptureLayer()
+      || !this.snapshotCaptureContainer
+      || !this.snapshotCaptureSprite
+      || !this.snapshotCaptureMask
+    ) {
       return false
+    }
 
     const app = this.adapter.getApp()
     const snapshotSprite = this.snapshotCaptureSprite
@@ -644,12 +684,28 @@ export class TransitionRuntime {
     snapshotSprite.renderable = true
     snapshotSprite.setFromMatrix(worldTransform)
 
+    const maskRect = normalizeTransitionMaskRect(rawMaskRect ?? null)
+    if (maskRect) {
+      this.snapshotCaptureMask.clear()
+        .rect(maskRect.x, maskRect.y, maskRect.width, maskRect.height)
+        .fill('#ffffff')
+      this.snapshotCaptureMask.visible = true
+      this.snapshotCaptureMask.setFromMatrix(worldTransform)
+      snapshotSprite.mask = this.snapshotCaptureMask
+    }
+    else {
+      this.snapshotCaptureMask.clear()
+      this.snapshotCaptureMask.visible = false
+      snapshotSprite.mask = null
+    }
+
     app.renderer.render({
       container: this.snapshotCaptureContainer,
       target: targetTexture,
       clear: true,
     })
 
+    snapshotSprite.mask = null
     return true
   }
 
@@ -679,8 +735,10 @@ export class TransitionRuntime {
       }
     }
 
-    const fromCaptured = this.captureSpriteSnapshot(fromSprite, this.transitionFromSnapshotTexture)
-    const toCaptured = this.captureSpriteSnapshot(toSprite, this.transitionToSnapshotTexture)
+    const fromMaskRect = context.from.getMaskRect?.() ?? null
+    const toMaskRect = context.to.getMaskRect?.() ?? null
+    const fromCaptured = this.captureSpriteSnapshot(fromSprite, this.transitionFromSnapshotTexture, fromMaskRect)
+    const toCaptured = this.captureSpriteSnapshot(toSprite, this.transitionToSnapshotTexture, toMaskRect)
 
     if (!fromCaptured || !toCaptured) {
       return {

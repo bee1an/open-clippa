@@ -9,6 +9,34 @@ export interface PerformerBounds {
   rotation?: number
 }
 
+export interface CropInsets {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+export interface CropMaskRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export type SideCropDirection = 'left' | 'right' | 'top' | 'bottom'
+
+export interface SideCropResizeInput {
+  direction: SideCropDirection
+  targetVisibleWidth: number
+  targetVisibleHeight: number
+}
+
+export interface SideCropResizeResult {
+  scaleX: number
+  scaleY: number
+  crop: CropInsets
+}
+
 export interface Performer {
   id: string
   start: number
@@ -43,6 +71,12 @@ export interface Performer {
   setAlpha: (alpha: number) => void
   setAnimation: (spec: PerformerAnimationSpec | null) => void
   setFilters: (filters: Filter[] | null) => void
+  getCropInsets?: () => CropInsets
+  setCropInsets?: (crop: Partial<CropInsets> | null) => CropInsets
+  clearCrop?: () => CropInsets
+  hasCrop?: () => boolean
+  getMaskRect?: () => CropMaskRect | null
+  applySideCropResize?: (input: SideCropResizeInput) => SideCropResizeResult | null
 }
 
 export interface PerformerOption {

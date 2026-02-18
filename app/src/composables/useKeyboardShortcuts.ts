@@ -1,4 +1,4 @@
-import type { Image } from '@clippc/performer'
+import type { CropInsets, Image } from '@clippc/performer'
 import type { Rail, Train } from 'clippc'
 import type { PerformerConfig } from '@/store/usePerformerStore'
 import { Text, Video } from '@clippc/performer'
@@ -186,6 +186,9 @@ export function useKeyboardShortcuts() {
     const rightDuration = train.duration - leftDuration
     const bounds = performer.getBaseBounds()
     const zIndex = performer.zIndex
+    const crop = 'getCropInsets' in performer && typeof performer.getCropInsets === 'function'
+      ? performer.getCropInsets() as CropInsets
+      : undefined
 
     // build right-half config based on performer type
     let rightConfig: PerformerConfig
@@ -202,6 +205,7 @@ export function useKeyboardShortcuts() {
         src: performer.src,
         sourceStart: performer.sourceStart + leftDuration,
         sourceDuration: performer.sourceDuration,
+        crop,
       }
     }
     else if (performer instanceof Text) {
@@ -231,6 +235,7 @@ export function useKeyboardShortcuts() {
         height: bounds.height,
         zIndex,
         src: (performer as Image).src,
+        crop,
       }
     }
 

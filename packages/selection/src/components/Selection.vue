@@ -129,17 +129,41 @@ const boxStyle = computed(() => {
 
 // 手柄样式
 // Updated for square look as requested
-const handleStyle = computed(() => ({
+const commonHandleStyle = computed(() => ({
   position: 'absolute' as const,
-  width: `${computedTheme.value.handleSize}px`,
-  height: `${computedTheme.value.handleSize}px`,
   backgroundColor: handleBackgroundColor.value,
   border: `1px solid ${handleColor.value}`,
-  borderRadius: '2px',
   zIndex: 1,
   pointerEvents: 'auto' as const,
   boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.65), 0 1px 2px rgba(0, 0, 0, 0.45)',
 }))
+
+function getHandleStyle(direction: ResizeDirection) {
+  const size = computedTheme.value.handleSize || 10
+  const common = commonHandleStyle.value
+
+  if (direction.includes('-')) {
+    // 顶点：保持方形
+    return {
+      ...common,
+      width: `${size}px`,
+      height: `${size}px`,
+      borderRadius: '2px',
+    }
+  }
+
+  // 非顶点：使用长方形
+  const isVertical = direction === 'left' || direction === 'right'
+  const longSide = Math.max(16, size * 2.5)
+  const shortSide = Math.max(4, size * 0.6)
+
+  return {
+    ...common,
+    width: `${isVertical ? shortSide : longSide}px`,
+    height: `${isVertical ? longSide : shortSide}px`,
+    borderRadius: '4px',
+  }
+}
 
 // 旋转手柄样式
 const rotateHandleStyle = computed(() => ({
@@ -506,7 +530,7 @@ onUnmounted(() => {
           v-if="props.active"
           :data-direction="direction"
           class="resize-handle" :class="[`resize-handle-${direction}`]"
-          :style="handleStyle"
+          :style="getHandleStyle(direction)"
           @mousedown.stop="handleResizeStart(direction, $event)"
           @touchstart.stop="handleResizeStart(direction, $event)"
         />

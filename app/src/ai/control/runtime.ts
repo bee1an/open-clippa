@@ -44,6 +44,7 @@ import type {
 import type { PerformerConfig } from '@/store/usePerformerStore'
 import { getFilterPresetConfig } from '@clippc/filter'
 import {
+  type CropInsets,
   Image,
   Text,
   Video,
@@ -611,6 +612,9 @@ export function createEditorControlRuntime(
           const leftDuration = splitTime - train.start
           const rightDuration = train.duration - leftDuration
           const bounds = performer.getBaseBounds()
+          const crop = 'getCropInsets' in performer && typeof performer.getCropInsets === 'function'
+            ? performer.getCropInsets() as CropInsets
+            : undefined
 
           const rightConfig: PerformerConfig = performer instanceof Video
             ? {
@@ -625,6 +629,7 @@ export function createEditorControlRuntime(
                 src: performer.src,
                 sourceStart: performer.sourceStart + leftDuration,
                 sourceDuration: performer.sourceDuration,
+                crop,
               }
             : performer instanceof Text
               ? {
@@ -651,6 +656,7 @@ export function createEditorControlRuntime(
                   height: bounds.height,
                   zIndex: performer.zIndex,
                   src: (performer as Image).src,
+                  crop,
                 }
 
           train.duration = leftDuration

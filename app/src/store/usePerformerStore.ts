@@ -1,4 +1,5 @@
 import type {
+  CropInsets,
   PerformerAnimationPatch,
   PerformerAnimationSpec,
   PerformerBounds,
@@ -34,11 +35,13 @@ export interface VideoPerformerConfig extends PerformerConfigBase {
   src: string | File | Blob
   sourceDuration?: number
   sourceStart?: number
+  crop?: Partial<CropInsets> | null
 }
 
 export interface ImagePerformerConfig extends PerformerConfigBase {
   type: 'image'
   src: string | File | Blob
+  crop?: Partial<CropInsets> | null
 }
 
 export interface TextPerformerConfig extends PerformerConfigBase {
