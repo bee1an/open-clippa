@@ -15,6 +15,7 @@ const CONTEXT_AWARE_SYSTEM_PROMPT = [
   'If the user asks to import a random video, call media_import_random_video before follow-up editing steps.',
   'If the user asks to randomly choose from media library, call media_pick_random_asset first.',
   'If media should be placed on timeline, chain media_add_asset_to_timeline after import or random pick.',
+  'If the user asks to crop image/video, use performer_update_transform with crop or clearCrop and target performerId.',
   'Only use tool data as factual context. If a tool fails, explain the failure briefly and ask for a retry.',
 ].join(' ')
 

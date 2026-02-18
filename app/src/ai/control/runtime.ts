@@ -210,6 +210,106 @@ function mapMediaImportFailure(error: unknown, fallbackMessage: string): ActionR
   return failure('NOT_READY', fallbackMessage)
 }
 
+function rotateVector(x: number, y: number, rotation: number): { x: number, y: number } {
+  if (!rotation)
+    return { x, y }
+
+  const radians = rotation * Math.PI / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  return {
+    x: x * cos - y * sin,
+    y: x * sin + y * cos,
+  }
+}
+
+type CroppablePerformer = (Image | Video) & {
+  getCropInsets?: () => CropInsets
+  setCropInsets?: (crop: Partial<CropInsets> | null) => CropInsets
+  clearCrop?: () => CropInsets
+}
+
+function isCroppablePerformer(performer: unknown): performer is CroppablePerformer {
+  return performer instanceof Image || performer instanceof Video
+}
+
+function resolvePerformerCrop(performer: unknown): CropInsets | null {
+  if (!isCroppablePerformer(performer) || typeof performer.getCropInsets !== 'function')
+    return null
+
+  const crop = performer.getCropInsets()
+  if (
+    !crop
+    || !isFiniteNumber(crop.left)
+    || !isFiniteNumber(crop.top)
+    || !isFiniteNumber(crop.right)
+    || !isFiniteNumber(crop.bottom)
+  ) {
+    return null
+  }
+
+  return {
+    left: crop.left,
+    top: crop.top,
+    right: crop.right,
+    bottom: crop.bottom,
+  }
+}
+
+function normalizeCropPatch(input: Partial<CropInsets> | undefined): ActionResult<Partial<CropInsets>> | null {
+  if (input === undefined)
+    return null
+
+  if (!input || typeof input !== 'object')
+    return failure('INVALID_ARGUMENT', 'crop must be an object')
+
+  const nextCrop: Partial<CropInsets> = {}
+  const fields: Array<keyof CropInsets> = ['left', 'top', 'right', 'bottom']
+  for (const field of fields) {
+    if (!(field in input))
+      continue
+
+    const value = input[field]
+    if (!isFiniteNumber(value))
+      return failure('INVALID_ARGUMENT', `crop.${field} must be a finite number`)
+    if (value < 0)
+      return failure('INVALID_ARGUMENT', `crop.${field} must be >= 0`)
+
+    nextCrop[field] = value
+  }
+
+  if (Object.keys(nextCrop).length === 0)
+    return failure('INVALID_ARGUMENT', 'crop must include at least one of: left, top, right, bottom')
+
+  return success(nextCrop)
+}
+
+function resolveCropCompensatedPosition(
+  performer: NonNullable<ReturnType<ReturnType<typeof usePerformerStore>['getPerformerById']>>,
+  beforeCrop: CropInsets | null,
+  afterCrop: CropInsets | null,
+): { x: number, y: number } | null {
+  if (!beforeCrop || !afterCrop)
+    return null
+
+  const deltaLeft = afterCrop.left - beforeCrop.left
+  const deltaTop = afterCrop.top - beforeCrop.top
+
+  if (Math.abs(deltaLeft) <= 1e-6 && Math.abs(deltaTop) <= 1e-6)
+    return null
+
+  const scaleX = performer.sprite?.scale?.x ?? 1
+  const scaleY = performer.sprite?.scale?.y ?? 1
+  const rotation = performer.sprite?.angle ?? performer.getBaseBounds().rotation ?? 0
+
+  const shifted = rotateVector(deltaLeft * scaleX, deltaTop * scaleY, rotation)
+  const currentBounds = performer.getBaseBounds()
+  return {
+    x: currentBounds.x + shifted.x,
+    y: currentBounds.y + shifted.y,
+  }
+}
+
 export function createEditorControlRuntime(
   dependencies: EditorControlRuntimeDependencies = {},
 ): EditorControlRuntime {
@@ -268,6 +368,9 @@ export function createEditorControlRuntime(
       snapshot.sourceStartMs = sourceStart
     if (isFiniteNumber(sourceDuration))
       snapshot.sourceDurationMs = sourceDuration
+    const crop = resolvePerformerCrop(performer)
+    if (crop)
+      snapshot.crop = crop
 
     if (performer instanceof Text) {
       snapshot.text = performer.getText()
@@ -1033,6 +1136,8 @@ export function createEditorControlRuntime(
       const performerResult = ensurePerformer(performerId)
       if (!performerResult.ok)
         return performerResult
+      const performer = performerResult.data
+      const beforeCrop = resolvePerformerCrop(performer)
 
       const updates: Record<string, unknown> = {}
       if (input.x !== undefined) {
@@ -1071,10 +1176,60 @@ export function createEditorControlRuntime(
         updates.zIndex = Math.max(1, Math.floor(input.zIndex))
       }
 
-      if (Object.keys(updates).length === 0)
-        return failure('INVALID_ARGUMENT', 'At least one transform field must be provided')
+      const cropPatchResult = normalizeCropPatch(input.crop)
+      if (cropPatchResult && !cropPatchResult.ok)
+        return cropPatchResult
 
-      performerStore.updatePerformer(performerId, updates as any)
+      if (input.clearCrop !== undefined && typeof input.clearCrop !== 'boolean')
+        return failure('INVALID_ARGUMENT', 'clearCrop must be a boolean')
+
+      const clearCrop = input.clearCrop === true
+      const cropPatch = cropPatchResult && cropPatchResult.ok ? cropPatchResult.data : undefined
+
+      if (cropPatch && clearCrop)
+        return failure('INVALID_ARGUMENT', 'crop and clearCrop cannot be used together')
+
+      const hasTransformUpdates = Object.keys(updates).length > 0
+      if (!hasTransformUpdates && !cropPatch && !clearCrop) {
+        return failure(
+          'INVALID_ARGUMENT',
+          'At least one transform field or crop operation must be provided',
+        )
+      }
+
+      const croppablePerformer = isCroppablePerformer(performer) ? performer : null
+      if ((cropPatch || clearCrop) && !croppablePerformer)
+        return failure('UNSUPPORTED', `Performer does not support crop updates: ${performer.id}`)
+
+      if (clearCrop) {
+        if (!croppablePerformer)
+          return failure('UNSUPPORTED', `Performer does not support clearing crop: ${performer.id}`)
+
+        if (typeof croppablePerformer.clearCrop === 'function') {
+          croppablePerformer.clearCrop()
+        }
+        else if (typeof croppablePerformer.setCropInsets === 'function') {
+          croppablePerformer.setCropInsets(null)
+        }
+        else {
+          return failure('UNSUPPORTED', `Performer does not support clearing crop: ${performer.id}`)
+        }
+      }
+      else if (cropPatch) {
+        if (!croppablePerformer || typeof croppablePerformer.setCropInsets !== 'function')
+          return failure('UNSUPPORTED', `Performer does not support crop updates: ${performer.id}`)
+        croppablePerformer.setCropInsets(cropPatch)
+      }
+
+      if ((cropPatch || clearCrop) && input.x === undefined && input.y === undefined) {
+        const afterCrop = resolvePerformerCrop(performer)
+        const compensated = resolveCropCompensatedPosition(performer, beforeCrop, afterCrop)
+        if (compensated)
+          performer.setPosition(compensated.x, compensated.y)
+      }
+
+      if (hasTransformUpdates)
+        performerStore.updatePerformer(performerId, updates as any)
 
       if (updates.zIndex !== undefined) {
         const train = findTrainById(listAllTrains(), performerId)

@@ -80,13 +80,14 @@ export class Image extends EventBus<ImageEvents> implements Performer {
 
   constructor(option: ImageOption) {
     super()
-    const { id, start, duration, src, zIndex } = option
+    const { id, start, duration, src, zIndex, crop } = option
 
     this.id = id
     this.start = start
     this.duration = duration
     this.zIndex = zIndex
     this.src = transformSrc(src)
+    this._cropInsets = cloneCrop(crop)
 
     if (typeof src !== 'string')
       this._objectUrl = this.src
@@ -98,7 +99,7 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     if (this._loader)
       return this._loader
 
-    const { height, width, x, y, crop } = option || {}
+    const { height, width, x, y } = option || {}
 
     const { promise, resolve, reject } = Promise.withResolvers<void>()
     this._loader = promise
@@ -133,7 +134,6 @@ export class Image extends EventBus<ImageEvents> implements Performer {
         if (y !== undefined)
           this._sprite.y = y
 
-        this._cropInsets = cloneCrop(crop)
         this._syncCropState()
 
         if (width !== undefined || height !== undefined) {

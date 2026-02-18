@@ -27,6 +27,12 @@ interface MockPerformerInput {
   sourceStart?: number
   sourceDuration?: number
   text?: string
+  crop?: {
+    left?: number
+    top?: number
+    right?: number
+    bottom?: number
+  }
 }
 
 function createMockPerformer(input: MockPerformerInput) {
@@ -42,6 +48,14 @@ function createMockPerformer(input: MockPerformerInput) {
     src: input.src,
     sourceStart: input.sourceStart,
     sourceDuration: input.sourceDuration,
+    getCropInsets: input.crop
+      ? () => ({
+          left: input.crop?.left ?? 0,
+          top: input.crop?.top ?? 0,
+          right: input.crop?.right ?? 0,
+          bottom: input.crop?.bottom ?? 0,
+        })
+      : undefined,
     getText: input.text ? () => input.text as string : undefined,
     load: vi.fn(async () => {}),
     update: vi.fn(),
@@ -89,7 +103,16 @@ describe('createEditorContextAdapter', () => {
   })
 
   it('maps selected performers and transition snapshot', () => {
-    const p1 = createMockPerformer({ id: 'p1', start: 0, duration: 1000, src: 'https://example.com/1.mp4' })
+    const p1 = createMockPerformer({
+      id: 'p1',
+      start: 0,
+      duration: 1000,
+      src: 'https://example.com/1.mp4',
+      crop: {
+        left: 8,
+        right: 12,
+      },
+    })
     const p2 = createMockPerformer({ id: 'p2', start: 1000, duration: 1000, text: 'selected text' })
 
     const adapter = createEditorContextAdapter({
@@ -120,6 +143,14 @@ describe('createEditorContextAdapter', () => {
     expect(selected[0].id).toBe('p2')
     expect(selected[0].text).toBe('selected text')
     expect(selected[0].animation).toEqual({ enter: { preset: 'fade', durationMs: 200 } })
+
+    const visible = adapter.listVisiblePerformers(200)
+    expect(visible[0].crop).toEqual({
+      left: 8,
+      top: 0,
+      right: 12,
+      bottom: 0,
+    })
 
     const transition = adapter.getActiveTransition()
     expect(transition).toEqual({

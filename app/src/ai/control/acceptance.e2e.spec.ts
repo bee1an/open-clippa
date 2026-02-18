@@ -66,21 +66,91 @@ const {
     src: string
     sourceStart: number
     sourceDuration: number
+    private crop: { left: number, top: number, right: number, bottom: number }
 
     constructor(option: any) {
       super(option)
       this.src = typeof option.src === 'string' ? option.src : `blob:${option.id}`
       this.sourceStart = option.sourceStart ?? 0
       this.sourceDuration = option.sourceDuration ?? option.duration
+      this.crop = {
+        left: option.crop?.left ?? 0,
+        top: option.crop?.top ?? 0,
+        right: option.crop?.right ?? 0,
+        bottom: option.crop?.bottom ?? 0,
+      }
+    }
+
+    getCropInsets() {
+      return { ...this.crop }
+    }
+
+    setCropInsets(crop: Record<string, unknown> | null) {
+      if (crop === null) {
+        this.crop = { left: 0, top: 0, right: 0, bottom: 0 }
+        return this.getCropInsets()
+      }
+
+      const toFinite = (value: unknown, fallback: number) => {
+        return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback
+      }
+
+      this.crop = {
+        left: toFinite(crop.left, this.crop.left),
+        top: toFinite(crop.top, this.crop.top),
+        right: toFinite(crop.right, this.crop.right),
+        bottom: toFinite(crop.bottom, this.crop.bottom),
+      }
+      return this.getCropInsets()
+    }
+
+    clearCrop() {
+      this.crop = { left: 0, top: 0, right: 0, bottom: 0 }
+      return this.getCropInsets()
     }
   }
 
   class LocalMockImage extends MockBasePerformer {
     src: string
+    private crop: { left: number, top: number, right: number, bottom: number }
 
     constructor(option: any) {
       super(option)
       this.src = typeof option.src === 'string' ? option.src : `blob:${option.id}`
+      this.crop = {
+        left: option.crop?.left ?? 0,
+        top: option.crop?.top ?? 0,
+        right: option.crop?.right ?? 0,
+        bottom: option.crop?.bottom ?? 0,
+      }
+    }
+
+    getCropInsets() {
+      return { ...this.crop }
+    }
+
+    setCropInsets(crop: Record<string, unknown> | null) {
+      if (crop === null) {
+        this.crop = { left: 0, top: 0, right: 0, bottom: 0 }
+        return this.getCropInsets()
+      }
+
+      const toFinite = (value: unknown, fallback: number) => {
+        return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback
+      }
+
+      this.crop = {
+        left: toFinite(crop.left, this.crop.left),
+        top: toFinite(crop.top, this.crop.top),
+        right: toFinite(crop.right, this.crop.right),
+        bottom: toFinite(crop.bottom, this.crop.bottom),
+      }
+      return this.getCropInsets()
+    }
+
+    clearCrop() {
+      this.crop = { left: 0, top: 0, right: 0, bottom: 0 }
+      return this.getCropInsets()
     }
   }
 
@@ -1020,6 +1090,91 @@ describe('aI control acceptance e2e', () => {
       fontWeight: 'bold',
       align: 'center',
     }))
+  })
+
+  it('scenario 2b: update and clear crop on image performer', async () => {
+    const imagePerformer = new MockImage({
+      id: 'image-1',
+      type: 'image',
+      src: 'blob:image-1',
+      start: 0,
+      duration: 6000,
+      zIndex: 2,
+      x: 50,
+      y: 40,
+      width: 640,
+      height: 360,
+    })
+
+    const harness = createHarness({
+      performers: [imagePerformer],
+      selectedPerformerId: 'image-1',
+    })
+
+    const updateCropResult = await harness.runTool('performer_update_transform', {
+      performerId: 'image-1',
+      crop: {
+        left: 20,
+        right: 24,
+        top: 12,
+      },
+    })
+
+    expect(updateCropResult.ok).toBe(true)
+    expect(updateCropResult.data.performer.crop).toEqual({
+      left: 20,
+      top: 12,
+      right: 24,
+      bottom: 0,
+    })
+    expect(updateCropResult.data.performer.bounds).toEqual(expect.objectContaining({
+      x: 70,
+      y: 52,
+    }))
+
+    const clearCropResult = await harness.runTool('performer_update_transform', {
+      performerId: 'image-1',
+      clearCrop: true,
+    })
+
+    expect(clearCropResult.ok).toBe(true)
+    expect(clearCropResult.data.performer.crop).toEqual({
+      left: 0,
+      top: 0,
+      right: 0,
+      bottom: 0,
+    })
+    expect(clearCropResult.data.performer.bounds).toEqual(expect.objectContaining({
+      x: 50,
+      y: 40,
+    }))
+  })
+
+  it('scenario 2c: reject crop update on text performer', async () => {
+    const textPerformer = new MockText({
+      id: 'text-1',
+      type: 'text',
+      content: 'title',
+      start: 0,
+      duration: 5000,
+      zIndex: 2,
+      x: 0,
+      y: 0,
+    })
+    const harness = createHarness({
+      performers: [textPerformer],
+      selectedPerformerId: 'text-1',
+    })
+
+    const cropResult = await harness.runTool('performer_update_transform', {
+      performerId: 'text-1',
+      crop: {
+        left: 10,
+      },
+    })
+
+    expect(cropResult.ok).toBe(false)
+    expect(cropResult.error.code).toBe('UNSUPPORTED')
   })
 
   it('scenario 3: query candidate then upsert crosswarp transition with 700ms', async () => {

@@ -102,7 +102,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
   constructor(option: VideoOption) {
     super()
-    const { id, start, duration, src, zIndex } = option
+    const { id, start, duration, src, zIndex, crop } = option
 
     this.id = id
     this.start = start
@@ -111,6 +111,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.src = transformSrc(src)
     this.sourceDuration = option.sourceDuration ?? option.duration
     this.sourceStart = option.sourceStart ?? 0
+    this._cropInsets = cloneCrop(crop)
 
     this.load(option)
   }
@@ -140,7 +141,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     if (this._loader)
       return this._loader
 
-    const { height, width, x, y, crop } = option || {}
+    const { height, width, x, y } = option || {}
 
     const { promise, reject, resolve } = Promise.withResolvers<void>()
 
@@ -168,7 +169,6 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         if (y !== undefined)
           this._sprite.y = y
 
-        this._cropInsets = cloneCrop(crop)
         this._syncCropState()
 
         if (width !== undefined || height !== undefined) {

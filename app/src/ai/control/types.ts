@@ -1,4 +1,4 @@
-import type { PerformerAnimationSpec, PerformerBounds, TextStyleOption } from '@clippc/performer'
+import type { CropInsets, PerformerAnimationSpec, PerformerBounds, TextStyleOption } from '@clippc/performer'
 import type { FilterConfig } from '@/store/useFilterStore'
 import type { TransitionSpec } from '@/store/useTransitionStore'
 
@@ -55,6 +55,7 @@ export interface PerformerSnapshot {
   source?: string
   sourceStartMs?: number
   sourceDurationMs?: number
+  crop?: CropInsets
   text?: string
   textStyle?: TextStyleOption
   animation?: PerformerAnimationSpec | null
@@ -221,6 +222,8 @@ export interface PerformerUpdateTransformInput {
   rotation?: number
   alpha?: number
   zIndex?: number
+  crop?: Partial<CropInsets>
+  clearCrop?: boolean
 }
 
 export interface PerformerUpdateTextContentInput {

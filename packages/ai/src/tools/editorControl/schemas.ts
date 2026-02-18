@@ -109,6 +109,17 @@ export const animationSchema = {
   additionalProperties: false,
 } as const
 
+export const cropInsetsSchema = {
+  type: 'object',
+  properties: {
+    left: { type: 'number' },
+    top: { type: 'number' },
+    right: { type: 'number' },
+    bottom: { type: 'number' },
+  },
+  additionalProperties: false,
+} as const
+
 export const filterConfigPatchSchema = {
   type: 'object',
   properties: {

@@ -272,4 +272,55 @@ describe('createEditorControlTools', () => {
       type: 'all',
     })
   })
+
+  it('normalizes crop fields for performer_update_transform', async () => {
+    const performerUpdateTransform: EditorControlAdapter['performerUpdateTransform'] = vi.fn(async () => ({ ok: true as const, data: {} }))
+    const adapter = createAdapter({ performerUpdateTransform })
+    const tool = getTool(adapter, 'performer_update_transform')
+
+    await tool.handler({
+      performerId: 'p-1',
+      crop: {
+        left: 12,
+        top: 8,
+      },
+    }, context)
+
+    expect(performerUpdateTransform).toHaveBeenCalledWith({
+      performerId: 'p-1',
+      x: undefined,
+      y: undefined,
+      width: undefined,
+      height: undefined,
+      rotation: undefined,
+      alpha: undefined,
+      zIndex: undefined,
+      crop: {
+        left: 12,
+        top: 8,
+      },
+      clearCrop: undefined,
+    })
+  })
+
+  it('rejects invalid crop combination for performer_update_transform', async () => {
+    const performerUpdateTransform: EditorControlAdapter['performerUpdateTransform'] = vi.fn(async () => ({ ok: true as const, data: {} }))
+    const adapter = createAdapter({ performerUpdateTransform })
+    const tool = getTool(adapter, 'performer_update_transform')
+
+    const result = await tool.handler({
+      performerId: 'p-1',
+      crop: { right: 20 },
+      clearCrop: true,
+    }, context)
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'crop and clearCrop cannot be used together',
+      },
+    })
+    expect(performerUpdateTransform).not.toHaveBeenCalled()
+  })
 })

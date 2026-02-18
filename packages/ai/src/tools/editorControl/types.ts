@@ -144,6 +144,13 @@ export interface PerformerUpdateTransformInput {
   rotation?: number
   alpha?: number
   zIndex?: number
+  crop?: {
+    left?: number
+    top?: number
+    right?: number
+    bottom?: number
+  }
+  clearCrop?: boolean
 }
 
 export interface PerformerUpdateTextContentInput {

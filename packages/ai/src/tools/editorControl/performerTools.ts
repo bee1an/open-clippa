@@ -5,9 +5,11 @@ import type {
 } from './types'
 import {
   animationSchema,
+  cropInsetsSchema,
   textStyleSchema,
 } from './schemas'
 import {
+  asOptionalBoolean,
   asOptionalFiniteNumber,
   asOptionalString,
   invalidArgument,
@@ -148,6 +150,58 @@ function resolveCreateTextInput(value: unknown): EditorControlCreateTextInput {
   return input
 }
 
+function resolveCropInsetsInput(value: unknown): {
+  crop: {
+    left?: number
+    top?: number
+    right?: number
+    bottom?: number
+  } | undefined
+  error?: string
+} {
+  if (value === undefined) {
+    return { crop: undefined }
+  }
+
+  if (!isRecord(value)) {
+    return {
+      crop: undefined,
+      error: 'crop must be an object',
+    }
+  }
+
+  const nextCrop: {
+    left?: number
+    top?: number
+    right?: number
+    bottom?: number
+  } = {}
+  const fields: Array<'left' | 'top' | 'right' | 'bottom'> = ['left', 'top', 'right', 'bottom']
+
+  for (const field of fields) {
+    if (!(field in value))
+      continue
+
+    const parsed = asOptionalFiniteNumber(value[field])
+    if (parsed === undefined)
+      return { crop: undefined, error: `crop.${field} must be a finite number` }
+
+    if (parsed < 0)
+      return { crop: undefined, error: `crop.${field} must be >= 0` }
+
+    nextCrop[field] = parsed
+  }
+
+  if (Object.keys(nextCrop).length === 0) {
+    return {
+      crop: undefined,
+      error: 'crop must include at least one of: left, top, right, bottom',
+    }
+  }
+
+  return { crop: nextCrop }
+}
+
 export const createPerformerTools: EditorControlToolFactory = adapter => [
   {
     name: 'create_text_element',
@@ -186,7 +240,7 @@ export const createPerformerTools: EditorControlToolFactory = adapter => [
   },
   {
     name: 'performer_update_transform',
-    description: 'Update performer transform values by performer id.',
+    description: 'Update performer transform values by performer id. For image/video, also supports crop updates.',
     jsonSchema: {
       type: 'object',
       properties: {
@@ -198,6 +252,8 @@ export const createPerformerTools: EditorControlToolFactory = adapter => [
         rotation: { type: 'number' },
         alpha: { type: 'number' },
         zIndex: { type: 'number' },
+        crop: cropInsetsSchema,
+        clearCrop: { type: 'boolean' },
       },
       required: ['performerId'],
       additionalProperties: false,
@@ -208,6 +264,17 @@ export const createPerformerTools: EditorControlToolFactory = adapter => [
       if (!performerId)
         return invalidArgument('performerId is required')
 
+      const cropResult = resolveCropInsetsInput(input.crop)
+      if (cropResult.error)
+        return invalidArgument(cropResult.error)
+
+      const clearCrop = asOptionalBoolean(input.clearCrop)
+      if (input.clearCrop !== undefined && clearCrop === undefined)
+        return invalidArgument('clearCrop must be a boolean')
+
+      if (cropResult.crop && clearCrop)
+        return invalidArgument('crop and clearCrop cannot be used together')
+
       return await adapter.performerUpdateTransform({
         performerId,
         x: asOptionalFiniteNumber(input.x),
@@ -217,6 +284,8 @@ export const createPerformerTools: EditorControlToolFactory = adapter => [
         rotation: asOptionalFiniteNumber(input.rotation),
         alpha: asOptionalFiniteNumber(input.alpha),
         zIndex: asOptionalFiniteNumber(input.zIndex),
+        crop: cropResult.crop,
+        clearCrop,
       })
     },
   },

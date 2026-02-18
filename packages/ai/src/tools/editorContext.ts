@@ -17,12 +17,20 @@ export interface EditorContextPerformerBounds {
   rotation?: number
 }
 
+export interface EditorContextPerformerCrop {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
 export interface EditorContextPerformerSummary {
   id: string
   type: EditorContextPerformerType
   startMs: number
   durationMs: number
   bounds: EditorContextPerformerBounds
+  crop?: EditorContextPerformerCrop
   alpha?: number
   text?: string
   source?: string
@@ -164,6 +172,15 @@ function toPerformerPayload(
 
   if (typeof performer.sourceDurationMs === 'number')
     basePayload.sourceDurationMs = performer.sourceDurationMs
+
+  if (performer.crop) {
+    basePayload.crop = {
+      left: normalizeNumber(performer.crop.left, 0),
+      top: normalizeNumber(performer.crop.top, 0),
+      right: normalizeNumber(performer.crop.right, 0),
+      bottom: normalizeNumber(performer.crop.bottom, 0),
+    }
+  }
 
   if (performer.animation !== undefined)
     basePayload.animation = performer.animation

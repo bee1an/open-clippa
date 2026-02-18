@@ -21,6 +21,12 @@ interface PerformerLike {
   sprite?: {
     alpha?: number
   }
+  getCropInsets?: () => {
+    left: number
+    top: number
+    right: number
+    bottom: number
+  }
   getText?: () => string
   getBaseBounds: () => {
     x: number
@@ -271,6 +277,23 @@ function toPerformerSummary(
 
   if (typeof performer.sourceDuration === 'number')
     summary.sourceDurationMs = performer.sourceDuration
+
+  if (typeof performer.getCropInsets === 'function') {
+    const crop = performer.getCropInsets()
+    if (
+      Number.isFinite(crop.left)
+      && Number.isFinite(crop.top)
+      && Number.isFinite(crop.right)
+      && Number.isFinite(crop.bottom)
+    ) {
+      summary.crop = {
+        left: crop.left,
+        top: crop.top,
+        right: crop.right,
+        bottom: crop.bottom,
+      }
+    }
+  }
 
   if (animation !== null && animation !== undefined)
     summary.animation = animation
