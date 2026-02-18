@@ -1,3 +1,4 @@
+import { Texture } from 'pixi.js'
 import { describe, expect, it, vi } from 'vitest'
 import { PlayState, ShowState } from '../src/performer'
 import { Video } from '../src/video'
@@ -242,5 +243,54 @@ describe('video core behavior', () => {
     expect(video.error).toBe(false)
     expect(video.showState).toBe(ShowState.UNPLAYED)
     expect(video.playState).toBe(PlayState.PAUSED)
+  })
+
+  it('keeps resized sprite size when async frame render completes', async () => {
+    const video = createVideoHarness()
+    const frameClose = vi.fn()
+    const sampleClose = vi.fn()
+    const nextTexture = { destroy: vi.fn() }
+    const textureFromSpy = vi.spyOn(Texture, 'from').mockReturnValue(nextTexture as any)
+
+    let resolveSample!: (sample: any) => void
+    const pendingSample = new Promise<any>((resolve) => {
+      resolveSample = resolve
+    })
+
+    video._sprite = {
+      texture: { id: 'old-texture' },
+      width: 300,
+      height: 180,
+      scale: { x: 1, y: 1 },
+      x: 0,
+      y: 0,
+      angle: 0,
+      alpha: 1,
+    }
+    video._getVideoSampleAtTime = vi.fn().mockReturnValue(pendingSample)
+    video._resolveCachedTexture = vi.fn().mockReturnValue(null)
+    video._clearCachedFrame = vi.fn(() => {
+      // Simulate PIXI recalculation side effect when texture is detached.
+      video._sprite.width = 1
+      video._sprite.height = 1
+    })
+
+    const renderPromise = video._renderFrameAtTime(120)
+
+    video._sprite.width = 180
+    video._sprite.height = 320
+
+    resolveSample({
+      toVideoFrame: () => ({ close: frameClose }),
+      close: sampleClose,
+    })
+
+    await renderPromise
+
+    expect(video._sprite.width).toBe(180)
+    expect(video._sprite.height).toBe(320)
+    expect(sampleClose).toHaveBeenCalledTimes(1)
+    expect(frameClose).not.toHaveBeenCalled()
+    textureFromSpy.mockRestore()
   })
 })

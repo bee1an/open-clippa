@@ -1,4 +1,4 @@
-import { CanvasExport, ExportCanceledError } from 'clippc'
+import { CanvasExport, ExportCanceledError, type CanvasSize } from 'clippc'
 import { defineStore } from 'pinia'
 import { nextTick } from 'vue'
 import { useEditorStore } from './useEditorStore'
@@ -25,6 +25,16 @@ function captureCanvasPreview(canvas: HTMLCanvasElement): string {
   }
   catch {
     return ''
+  }
+}
+
+function resolvePreviewCanvasSize(canvas: HTMLCanvasElement, fallbackSize: CanvasSize): CanvasSize {
+  const width = Number.isFinite(canvas.width) && canvas.width > 0 ? canvas.width : fallbackSize.width
+  const height = Number.isFinite(canvas.height) && canvas.height > 0 ? canvas.height : fallbackSize.height
+
+  return {
+    width: Math.max(1, Math.round(width)),
+    height: Math.max(1, Math.round(height)),
   }
 }
 
@@ -61,6 +71,10 @@ export const useExportTaskStore = defineStore('export-task', () => {
   const currentFrame = ref(0)
   const totalFrames = ref(0)
   const previewUrl = ref('')
+  const previewCanvasSize = ref<CanvasSize>({
+    width: editorStore.canvasSize.width,
+    height: editorStore.canvasSize.height,
+  })
   const errorMessage = ref('')
   const result = ref<ExportTaskResult | null>(null)
   const modalOpen = ref(false)
@@ -78,6 +92,10 @@ export const useExportTaskStore = defineStore('export-task', () => {
     currentFrame.value = 0
     totalFrames.value = 0
     previewUrl.value = ''
+    previewCanvasSize.value = {
+      width: editorStore.canvasSize.width,
+      height: editorStore.canvasSize.height,
+    }
     errorMessage.value = ''
   }
 
@@ -139,6 +157,7 @@ export const useExportTaskStore = defineStore('export-task', () => {
     modalOpen.value = true
     currentFrame.value = 0
     totalFrames.value = Math.max(1, Math.ceil((duration / 1000) * frameRate))
+    previewCanvasSize.value = resolvePreviewCanvasSize(canvas, editorStore.canvasSize)
     previewUrl.value = captureCanvasPreview(canvas)
     errorMessage.value = ''
     result.value = null
@@ -250,6 +269,7 @@ export const useExportTaskStore = defineStore('export-task', () => {
       totalFrames: totalFrames.value,
       progress: progress.value,
       previewUrl: previewUrl.value,
+      previewCanvasSize: previewCanvasSize.value,
       errorMessage: errorMessage.value,
       result: result.value,
     }
@@ -262,6 +282,7 @@ export const useExportTaskStore = defineStore('export-task', () => {
     totalFrames,
     progress,
     previewUrl,
+    previewCanvasSize,
     errorMessage,
     result,
     modalOpen,

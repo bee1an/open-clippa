@@ -9,6 +9,7 @@ interface Props {
   currentFrame: number
   totalFrames: number
   previewUrl?: string
+  previewCanvasSize?: { width: number, height: number }
   errorMessage?: string
 }
 
@@ -32,6 +33,29 @@ const progress = computed(() => {
 const percentText = computed(() => `${Math.round(progress.value * 100)}%`)
 
 const canClose = computed(() => props.status !== 'exporting')
+
+const normalizedPreviewCanvasSize = computed(() => {
+  const width = props.previewCanvasSize?.width ?? 16
+  const height = props.previewCanvasSize?.height ?? 9
+  const normalizedWidth = Number.isFinite(width) ? Math.max(1, Math.round(width)) : 16
+  const normalizedHeight = Number.isFinite(height) ? Math.max(1, Math.round(height)) : 9
+
+  return {
+    width: normalizedWidth,
+    height: normalizedHeight,
+    ratio: normalizedWidth / normalizedHeight,
+  }
+})
+
+const previewFrameStyle = computed(() => {
+  const { width, height, ratio } = normalizedPreviewCanvasSize.value
+  const safeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 16 / 9
+
+  return {
+    aspectRatio: `${width} / ${height}`,
+    width: `min(100%, calc(52vh * ${safeRatio.toFixed(6)}))`,
+  }
+})
 
 const title = computed(() => {
   if (props.status === 'error')
@@ -74,15 +98,17 @@ function handleCancel() {
         />
       </div>
 
-      <div class="aspect-video w-full rounded-md border border-border/50 bg-black/40 overflow-hidden flex items-center justify-center">
-        <img
-          v-if="previewUrl"
-          :src="previewUrl"
-          alt="导出预览"
-          class="h-full w-full object-cover"
-        >
-        <div v-else class="text-xs text-foreground-muted">
-          预览图将在这里显示
+      <div class="w-full rounded-md border border-border/50 bg-black/40 p-2">
+        <div class="mx-auto flex items-center justify-center overflow-hidden rounded-sm bg-black/60" :style="previewFrameStyle">
+          <img
+            v-if="previewUrl"
+            :src="previewUrl"
+            alt="导出预览"
+            class="h-full w-full object-contain"
+          >
+          <div v-else class="text-xs text-foreground-muted">
+            预览图将在这里显示
+          </div>
         </div>
       </div>
 

@@ -31,6 +31,7 @@ const {
   currentFrame: exportCurrentFrame,
   totalFrames: exportTotalFrames,
   previewUrl: exportPreviewUrl,
+  previewCanvasSize: exportPreviewCanvasSize,
   errorMessage: exportErrorMessage,
 } = storeToRefs(exportTaskStore)
 const isExporting = computed(() => exportStatus.value === 'exporting')
@@ -207,6 +208,7 @@ watch(exportStatus, (nextStatus) => {
       :current-frame="exportCurrentFrame"
       :total-frames="exportTotalFrames"
       :preview-url="exportPreviewUrl"
+      :preview-canvas-size="exportPreviewCanvasSize"
       :error-message="exportErrorMessage"
       @update:model-value="handleExportModalUpdate"
       @cancel="handleExportCancel"

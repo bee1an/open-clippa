@@ -376,16 +376,29 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     try {
       const cacheKey = this._resolveFrameCacheKey(normalizedTime)
       let texture = this._resolveCachedTexture(cacheKey)
+      let videoFrame: VideoFrame | null = null
 
       if (!texture) {
         const videoSample = await this._getVideoSampleAtTime(normalizedTime)
         if (!videoSample)
           return
 
-        const videoFrame = videoSample.toVideoFrame()
+        videoFrame = videoSample.toVideoFrame()
         videoSample.close()
 
         texture = Texture.from(videoFrame)
+      }
+
+      const sprite = this._sprite
+      if (!sprite)
+        return
+
+      const preservedSize = {
+        width: sprite.width,
+        height: sprite.height,
+      }
+
+      if (videoFrame) {
         this._clearCachedFrame()
         this._cachedFrame = {
           key: cacheKey,
@@ -394,18 +407,13 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         }
       }
 
-      const preservedSize = {
-        width: this._sprite.width,
-        height: this._sprite.height,
-      }
+      if (sprite.texture !== texture)
+        sprite.texture = texture
 
-      if (this._sprite.texture !== texture)
-        this._sprite.texture = texture
-
-      if (preservedSize.width > 0 && preservedSize.height > 0) {
-        this._sprite.width = preservedSize.width
-        this._sprite.height = preservedSize.height
-      }
+      if (preservedSize.width > 0)
+        sprite.width = preservedSize.width
+      if (preservedSize.height > 0)
+        sprite.height = preservedSize.height
 
       this._lastRenderedTime = normalizedTime
     }
