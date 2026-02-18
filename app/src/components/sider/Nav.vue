@@ -31,10 +31,16 @@ const navItems = [
     title: '转场',
   },
   {
-    path: '/editor/library',
-    icon: 'i-ph-images-bold',
-    activeIcon: 'i-ph-images-fill',
-    title: '素材库',
+    path: '/editor/video-library',
+    icon: 'i-ph-video-camera-bold',
+    activeIcon: 'i-ph-video-camera-fill',
+    title: '视频库',
+  },
+  {
+    path: '/editor/image-library',
+    icon: 'i-ph-image-bold',
+    activeIcon: 'i-ph-image-fill',
+    title: '图片库',
   },
 ]
 

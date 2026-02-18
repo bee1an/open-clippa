@@ -32,11 +32,14 @@ interface LibraryResponse {
 
 const LOAD_MORE_THRESHOLD_PX = 300
 
+const props = defineProps<{
+  kind: AssetKind
+}>()
+
 const mediaStore = useMediaStore()
 const router = useRouter()
 
 const query = ref('')
-const kind = ref<AssetKind>('video')
 const page = ref(1)
 const perPage = ref(24)
 const total = ref<number | null>(null)
@@ -57,7 +60,8 @@ const allLoadedSelected = computed(() => {
   return assets.value.length > 0
     && assets.value.every(asset => selectedExternalIds.value.includes(asset.externalId))
 })
-const kindLabel = computed(() => (kind.value === 'video' ? '视频素材' : '图片素材'))
+const libraryTitle = computed(() => (props.kind === 'video' ? '视频库' : '图片库'))
+const libraryHint = computed(() => (props.kind === 'video' ? '视频素材' : '图片素材'))
 const loadedSummary = computed(() => {
   if (total.value === null)
     return `已加载 ${assets.value.length}`
@@ -87,7 +91,7 @@ function formatResolution(asset: LibraryAsset): string {
 
 function buildRequestUrl(targetPage: number): string {
   const params = new URLSearchParams({
-    kind: kind.value,
+    kind: props.kind,
     page: String(targetPage),
     perPage: String(perPage.value),
   })
@@ -237,7 +241,7 @@ async function importAssets(targetAssets: LibraryAsset[]): Promise<void> {
   importingIds.value = targetAssets.map(asset => asset.externalId)
   try {
     for (const asset of targetAssets) {
-      if (kind.value === 'image') {
+      if (props.kind === 'image') {
         mediaStore.addImageFromUrl(asset.sourceUrl, asset.name)
         continue
       }
@@ -281,13 +285,9 @@ function clearQuery(): void {
   void loadAssets({ reset: true })
 }
 
-watch(kind, () => {
+watch(() => props.kind, () => {
   void loadAssets({ reset: true })
-})
-
-onMounted(() => {
-  void loadAssets({ reset: true })
-})
+}, { immediate: true })
 </script>
 
 <template>
@@ -295,7 +295,7 @@ onMounted(() => {
     <div class="flex flex-col gap-3 p-3 border-b border-border/70">
       <!-- Header Row: Title & Stats -->
       <div class="flex items-center justify-between">
-        <div class="text-sm font-medium text-foreground">素材库</div>
+        <div class="text-sm font-medium text-foreground">{{ libraryTitle }}</div>
         <div class="flex items-center gap-2 text-[10px] text-foreground-muted">
           <span>{{ loadedSummary }}</span>
           <span v-if="selectedCount > 0" class="text-primary font-medium">
@@ -304,7 +304,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Search & Kind Toggle -->
+      <!-- Search -->
       <div class="flex items-center gap-2">
         <div class="relative flex-1 group">
           <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted i-carbon-search text-xs" />
@@ -321,18 +321,6 @@ onMounted(() => {
             @click="clearQuery"
           >
             <div i-carbon-close text-xs />
-          </button>
-        </div>
-
-        <div class="flex items-center rounded-md border border-border/70 bg-secondary/30 p-0.5 shrink-0">
-          <button
-            v-for="k in ['video', 'image'] as const"
-            :key="k"
-            class="px-2 py-1 text-[10px] rounded-[3px] transition-all"
-            :class="kind === k ? 'bg-background shadow-sm text-foreground font-medium' : 'text-foreground-muted hover:text-foreground'"
-            @click="kind = k"
-          >
-            {{ k === 'video' ? '视频' : '图片' }}
           </button>
         </div>
       </div>
@@ -424,7 +412,7 @@ onMounted(() => {
             暂无素材
           </div>
           <div class="mt-1 text-xs text-foreground-muted">
-            尝试更换关键词或切换素材类型
+            尝试更换关键词搜索{{ libraryHint }}
           </div>
         </div>
       </div>
@@ -458,7 +446,7 @@ onMounted(() => {
             <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
 
             <div
-              v-if="kind === 'video'"
+              v-if="props.kind === 'video'"
               class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white"
             >
               {{ formatDuration(asset.durationMs) }}
