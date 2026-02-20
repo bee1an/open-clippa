@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ImageFile } from '@/store'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { useMediaStore } from '@/store/useMediaStore'
-import { usePerformerStore } from '@/store/usePerformerStore'
 
 interface Props {
   imageFile: ImageFile
@@ -14,8 +14,7 @@ const DEFAULT_IMAGE_DURATION = 3000
 
 const editorStore = useEditorStore()
 const mediaStore = useMediaStore()
-const performerStore = usePerformerStore()
-const { clippa } = editorStore
+const editorCommandActions = useEditorCommandActions()
 
 const isSelected = ref(false)
 const cardRef = ref<HTMLElement | null>(null)
@@ -27,20 +26,13 @@ onClickOutside(cardRef, () => {
 
 async function addToTimeline() {
   showMenu.value = false
-  await clippa.ready
+  await editorStore.clippa.ready
 
-  const performer = performerStore.addPerformer({
-    id: `image-${crypto.randomUUID()}`,
-    type: 'image',
-    src: props.imageFile.source,
-    start: 0,
-    duration: DEFAULT_IMAGE_DURATION,
-    x: 0,
-    y: 0,
-    zIndex: clippa.timeline.rails!.maxZIndex + 1,
+  await editorCommandActions.mediaAddAssetToTimeline({
+    assetId: props.imageFile.id,
+    startMs: 0,
+    durationMs: DEFAULT_IMAGE_DURATION,
   })
-
-  clippa.hire(performer)
 }
 
 async function handleMenuAddToTimeline() {

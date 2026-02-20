@@ -45,6 +45,9 @@ describe('createEditorControlTools', () => {
       'performer_update_text_style',
       'filter_update_config',
       'transition_upsert_by_pair',
+      'history_get_status',
+      'history_undo',
+      'history_redo',
       'export_get_status',
     ]))
     expect(new Set(names).size).toBe(names.length)
@@ -271,6 +274,26 @@ describe('createEditorControlTools', () => {
     expect(mediaPickRandomAsset).toHaveBeenCalledWith({
       type: 'all',
     })
+  })
+
+  it('invokes history tools without arguments', async () => {
+    const historyGetStatus: EditorControlAdapter['historyGetStatus'] = vi.fn(async () => ({ ok: true as const, data: { canUndo: false } }))
+    const historyUndo: EditorControlAdapter['historyUndo'] = vi.fn(async () => ({ ok: true as const, data: { entryId: 'entry-1' } }))
+    const historyRedo: EditorControlAdapter['historyRedo'] = vi.fn(async () => ({ ok: true as const, data: { entryId: 'entry-2' } }))
+
+    const adapter = createAdapter({
+      historyGetStatus,
+      historyUndo,
+      historyRedo,
+    })
+
+    await getTool(adapter, 'history_get_status').handler({}, context)
+    await getTool(adapter, 'history_undo').handler({}, context)
+    await getTool(adapter, 'history_redo').handler({}, context)
+
+    expect(historyGetStatus).toHaveBeenCalledTimes(1)
+    expect(historyUndo).toHaveBeenCalledTimes(1)
+    expect(historyRedo).toHaveBeenCalledTimes(1)
   })
 
   it('normalizes crop fields for performer_update_transform', async () => {

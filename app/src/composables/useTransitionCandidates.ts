@@ -7,13 +7,13 @@ import type { ComputedRef } from 'vue'
 import {
   buildTransitionPairKey,
   DEFAULT_GL_TRANSITION_TYPE,
-  getGlTransitionDefaultParams,
   TRANSITION_FEATURE_AVAILABLE,
   TransitionCandidateTracker,
 } from '@clippc/transition'
 import { Image, Video } from 'clippc'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { useTransitionStore } from '@/store/useTransitionStore'
@@ -34,6 +34,7 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
   const editorStore = useEditorStore()
   const performerStore = usePerformerStore()
   const transitionStore = useTransitionStore()
+  const editorCommandActions = useEditorCommandActions()
   const { clippa } = editorStore
   const { transitions, activeTransition, activePairKey } = storeToRefs(transitionStore)
 
@@ -69,7 +70,9 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
     timeline: clippa.timeline,
     resolveClip: getTransitionClip,
     getActivePairKey: () => activePairKey.value,
-    clearActiveSelection: () => transitionStore.clearActiveSelection(),
+    clearActiveSelection: () => {
+      void editorCommandActions.transitionClearSelection()
+    },
   })
 
   const trackerSnapshot = ref<TransitionCandidateSnapshot>(tracker.getSnapshot())
@@ -116,21 +119,10 @@ export function useTransitionCandidates(): UseTransitionCandidatesResult {
       return
 
     const nextType = transitionType || DEFAULT_GL_TRANSITION_TYPE
-    const existing = transitionStore.getTransitionByPair(candidate.fromId, candidate.toId)
-    if (existing) {
-      transitionStore.updateTransition(existing.id, {
-        type: nextType,
-        params: getGlTransitionDefaultParams(nextType),
-      })
-      transitionStore.selectTransition(existing.id)
-      return
-    }
-
-    transitionStore.createTransition({
+    void editorCommandActions.transitionUpsertByPair({
       fromId: candidate.fromId,
       toId: candidate.toId,
       type: nextType,
-      params: getGlTransitionDefaultParams(nextType),
     })
   }
 

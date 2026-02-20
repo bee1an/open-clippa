@@ -2,9 +2,9 @@
 import type { ImageFile, VideoFile } from '@/store/useMediaStore'
 import { nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { useMediaStore } from '@/store/useMediaStore'
-import { usePerformerStore } from '@/store/usePerformerStore'
 
 type AssetKind = 'image' | 'video'
 
@@ -43,7 +43,7 @@ const props = defineProps<{
 
 const mediaStore = useMediaStore()
 const editorStore = useEditorStore()
-const performerStore = usePerformerStore()
+const editorCommandActions = useEditorCommandActions()
 
 const query = ref('')
 const page = ref(1)
@@ -263,47 +263,24 @@ async function addAssetToCanvas(asset: LibraryAsset): Promise<void> {
   try {
     await editorStore.clippa.ready
     const startMs = editorStore.currentTime
-    const stageWidth = editorStore.clippa.stage.app?.renderer.width ?? 0
-    const stageHeight = editorStore.clippa.stage.app?.renderer.height ?? 0
 
     if (props.kind === 'image') {
       const imageFile = importAssetToMediaLibrary(asset) as ImageFile
-      const performer = performerStore.addPerformer({
-        id: `image-${crypto.randomUUID()}`,
-        type: 'image',
-        src: imageFile.source,
-        start: startMs,
-        duration: DEFAULT_IMAGE_DURATION_MS,
-        x: 0,
-        y: 0,
-        zIndex: Math.max(1, (editorStore.clippa.timeline.rails?.maxZIndex ?? 0) + 1),
+      await editorCommandActions.mediaAddAssetToTimeline({
+        assetId: imageFile.id,
+        startMs,
+        durationMs: DEFAULT_IMAGE_DURATION_MS,
       })
-      await editorStore.clippa.hire(performer)
-      if (!editorStore.clippa.stage.performers.has(performer))
-        editorStore.clippa.show(performer)
-      performerStore.selectPerformer(performer.id)
       return
     }
 
     const videoFile = importAssetToMediaLibrary(asset) as VideoFile
     const resolvedDuration = videoFile.duration > 0 ? videoFile.duration : DEFAULT_VIDEO_DURATION_MS
-    const performer = performerStore.addPerformer({
-      id: `video-${crypto.randomUUID()}`,
-      type: 'video',
-      src: videoFile.source,
-      start: startMs,
-      duration: resolvedDuration,
-      sourceDuration: resolvedDuration,
-      width: asset.width > 0 ? asset.width : stageWidth,
-      height: asset.height > 0 ? asset.height : stageHeight,
-      x: 0,
-      y: 0,
-      zIndex: Math.max(1, (editorStore.clippa.timeline.rails?.maxZIndex ?? 0) + 1),
+    await editorCommandActions.mediaAddAssetToTimeline({
+      assetId: videoFile.id,
+      startMs,
+      durationMs: resolvedDuration,
     })
-    await editorStore.clippa.hire(performer)
-    if (!editorStore.clippa.stage.performers.has(performer))
-      editorStore.clippa.show(performer)
-    performerStore.selectPerformer(performer.id)
   }
   catch (error) {
     importError.value = error instanceof Error ? error.message : '添加到画布失败'

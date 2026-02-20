@@ -4,6 +4,7 @@ import type { FilterConfig } from '@/store/useFilterStore'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted } from 'vue'
 import { Button, Slider } from '@/components/ui'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { APP_FILTER_PRESETS } from '@/lib/filterPresets'
 import { useEditorStore } from '@/store'
 import {
@@ -17,6 +18,7 @@ const FILTER_PRESETS = APP_FILTER_PRESETS
 
 const editorStore = useEditorStore()
 const filterStore = useFilterStore()
+const editorCommandActions = useEditorCommandActions()
 const { activeLayer } = storeToRefs(filterStore)
 const { currentTime } = storeToRefs(editorStore)
 
@@ -47,25 +49,28 @@ async function handleCreateFromPreset(preset: AppFilterPresetOption) {
     zIndex = performers.reduce((max, p) => Math.max(max, p.zIndex), 0) + 1
   }
 
-  filterStore.createLayer({
-    start: time,
+  await editorCommandActions.filterCreateLayer({
+    startMs: time,
     zIndex,
     name: preset.label,
-    config: preset.config,
+    preset: preset.value,
   })
 }
 
 function handleResetConfig() {
   if (!activeLayer.value)
     return
-  filterStore.resetLayerConfig(activeLayer.value.id)
+  void editorCommandActions.filterResetConfig({ layerId: activeLayer.value.id })
 }
 
 function handleUpdateConfig(key: keyof FilterConfig, value: number) {
   if (!activeLayer.value)
     return
   const patch = { [key]: value } as Partial<FilterConfig>
-  filterStore.updateLayerConfig(activeLayer.value.id, patch)
+  void editorCommandActions.filterUpdateConfig({
+    layerId: activeLayer.value.id,
+    patch,
+  })
 }
 
 function handleBrightnessChange(value: number) {

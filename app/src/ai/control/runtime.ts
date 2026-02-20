@@ -60,6 +60,8 @@ import {
 } from '@clippc/transition'
 import { getPxByMs } from '@clippc/utils'
 import { VideoTrain } from 'clippc'
+import { getEditorCommandBus } from '@/command/commandBus'
+import { applyEditorContentSnapshot, captureEditorContentSnapshot } from '@/history/editorContentSnapshot'
 import { getFilterPresetLabel } from '@/lib/filterPresets'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useExportTaskStore } from '@/store/useExportTaskStore'
@@ -319,6 +321,25 @@ export function createEditorControlRuntime(
   const filterStore = dependencies.filterStore ?? useFilterStore()
   const transitionStore = dependencies.transitionStore ?? useTransitionStore()
   const exportTaskStore = dependencies.exportTaskStore ?? useExportTaskStore()
+  const commandBus = getEditorCommandBus()
+
+  const captureContentSnapshot = () => {
+    return captureEditorContentSnapshot({
+      editorStore,
+      performerStore,
+      filterStore,
+      transitionStore,
+    })
+  }
+
+  const applyContentSnapshot = async (snapshot: ReturnType<typeof captureContentSnapshot>) => {
+    await applyEditorContentSnapshot(snapshot, {
+      editorStore,
+      performerStore,
+      filterStore,
+      transitionStore,
+    })
+  }
 
   const listAllTrains = (): Train[] => {
     const rails = editorStore.clippa.timeline.rails?.rails ?? []
@@ -538,6 +559,36 @@ export function createEditorControlRuntime(
       return null
 
     return computeTransitionMaxMs(fromClip, toClip, DEFAULT_TRANSITION_DURATION)
+  }
+
+  const executeMutationCommand = async <TData>(
+    input: {
+      commandType: string
+      payload?: unknown
+      label: string
+      source?: 'ui' | 'ai' | 'shortcut' | 'system'
+      recordable?: boolean
+      execute: () => Promise<ActionResult<TData>> | ActionResult<TData>
+    },
+  ): Promise<ActionResult<TData>> => {
+    return await commandBus.dispatch(
+      {
+        type: input.commandType,
+        payload: (input.payload ?? {}) as Record<string, unknown>,
+        meta: {
+          source: input.source ?? 'system',
+          label: input.label,
+          recordable: input.recordable ?? true,
+        },
+      },
+      input.execute,
+      {
+        source: input.source ?? 'system',
+        label: input.label,
+        recordable: input.recordable ?? true,
+        captureSnapshot: captureContentSnapshot,
+      },
+    )
   }
 
   const runtime: EditorControlRuntime = {
@@ -1724,7 +1775,118 @@ export function createEditorControlRuntime(
     exportGetStatus() {
       return success(exportTaskStore.getStatus() as ExportStatusSnapshot)
     },
+
+    historyGetStatus() {
+      return success(commandBus.getHistoryStatus())
+    },
+
+    async historyUndo() {
+      return await commandBus.undo({
+        applySnapshot: async (snapshot: unknown) => {
+          await applyContentSnapshot(snapshot as ReturnType<typeof captureContentSnapshot>)
+        },
+      })
+    },
+
+    async historyRedo() {
+      return await commandBus.redo({
+        applySnapshot: async (snapshot: unknown) => {
+          await applyContentSnapshot(snapshot as ReturnType<typeof captureContentSnapshot>)
+        },
+      })
+    },
+
+    historyBeginTransaction(input) {
+      return commandBus.beginTransaction({
+        source: input?.source ?? 'system',
+        label: input?.label,
+        mergeKey: input?.mergeKey,
+      })
+    },
+
+    historyEndTransaction(transactionId) {
+      return commandBus.endTransaction(transactionId)
+    },
+
+    historyCancelTransaction(transactionId) {
+      return commandBus.cancelTransaction(transactionId)
+    },
+
+    async historyCheckpoint(input) {
+      const source = input?.source ?? 'system'
+      const label = input?.label?.trim() || 'History Checkpoint'
+
+      return await executeMutationCommand({
+        commandType: 'history.checkpoint',
+        payload: {},
+        label,
+        source,
+        recordable: true,
+        execute: async () => success({ checkpointed: true as const }),
+      })
+    },
   }
+
+  const mutationMethodConfigs: Array<{
+    key: keyof EditorControlRuntime
+    commandType: string
+    label: string
+    recordable: boolean
+  }> = [
+    { key: 'timelinePlay', commandType: 'timeline.play', label: 'Play Timeline', recordable: false },
+    { key: 'timelinePause', commandType: 'timeline.pause', label: 'Pause Timeline', recordable: false },
+    { key: 'timelineSeek', commandType: 'timeline.seek', label: 'Seek Timeline', recordable: false },
+    { key: 'timelineSplitAtTime', commandType: 'timeline.split', label: 'Split Timeline Item', recordable: true },
+    { key: 'timelineDeleteActiveItem', commandType: 'timeline.delete_active_item', label: 'Delete Active Timeline Item', recordable: true },
+    { key: 'timelineSelectTrain', commandType: 'timeline.select_train', label: 'Select Timeline Train', recordable: false },
+    { key: 'timelineClearSelection', commandType: 'timeline.clear_selection', label: 'Clear Timeline Selection', recordable: false },
+    { key: 'mediaAddAssetToTimeline', commandType: 'media.add_asset_to_timeline', label: 'Add Media To Timeline', recordable: true },
+    { key: 'mediaImportVideoFromUrl', commandType: 'media.import_video_from_url', label: 'Import Video Asset', recordable: false },
+    { key: 'mediaImportRandomImage', commandType: 'media.import_random_image', label: 'Import Random Image Asset', recordable: false },
+    { key: 'mediaImportRandomVideo', commandType: 'media.import_random_video', label: 'Import Random Video Asset', recordable: false },
+    { key: 'mediaPickRandomAsset', commandType: 'media.pick_random_asset', label: 'Pick Random Asset', recordable: false },
+    { key: 'mediaRemoveAsset', commandType: 'media.remove_asset', label: 'Remove Media Asset', recordable: false },
+    { key: 'mediaClearLibrary', commandType: 'media.clear_library', label: 'Clear Media Library', recordable: false },
+    { key: 'createTextElement', commandType: 'performer.create_text', label: 'Create Text Element', recordable: true },
+    { key: 'performerUpdateTransform', commandType: 'performer.update_transform', label: 'Update Performer Transform', recordable: true },
+    { key: 'performerSelect', commandType: 'performer.select', label: 'Select Performer', recordable: false },
+    { key: 'performerClearSelection', commandType: 'performer.clear_selection', label: 'Clear Performer Selection', recordable: false },
+    { key: 'performerRemove', commandType: 'performer.remove', label: 'Remove Performer', recordable: true },
+    { key: 'performerUpdateTextContent', commandType: 'performer.update_text_content', label: 'Update Text Content', recordable: true },
+    { key: 'performerUpdateTextStyle', commandType: 'performer.update_text_style', label: 'Update Text Style', recordable: true },
+    { key: 'performerSetAnimation', commandType: 'performer.set_animation', label: 'Set Performer Animation', recordable: true },
+    { key: 'performerClearAnimation', commandType: 'performer.clear_animation', label: 'Clear Performer Animation', recordable: true },
+    { key: 'filterCreateLayer', commandType: 'filter.create_layer', label: 'Create Filter Layer', recordable: true },
+    { key: 'filterSelectLayer', commandType: 'filter.select_layer', label: 'Select Filter Layer', recordable: false },
+    { key: 'filterUpdateConfig', commandType: 'filter.update_config', label: 'Update Filter Config', recordable: true },
+    { key: 'filterResetConfig', commandType: 'filter.reset_config', label: 'Reset Filter Config', recordable: true },
+    { key: 'filterUpdateZIndex', commandType: 'filter.update_zindex', label: 'Update Filter Layer Z-Index', recordable: true },
+    { key: 'filterRemoveLayer', commandType: 'filter.remove_layer', label: 'Remove Filter Layer', recordable: true },
+    { key: 'transitionSelectPair', commandType: 'transition.select_pair', label: 'Select Transition Pair', recordable: false },
+    { key: 'transitionUpsertByPair', commandType: 'transition.upsert_by_pair', label: 'Create Or Update Transition', recordable: true },
+    { key: 'transitionUpdate', commandType: 'transition.update', label: 'Update Transition', recordable: true },
+    { key: 'transitionRemove', commandType: 'transition.remove', label: 'Remove Transition', recordable: true },
+    { key: 'transitionClearSelection', commandType: 'transition.clear_selection', label: 'Clear Transition Selection', recordable: false },
+    { key: 'exportStart', commandType: 'export.start', label: 'Start Export', recordable: false },
+    { key: 'exportCancel', commandType: 'export.cancel', label: 'Cancel Export', recordable: false },
+  ]
+
+  mutationMethodConfigs.forEach((config) => {
+    const original = runtime[config.key]
+    if (typeof original !== 'function')
+      return
+
+    ;(runtime as any)[config.key] = async (...args: any[]) => {
+      return await executeMutationCommand({
+        commandType: config.commandType,
+        payload: args[0] ?? {},
+        label: config.label,
+        source: 'system',
+        recordable: config.recordable,
+        execute: async () => await (original as any)(...args),
+      })
+    }
+  })
 
   return runtime
 }

@@ -307,6 +307,20 @@ export interface ExportCancelInput {
   jobId?: string
 }
 
+export interface HistoryStatusSnapshot {
+  canUndo: boolean
+  canRedo: boolean
+  pastCount: number
+  futureCount: number
+  activeTransaction: {
+    id: string
+    label: string
+    source: string
+    startedAt: number
+    commandCount: number
+  } | null
+}
+
 export interface EditorControlRuntime {
   queryProjectState: () => Promise<ActionResult<ProjectStateSnapshot>> | ActionResult<ProjectStateSnapshot>
   queryMediaAssets: (input: QueryMediaAssetsInput) => Promise<ActionResult<{ assets: MediaAssetSnapshot[] }>> | ActionResult<{ assets: MediaAssetSnapshot[] }>
@@ -358,4 +372,12 @@ export interface EditorControlRuntime {
   exportStart: (input: ExportStartInput) => Promise<ActionResult<{ jobId: string }>> | ActionResult<{ jobId: string }>
   exportCancel: (input: ExportCancelInput) => Promise<ActionResult<{ canceled: true }>> | ActionResult<{ canceled: true }>
   exportGetStatus: () => Promise<ActionResult<ExportStatusSnapshot>> | ActionResult<ExportStatusSnapshot>
+
+  historyGetStatus: () => Promise<ActionResult<HistoryStatusSnapshot>> | ActionResult<HistoryStatusSnapshot>
+  historyUndo: () => Promise<ActionResult<{ entryId: string, status: HistoryStatusSnapshot }>> | ActionResult<{ entryId: string, status: HistoryStatusSnapshot }>
+  historyRedo: () => Promise<ActionResult<{ entryId: string, status: HistoryStatusSnapshot }>> | ActionResult<{ entryId: string, status: HistoryStatusSnapshot }>
+  historyBeginTransaction: (input?: { label?: string, source?: 'ui' | 'ai' | 'shortcut' | 'system', mergeKey?: string }) => Promise<ActionResult<{ transactionId: string, status: HistoryStatusSnapshot }>> | ActionResult<{ transactionId: string, status: HistoryStatusSnapshot }>
+  historyEndTransaction: (transactionId?: string) => Promise<ActionResult<{ committed: boolean, status: HistoryStatusSnapshot }>> | ActionResult<{ committed: boolean, status: HistoryStatusSnapshot }>
+  historyCancelTransaction: (transactionId?: string) => Promise<ActionResult<{ canceled: boolean, status: HistoryStatusSnapshot }>> | ActionResult<{ canceled: boolean, status: HistoryStatusSnapshot }>
+  historyCheckpoint: (input?: { label?: string, source?: 'ui' | 'ai' | 'shortcut' | 'system' }) => Promise<ActionResult<{ checkpointed: true }>> | ActionResult<{ checkpointed: true }>
 }

@@ -4,6 +4,7 @@ import type { VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Select } from '@/components/ui/select'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
@@ -19,6 +20,7 @@ const MAX_TIMELINE_SYNC_RETRIES = 24
 const editorStore = useEditorStore()
 const mediaStore = useMediaStore()
 const performerStore = usePerformerStore()
+const editorCommandActions = useEditorCommandActions()
 const { currentTime, duration, canvasPresetId, canvasSize } = storeToRefs(editorStore)
 const { selectedPerformers, selectionRevision } = storeToRefs(performerStore)
 const { clippa } = editorStore
@@ -120,7 +122,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
     .filter(performer => performer.containsPoint(canvasX, canvasY))
 
   if (hitPerformers.length === 0) {
-    performerStore.clearSelection()
+    void editorCommandActions.performerClearSelection()
     performerStore.clearPendingSelectionDrag()
     syncSelectionToTimeline(null)
     return
@@ -130,7 +132,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
   if (!target)
     return
 
-  performerStore.selectPerformer(target.id)
+  void editorCommandActions.performerSelect({ performerId: target.id })
   syncSelectionToTimeline(target.id)
   performerStore.requestSelectionDrag({
     id: target.id,
@@ -182,7 +184,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
   if (timelineElement && timelineElement.contains(target))
     return
 
-  performerStore.clearSelection()
+  void editorCommandActions.performerClearSelection()
   performerStore.clearPendingSelectionDrag()
   syncSelectionToTimeline(null)
 }
@@ -253,10 +255,10 @@ function syncTimelineToSelection(train: Train | null) {
 
   isSyncingFromTimeline.value = true
   if (train) {
-    performerStore.selectPerformer(train.id)
+    void editorCommandActions.performerSelect({ performerId: train.id })
   }
   else {
-    performerStore.clearSelection()
+    void editorCommandActions.performerClearSelection()
   }
 
   nextTick(() => {

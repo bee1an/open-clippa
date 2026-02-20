@@ -14,6 +14,7 @@
   "dependencies": {
     "@clippc/ai": "workspace:*",
     "@clippc/filter": "workspace:*",
+    "@clippc/history": "workspace:*",
     "@clippc/transition": "workspace:*",
     "@iconify/json": "catalog:app",
     "@vueuse/core": "catalog:app",

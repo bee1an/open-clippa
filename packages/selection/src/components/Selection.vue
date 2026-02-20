@@ -297,12 +297,12 @@ function handleRotateStart(event: MouseEvent | TouchEvent) {
   if (props.disabled)
     return
 
-  isRotating.value = true
-  initialRotation.value = props.item.rotation
-
   const rect = containerRef.value?.getBoundingClientRect()
   if (!rect)
     return
+
+  isRotating.value = true
+  initialRotation.value = props.item.rotation
 
   const centerX = rect.left + rect.width / 2
   const centerY = rect.top + rect.height / 2
@@ -321,6 +321,7 @@ function handleRotateStart(event: MouseEvent | TouchEvent) {
   rotateStartAngle.value = Math.atan2(clientY - centerY, clientX - centerX) * 180 / Math.PI
 
   emit('select', props.item.id)
+  emit('rotateStart', props.item.id, event)
 }
 
 function updateRotation(clientX: number, clientY: number) {
@@ -353,12 +354,15 @@ function updateRotation(clientX: number, clientY: number) {
 
   const updatedItem = { ...props.item, rotation: newRotation }
   emit('update', updatedItem)
+  emit('rotate', props.item.id, updatedItem)
 }
 
-function handleRotateEnd() {
+function handleRotateEnd(event?: MouseEvent | TouchEvent) {
   if (isRotating.value) {
     isRotating.value = false
     emit('update', { ...props.item })
+    if (event)
+      emit('rotateEnd', props.item.id, event)
   }
 }
 
@@ -437,7 +441,7 @@ function handleMouseUp(event: MouseEvent) {
     endResize(event)
   }
   else if (isRotating.value) {
-    handleRotateEnd()
+    handleRotateEnd(event)
   }
 }
 
@@ -449,7 +453,7 @@ function handleTouchEnd(event: TouchEvent) {
     endResize(event as any)
   }
   else if (isRotating.value) {
-    handleRotateEnd()
+    handleRotateEnd(event)
   }
 }
 

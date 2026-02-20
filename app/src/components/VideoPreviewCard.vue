@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { VideoFile } from '@/store'
 import { ms2TimeStr } from 'clippc'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { useMediaStore } from '@/store/useMediaStore'
-import { usePerformerStore } from '@/store/usePerformerStore'
-import { loadVideoMetadata } from '@/utils/media'
 
 interface Props {
   videoFile: VideoFile
@@ -14,8 +13,7 @@ const props = defineProps<Props>()
 
 const editorStore = useEditorStore()
 const mediaStore = useMediaStore()
-const performerStore = usePerformerStore()
-const { clippa } = editorStore
+const editorCommandActions = useEditorCommandActions()
 
 // 勾选状态
 const isSelected = ref(false)
@@ -29,27 +27,12 @@ onClickOutside(cardRef, () => {
 // 添加到时间轴
 async function addToTimeline() {
   showMenu.value = false
-  await clippa.ready
+  await editorStore.clippa.ready
 
-  const { duration, width, height } = await loadVideoMetadata(props.videoFile.url)
-  const stageWidth = clippa.stage.app?.renderer.width ?? 0
-  const stageHeight = clippa.stage.app?.renderer.height ?? 0
-
-  const performer = performerStore.addPerformer({
-    id: `video-${crypto.randomUUID()}`,
-    type: 'video',
-    src: props.videoFile.source,
-    start: 0,
-    duration: props.videoFile.duration || duration || 5000,
-    sourceDuration: duration || props.videoFile.duration || 5000,
-    width: width || stageWidth,
-    height: height || stageHeight,
-    x: 0,
-    y: 0,
-    zIndex: clippa.timeline.rails!.maxZIndex + 1,
+  await editorCommandActions.mediaAddAssetToTimeline({
+    assetId: props.videoFile.id,
+    startMs: 0,
   })
-
-  clippa.hire(performer)
 }
 
 async function handleMenuAddToTimeline() {

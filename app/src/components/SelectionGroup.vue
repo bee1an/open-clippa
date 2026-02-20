@@ -3,7 +3,8 @@ import type { ResizeDirection, SelectionItem } from '@clippc/selection'
 import { Image, Video } from '@clippc/performer'
 import { Selection } from '@clippc/selection'
 import { storeToRefs } from 'pinia'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
@@ -20,6 +21,7 @@ const scaleRatio = computed(() => props.scaleRatio)
 
 const performerStore = usePerformerStore()
 const editorStore = useEditorStore()
+const editorCommandActions = useEditorCommandActions()
 const { currentTime } = storeToRefs(editorStore)
 interface SelectionExpose {
   startExternalDrag?: (clientX: number, clientY: number) => void
@@ -28,6 +30,8 @@ interface SelectionExpose {
 const { selectedPerformers, pendingSelectionDrag } = storeToRefs(performerStore)
 const selectionRef = ref<SelectionExpose | null>(null)
 const activeResizeDirection = ref<ResizeDirection | null>(null)
+const activeGestureTransactionId = ref<string | null>(null)
+const isGestureTransactionStarting = ref(false)
 
 const selectionCustomStyle = {
   'border': '1.5px solid hsl(var(--foreground) / 0.92)',
@@ -97,6 +101,67 @@ function isCroppablePerformer(performer: unknown): performer is Image | Video {
   return performer instanceof Image || performer instanceof Video
 }
 
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return typeof (value as Promise<T> | undefined)?.then === 'function'
+}
+
+function beginGestureTransaction(label: string): void {
+  if (activeGestureTransactionId.value || isGestureTransactionStarting.value)
+    return
+
+  isGestureTransactionStarting.value = true
+  const transaction = editorCommandActions.historyBeginTransaction({
+    source: 'ui',
+    label,
+  })
+
+  const applyBeginResult = (beginResult: { ok: true, data: { transactionId: string } } | { ok: false }) => {
+    if (!beginResult.ok)
+      return
+
+    activeGestureTransactionId.value = beginResult.data.transactionId
+    void editorCommandActions.historyCheckpoint({
+      source: 'ui',
+      label: `${label} Start`,
+    })
+  }
+
+  if (isPromiseLike(transaction)) {
+    void transaction
+      .then(applyBeginResult)
+      .finally(() => {
+        isGestureTransactionStarting.value = false
+      })
+    return
+  }
+
+  isGestureTransactionStarting.value = false
+  applyBeginResult(transaction)
+}
+
+async function endGestureTransaction(label: string): Promise<void> {
+  const transactionId = activeGestureTransactionId.value
+  if (!transactionId)
+    return
+
+  await editorCommandActions.historyCheckpoint({
+    source: 'ui',
+    label: `${label} End`,
+  })
+
+  await editorCommandActions.historyEndTransaction(transactionId)
+  activeGestureTransactionId.value = null
+}
+
+async function cancelGestureTransaction(): Promise<void> {
+  const transactionId = activeGestureTransactionId.value
+  if (!transactionId)
+    return
+
+  await editorCommandActions.historyCancelTransaction(transactionId)
+  activeGestureTransactionId.value = null
+}
+
 // 计算当前选中的 performer 信息（包含响应式 bounds）
 const currentSelectionInfo = computed(() => {
   return selectedPerformers.value.length > 0 ? selectedPerformers.value[0] : null
@@ -147,6 +212,9 @@ function handleSelectionUpdate(item: SelectionItem) {
   if (!performer)
     return
 
+  if (isGestureTransactionStarting.value && !activeGestureTransactionId.value)
+    return
+
   const canvasItem: BoundsLike = {
     x: item.x / scaleRatio.value,
     y: item.y / scaleRatio.value,
@@ -180,52 +248,62 @@ function handleSelectionUpdate(item: SelectionItem) {
     return
   }
 
-  // 更新 performer 属性
-  const currentBounds = performer.getBaseBounds()
-  const currentScaleX = performer.sprite?.scale.x ?? 1
-  const currentScaleY = performer.sprite?.scale.y ?? 1
-
-  const widthRatio = currentBounds.width ? topLeftBounds.width / currentBounds.width : 1
-  const heightRatio = currentBounds.height ? topLeftBounds.height / currentBounds.height : 1
-
-  if (currentBounds.width && currentBounds.height && (Math.abs(widthRatio - 1) > 1e-3 || Math.abs(heightRatio - 1) > 1e-3)) {
-    performer.setScale(currentScaleX * widthRatio, currentScaleY * heightRatio)
-  }
-
-  if (topLeftBounds.x !== currentBounds.x || topLeftBounds.y !== currentBounds.y) {
-    performer.setPosition(topLeftBounds.x, topLeftBounds.y)
-  }
-
-  // 更新旋转
-  if (item.rotation !== undefined) {
-    performer.setRotation(item.rotation)
-  }
+  void editorCommandActions.performerUpdateTransform({
+    performerId: performer.id,
+    x: topLeftBounds.x,
+    y: topLeftBounds.y,
+    width: topLeftBounds.width,
+    height: topLeftBounds.height,
+    rotation: item.rotation,
+  })
 }
 
 function handleSelectionResizeStart(_id: string, direction: ResizeDirection) {
   activeResizeDirection.value = direction
+  beginGestureTransaction('Resize Performer')
 }
 
 function handleSelectionResizeEnd() {
   activeResizeDirection.value = null
+  void endGestureTransaction('Resize Performer')
+}
+
+function handleSelectionDragStart() {
+  beginGestureTransaction('Move Performer')
+}
+
+function handleSelectionDragEnd() {
+  void endGestureTransaction('Move Performer')
+}
+
+function handleSelectionRotateStart() {
+  beginGestureTransaction('Rotate Performer')
+}
+
+function handleSelectionRotateEnd() {
+  void endGestureTransaction('Rotate Performer')
 }
 
 watch(currentSelection, (value) => {
-  if (!value)
+  if (!value) {
     activeResizeDirection.value = null
+    void cancelGestureTransaction()
+  }
 })
 
 watch(selectionItem, (value) => {
-  if (!value)
+  if (!value) {
     activeResizeDirection.value = null
+    void cancelGestureTransaction()
+  }
 })
 
 function handleSelectionSelect(id: string) {
-  performerStore.selectPerformer(id)
+  void editorCommandActions.performerSelect({ performerId: id })
 }
 
 function handleSelectionDelete(id: string) {
-  performerStore.removePerformer(id)
+  void editorCommandActions.performerRemove({ performerId: id })
 }
 
 watch(
@@ -241,6 +319,10 @@ watch(
   },
   { flush: 'post' },
 )
+
+onUnmounted(() => {
+  void cancelGestureTransaction()
+})
 </script>
 
 <template>
@@ -261,8 +343,12 @@ watch(
       :min-width="20"
       :min-height="20"
       @update="handleSelectionUpdate"
+      @drag-start="handleSelectionDragStart"
+      @drag-end="handleSelectionDragEnd"
       @resize-start="handleSelectionResizeStart"
       @resize-end="handleSelectionResizeEnd"
+      @rotate-start="handleSelectionRotateStart"
+      @rotate-end="handleSelectionRotateEnd"
       @select="handleSelectionSelect"
       @delete="handleSelectionDelete"
     />

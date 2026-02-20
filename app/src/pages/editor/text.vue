@@ -1,24 +1,13 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { useEditorStore } from '@/store/useEditorStore'
-import { usePerformerStore } from '@/store/usePerformerStore'
-
-const editorStore = useEditorStore()
-const performerStore = usePerformerStore()
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
+const editorCommandActions = useEditorCommandActions()
 
 async function addText() {
-  await editorStore.clippa.ready
-
-  const maxZIndex = editorStore.clippa.timeline.rails?.maxZIndex ?? 0
-  const nextZIndex = Math.max(1, maxZIndex + 1)
-
-  const textPerformer = performerStore.addPerformer({
-    id: `text-${Date.now()}`,
-    type: 'text',
+  await editorCommandActions.createTextElement({
     content: '双击编辑文本',
-    start: 0,
-    duration: 5000,
-    zIndex: nextZIndex,
+    startMs: 0,
+    durationMs: 5000,
     x: 100,
     y: 100,
     style: {
@@ -26,12 +15,6 @@ async function addText() {
       fontWeight: 'normal',
     },
   })
-
-  textPerformer.update(editorStore.currentTime - textPerformer.start)
-  await editorStore.clippa.hire(textPerformer)
-  if (!editorStore.clippa.stage.performers.has(textPerformer)) {
-    editorStore.clippa.show(textPerformer)
-  }
 }
 </script>
 

@@ -4,6 +4,7 @@ import { TRANSITION_FEATURE_AVAILABLE } from '@clippc/transition'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useEditorStore } from '@/store'
 import { useLayoutStore } from '@/store/useLayoutStore'
@@ -13,6 +14,7 @@ import { useTransitionStore } from '@/store/useTransitionStore'
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const transitionStore = useTransitionStore()
+const editorCommandActions = useEditorCommandActions()
 const layoutStore = useLayoutStore()
 const router = useRouter()
 const { clippa } = editorStore
@@ -37,7 +39,7 @@ const timelineHandles = computed<TimelineTransitionHandle[]>(() => {
 })
 
 function clearTimelineSelection(): void {
-  performerStore.clearSelection()
+  void editorCommandActions.performerClearSelection()
   performerStore.clearPendingSelectionDrag()
   clippa.timeline.state.activeTrain?.updateActive(false)
 }
@@ -47,11 +49,14 @@ async function openTransitionPanel(handle: TimelineTransitionHandle): Promise<vo
 
   const toggledOff = activePairKey.value === handle.pairKey
   if (toggledOff) {
-    transitionStore.clearActiveSelection()
+    void editorCommandActions.transitionClearSelection()
     return
   }
 
-  transitionStore.selectPair(handle.fromId, handle.toId)
+  await editorCommandActions.transitionSelectPair({
+    fromId: handle.fromId,
+    toId: handle.toId,
+  })
 
   layoutStore.setSiderCollapsed(false)
   await router.push('/editor/transition')

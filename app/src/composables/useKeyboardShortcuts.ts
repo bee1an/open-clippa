@@ -1,25 +1,17 @@
-import type { CropInsets, Image } from '@clippc/performer'
 import type { Rail, Train } from 'clippc'
-import type { PerformerConfig } from '@/store/usePerformerStore'
-import { Text, Video } from '@clippc/performer'
-import { getPxByMs } from '@clippc/utils'
-import { VideoTrain } from 'clippc'
 import { storeToRefs } from 'pinia'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { useFilterStore } from '@/store/useFilterStore'
-import { usePerformerStore } from '@/store/usePerformerStore'
 
 export function useKeyboardShortcuts() {
   const editorStore = useEditorStore()
   const filterStore = useFilterStore()
-  const performerStore = usePerformerStore()
+  const editorCommandActions = useEditorCommandActions()
   const { currentTime, duration } = storeToRefs(editorStore)
   const { clippa } = editorStore
 
-  // 播放状态
   const isPlaying = ref(false)
-
-  // 全屏状态
   const isFullscreen = ref(false)
   const splitRevision = ref(0)
   const railDisposers = new Map<Rail, () => void>()
@@ -98,7 +90,6 @@ export function useKeyboardShortcuts() {
     },
   )
 
-  // 监听 clippa 的播放状态变化
   onMounted(() => {
     clippa.timeline.on('play', handlePlay)
     clippa.timeline.on('pause', handlePause)
@@ -117,7 +108,6 @@ export function useKeyboardShortcuts() {
     railDisposers.clear()
   })
 
-  // 播放控制函数
   function togglePlayPause() {
     try {
       if (isPlaying.value) {
@@ -136,7 +126,7 @@ export function useKeyboardShortcuts() {
 
   async function handleRewind() {
     try {
-      const newTime = Math.max(0, currentTime.value - 10000) // 快退10秒
+      const newTime = Math.max(0, currentTime.value - 10000)
       await clippa.seek(newTime)
     }
     catch (error) {
@@ -146,7 +136,7 @@ export function useKeyboardShortcuts() {
 
   async function handleFastForward() {
     try {
-      const newTime = Math.min(duration.value, currentTime.value + 10000) // 快进10秒
+      const newTime = Math.min(duration.value, currentTime.value + 10000)
       await clippa.seek(newTime)
     }
     catch (error) {
@@ -154,192 +144,70 @@ export function useKeyboardShortcuts() {
     }
   }
 
-  // 全屏控制函数
   function toggleFullscreen() {
     const canvas = document.getElementById('canvas')
     if (!canvas)
       return
 
     if (!isFullscreen.value) {
-      if (canvas.requestFullscreen) {
+      if (canvas.requestFullscreen)
         canvas.requestFullscreen()
-      }
     }
-    else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen()
-      }
+    else if (document.exitFullscreen) {
+      document.exitFullscreen()
     }
   }
 
-  // 监听全屏状态变化
   useEventListener(document, 'fullscreenchange', () => {
     isFullscreen.value = !!document.fullscreenElement
   })
 
-  async function splitPerformerTrain(train: Train, splitTime: number): Promise<boolean> {
-    const performer = performerStore.getPerformerById(train.id)
-    if (!performer)
-      return false
-
-    const leftDuration = splitTime - train.start
-    const rightDuration = train.duration - leftDuration
-    const bounds = performer.getBaseBounds()
-    const zIndex = performer.zIndex
-    const crop = 'getCropInsets' in performer && typeof performer.getCropInsets === 'function'
-      ? performer.getCropInsets() as CropInsets
-      : undefined
-
-    // build right-half config based on performer type
-    let rightConfig: PerformerConfig
-    if (performer instanceof Video) {
-      rightConfig = {
-        id: `${train.id}-split`,
-        start: splitTime,
-        duration: rightDuration,
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        zIndex,
-        src: performer.src,
-        sourceStart: performer.sourceStart + leftDuration,
-        sourceDuration: performer.sourceDuration,
-        crop,
-      }
-    }
-    else if (performer instanceof Text) {
-      rightConfig = {
-        id: `${train.id}-split`,
-        type: 'text',
-        start: splitTime,
-        duration: rightDuration,
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        zIndex,
-        content: performer.getText(),
-        style: performer.getStyle(),
-      }
-    }
-    else {
-      rightConfig = {
-        id: `${train.id}-split`,
-        type: 'image',
-        start: splitTime,
-        duration: rightDuration,
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        zIndex,
-        src: (performer as Image).src,
-        crop,
-      }
-    }
-
-    // shrink left half (original train + performer)
-    train.duration = leftDuration
-    train.updateWidth(getPxByMs(leftDuration, clippa.timeline.state.pxPerMs))
-    performer.duration = leftDuration
-    if (train instanceof VideoTrain) {
-      train.refreshThumbnails().catch((error) => {
-        console.warn('[split] refresh video train thumbnails failed', error)
-      })
-    }
-
-    const rightPerformer = performerStore.addPerformer(rightConfig)
-    await clippa.hire(rightPerformer)
-    return true
-  }
-
-  function splitFilterTrain(train: Train, splitTime: number): boolean {
-    return Boolean(filterStore.splitLayerByTrainId(train.id, splitTime))
-  }
-
   async function splitActiveTrain() {
     const splitTime = currentTime.value
-    const candidates = listSplittableTrains(splitTime)
-    if (candidates.length === 0)
-      return
-
-    let changed = false
-    for (const train of candidates) {
-      try {
-        const performer = performerStore.getPerformerById(train.id)
-        if (performer) {
-          changed = await splitPerformerTrain(train, splitTime) || changed
-          continue
-        }
-
-        changed = splitFilterTrain(train, splitTime) || changed
-      }
-      catch (error) {
-        console.warn('[split] split train failed', train.id, error)
-      }
-    }
-
-    if (!changed)
-      return
-
-    bumpSplitRevision()
-    if (!isPlaying.value)
-      await clippa.director.seek(splitTime)
+    const result = await editorCommandActions.timelineSplitAtTime({ timeMs: splitTime })
+    if (result.ok)
+      bumpSplitRevision()
   }
 
-  function deleteActiveTrain() {
-    const activeTrain = clippa.timeline.state.activeTrain
-    if (!activeTrain)
-      return
-
-    const performer = performerStore.getPerformerById(activeTrain.id)
-    if (performer) {
-      performerStore.removePerformer(activeTrain.id)
-    }
-    else {
-      const layer = filterStore.layers.find(item => item.train.id === activeTrain.id)
-      if (!layer)
-        return
-
-      filterStore.removeLayer(layer.id)
-    }
-
-    // clean up empty rails
-    const rails = clippa.timeline.rails
-    if (rails) {
-      const emptyRails = rails.rails.filter(rail => rail.trains.length === 0)
-      emptyRails.forEach(rail => rails.removeRail(rail))
-
-      // recalc duration
-      const maxEnd = rails.rails.reduce((acc, rail) => {
-        return rail.trains.reduce(
-          (inner, train) => Math.max(inner, train.start + train.duration),
-          acc,
-        )
-      }, 0)
-
-      if (maxEnd !== clippa.timeline.duration) {
-        clippa.timeline.updateDuration(maxEnd)
-      }
-    }
-
-    bumpSplitRevision()
-
-    if (!isPlaying.value) {
-      void clippa.director.seek(currentTime.value)
-    }
+  async function deleteActiveTrain() {
+    const result = await editorCommandActions.timelineDeleteActiveItem()
+    if (result.ok)
+      bumpSplitRevision()
   }
 
-  // 键盘事件处理
+  function handleUndo(): void {
+    void editorCommandActions.historyUndo()
+  }
+
+  function handleRedo(): void {
+    void editorCommandActions.historyRedo()
+  }
+
   useEventListener('keydown', async (e: KeyboardEvent) => {
-    // 如果焦点在输入框中，不处理快捷键
     const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       return
-    }
+
+    const isMetaOrCtrl = e.metaKey || e.ctrlKey
 
     switch (e.code) {
+      case 'KeyZ':
+        if (!isMetaOrCtrl)
+          break
+
+        e.preventDefault()
+        if (e.shiftKey)
+          handleRedo()
+        else
+          handleUndo()
+        break
+      case 'KeyY':
+        if (!e.ctrlKey || e.metaKey)
+          break
+
+        e.preventDefault()
+        handleRedo()
+        break
       case 'Space':
         e.preventDefault()
         togglePlayPause()
@@ -362,7 +230,7 @@ export function useKeyboardShortcuts() {
         if (clippa.timeline.rails?.deleteActiveGap())
           break
 
-        deleteActiveTrain()
+        void deleteActiveTrain()
         break
       case 'Escape':
         if (isFullscreen.value) {
@@ -373,13 +241,10 @@ export function useKeyboardShortcuts() {
     }
   })
 
-  // 设置和清理函数
   function setupShortcuts() {
-    // 键盘快捷键已在全局监听器中处理
   }
 
   function cleanupShortcuts() {
-    // 清理工作在全局监听器中处理
   }
 
   return {

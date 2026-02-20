@@ -2,6 +2,7 @@ import type { AiToolDefinition } from '../../tooling/types'
 import type { EditorControlAdapter } from './types'
 import { createExportTools } from './exportTools'
 import { createFilterTools } from './filterTools'
+import { createHistoryTools } from './historyTools'
 import { createMediaTools } from './mediaTools'
 import { createPerformerTools } from './performerTools'
 import { createQueryTools } from './queryTools'
@@ -18,6 +19,7 @@ export function createEditorControlTools(adapter: EditorControlAdapter): AiToolD
     ...createPerformerTools(adapter),
     ...createFilterTools(adapter),
     ...createTransitionTools(adapter),
+    ...createHistoryTools(adapter),
     ...createExportTools(adapter),
   ]
 }

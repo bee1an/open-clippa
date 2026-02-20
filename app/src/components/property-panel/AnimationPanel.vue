@@ -3,11 +3,13 @@ import type { EnterExitPresetType, LoopPresetType } from '@clippc/performer'
 import {
   DEFAULT_ENTER_EXIT_DURATION_MS,
   DEFAULT_LOOP_DURATION_MS,
+  mergeAnimationSpec,
 } from '@clippc/performer'
 import { storeToRefs } from 'pinia'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'radix-vue'
 import { computed } from 'vue'
 import { Slider } from '@/components/ui/slider'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 const emit = defineEmits<{
@@ -15,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const performerStore = usePerformerStore()
+const editorCommandActions = useEditorCommandActions()
 const { selectedPerformers } = storeToRefs(performerStore)
 
 interface PresetOption {
@@ -83,17 +86,31 @@ function togglePreset(channel: AnimationChannel, value: string, fallbackDuration
   if (!id)
     return
 
+  const currentSpec = animationSpec.value
+
   // re-clicking the active preset deselects it
   if (getPreset(channel) === value) {
-    performerStore.updateAnimation(id, { [channel]: null })
+    const nextSpec = mergeAnimationSpec(currentSpec, { [channel]: null })
+    if (nextSpec)
+      void editorCommandActions.performerSetAnimation({ performerId: id, animation: nextSpec as Record<string, unknown> })
+    else
+      void editorCommandActions.performerClearAnimation({ performerId: id })
     return
   }
 
-  performerStore.updateAnimation(id, {
+  const nextSpec = mergeAnimationSpec(currentSpec, {
     [channel]: {
       preset: value as EnterExitPresetType | LoopPresetType,
       durationMs: getDuration(channel, fallbackDuration),
     },
+  })
+
+  if (!nextSpec)
+    return
+
+  void editorCommandActions.performerSetAnimation({
+    performerId: id,
+    animation: nextSpec as Record<string, unknown>,
   })
 }
 
@@ -102,10 +119,18 @@ function handleDurationChange(channel: AnimationChannel, value: number, fallback
   if (!id || getPreset(channel) === 'none')
     return
 
-  performerStore.updateAnimation(id, {
+  const nextSpec = mergeAnimationSpec(animationSpec.value, {
     [channel]: {
       durationMs: clampDuration(value, fallbackDuration),
     },
+  })
+
+  if (!nextSpec)
+    return
+
+  void editorCommandActions.performerSetAnimation({
+    performerId: id,
+    animation: nextSpec as Record<string, unknown>,
   })
 }
 </script>
@@ -166,12 +191,12 @@ function handleDurationChange(channel: AnimationChannel, value: number, fallback
               </span>
             </div>
             <Slider
-              :model-value="[getDuration(ch.key, ch.defaultDuration)]"
+              :model-value="getDuration(ch.key, ch.defaultDuration)"
               :min="50"
               :max="3000"
               :step="50"
               size="sm"
-              @update:model-value="(v: number[]) => handleDurationChange(ch.key, v[0], ch.defaultDuration)"
+              @update:model-value="(v: number) => handleDurationChange(ch.key, v, ch.defaultDuration)"
             />
           </div>
         </TabsContent>

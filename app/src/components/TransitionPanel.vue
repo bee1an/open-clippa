@@ -2,10 +2,12 @@
 import { computeTransitionMaxMs, DEFAULT_TRANSITION_DURATION, GL_TRANSITION_PRESETS, TRANSITION_FEATURE_AVAILABLE } from '@clippc/transition'
 import { computed } from 'vue'
 import { Slider } from '@/components/ui/slider'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useTransitionStore } from '@/store/useTransitionStore'
 
 const transitionStore = useTransitionStore()
+const editorCommandActions = useEditorCommandActions()
 const transitionFeatureAvailable = TRANSITION_FEATURE_AVAILABLE
 const {
   activeCandidate,
@@ -101,8 +103,11 @@ function handleDurationChange(value: number): void {
   if (next === activeTransition.value.durationMs)
     return
 
-  transitionStore.updateTransition(activeTransition.value.id, {
-    durationMs: next,
+  void editorCommandActions.transitionUpdate({
+    transitionId: activeTransition.value.id,
+    patch: {
+      durationMs: next,
+    },
   })
 }
 
@@ -110,11 +115,13 @@ function removeActiveTransition(): void {
   if (!activeTransition.value)
     return
 
-  transitionStore.removeTransition(activeTransition.value.id)
+  void editorCommandActions.transitionRemove({
+    transitionId: activeTransition.value.id,
+  })
 }
 
 function clearActiveSelection(): void {
-  transitionStore.clearActiveSelection()
+  void editorCommandActions.transitionClearSelection()
 }
 </script>
 

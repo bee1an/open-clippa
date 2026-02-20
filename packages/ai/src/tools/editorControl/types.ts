@@ -234,6 +234,20 @@ export interface ExportCancelInput {
   jobId?: string
 }
 
+export interface HistoryStatusSnapshot {
+  canUndo: boolean
+  canRedo: boolean
+  pastCount: number
+  futureCount: number
+  activeTransaction: {
+    id: string
+    label: string
+    source: string
+    startedAt: number
+    commandCount: number
+  } | null
+}
+
 export interface EditorControlAdapter {
   queryProjectState: () => EditorControlActionResult | Promise<EditorControlActionResult>
   queryMediaAssets: (input: QueryMediaAssetsInput) => EditorControlActionResult | Promise<EditorControlActionResult>
@@ -285,6 +299,10 @@ export interface EditorControlAdapter {
   exportStart: (input: ExportStartInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   exportCancel: (input: ExportCancelInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   exportGetStatus: () => EditorControlActionResult | Promise<EditorControlActionResult>
+
+  historyGetStatus: () => EditorControlActionResult | Promise<EditorControlActionResult>
+  historyUndo: () => EditorControlActionResult | Promise<EditorControlActionResult>
+  historyRedo: () => EditorControlActionResult | Promise<EditorControlActionResult>
 }
 
 export type EditorControlToolFactory = (adapter: EditorControlAdapter) => AiToolDefinition[]

@@ -5,6 +5,7 @@ import { createEditorControlTools } from '@clippc/ai'
 import { getFilterPresetConfig } from '@clippc/filter'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetEditorCommandBusForTesting } from '@/command/commandBus'
 import { createEditorControlRuntime } from './runtime'
 
 const {
@@ -899,6 +900,7 @@ function createHarness(options: {
 
 describe('aI control acceptance e2e', () => {
   beforeEach(() => {
+    resetEditorCommandBusForTesting()
     loadVideoMetadataMock.mockClear()
     loadVideoMetadataMock.mockResolvedValue({
       duration: 12000,
@@ -1276,5 +1278,49 @@ describe('aI control acceptance e2e', () => {
     }
 
     expect(statuses).toEqual(['exporting', 'exporting', 'done'])
+  })
+
+  it('scenario 6: undo and redo content changes through history tools', async () => {
+    const performer = new MockText({
+      id: 'text-history',
+      type: 'text',
+      content: 'history',
+      start: 0,
+      duration: 5000,
+      zIndex: 1,
+      x: 10,
+      y: 20,
+    })
+    const harness = createHarness({
+      performers: [performer],
+      selectedPerformerId: 'text-history',
+    })
+
+    const updateResult = await harness.runTool('performer_update_transform', {
+      performerId: 'text-history',
+      x: 120,
+      y: 160,
+    })
+    expect(updateResult.ok).toBe(true)
+
+    const historyStatus = await harness.runTool('history_get_status')
+    expect(historyStatus.ok).toBe(true)
+    expect(historyStatus.data.canUndo).toBe(true)
+
+    const undoResult = await harness.runTool('history_undo')
+    expect(undoResult.ok).toBe(true)
+    const performerAfterUndo = harness.state.performers.get('text-history')
+    expect(performerAfterUndo?.getBaseBounds()).toEqual(expect.objectContaining({
+      x: 10,
+      y: 20,
+    }))
+
+    const redoResult = await harness.runTool('history_redo')
+    expect(redoResult.ok).toBe(true)
+    const performerAfterRedo = harness.state.performers.get('text-history')
+    expect(performerAfterRedo?.getBaseBounds()).toEqual(expect.objectContaining({
+      x: 120,
+      y: 160,
+    }))
   })
 })

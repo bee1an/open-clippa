@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getEditorCommandBus, resetEditorCommandBusForTesting } from '@/command/commandBus'
 import { useAiChatStore } from './useAiChatStore'
 import { useAiSettingsStore } from './useAiSettingsStore'
 
@@ -26,6 +27,7 @@ vi.mock('@/ai/context/tools', () => {
 
 describe('useAiChatStore', () => {
   beforeEach(() => {
+    resetEditorCommandBusForTesting()
     setActivePinia(createPinia())
     chatWithToolsMock.mockReset()
     resolveAppAiToolsMock.mockReset()
@@ -86,6 +88,8 @@ describe('useAiChatStore', () => {
     expect(callOptions.messages[0].content).toContain('media_import_random_image')
     expect(callOptions.messages[0].content).toContain('media_import_random_video')
     expect(callOptions.messages[0].content).toContain('media_pick_random_asset')
+    expect(callOptions.messages[0].content).toContain('history_undo')
+    expect(callOptions.messages[0].content).toContain('history_redo')
     expect(callOptions.maxToolRounds).toBe(12)
     expect(typeof callOptions.onToolStart).toBe('function')
     expect(typeof callOptions.onToolResult).toBe('function')
@@ -361,5 +365,42 @@ describe('useAiChatStore', () => {
       'media_add_asset_to_timeline',
       'export_start',
     ]))
+  })
+
+  it('wraps single ai request in one history transaction', async () => {
+    chatWithToolsMock.mockImplementation(async (options: any) => {
+      options.onToolStart({
+        id: 'tool-1',
+        name: 'query_project_state',
+        arguments: '{}',
+      })
+      options.onToolResult({
+        toolCallId: 'tool-1',
+        toolName: 'query_project_state',
+        content: '{}',
+      })
+      options.onToken('ok')
+      options.onDone?.()
+    })
+
+    const bus = getEditorCommandBus()
+    const beginSpy = vi.spyOn(bus, 'beginTransaction')
+    const endSpy = vi.spyOn(bus, 'endTransaction')
+
+    const settingsStore = useAiSettingsStore()
+    settingsStore.updateSettings({
+      apiKeySource: 'byok',
+      apiKey: 'test-key',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      model: 'moonshotai/kimi-k2.5',
+    })
+
+    const store = useAiChatStore()
+    store.draft = 'do something'
+
+    await store.sendMessage()
+
+    expect(beginSpy).toHaveBeenCalledTimes(1)
+    expect(endSpy).toHaveBeenCalledTimes(1)
   })
 })

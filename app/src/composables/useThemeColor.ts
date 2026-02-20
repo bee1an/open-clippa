@@ -182,6 +182,18 @@ export function useThemeColor() {
     return updatePrimaryColor(preset.hex, styleTarget)
   }
 
+  function previewPrimaryPreset(presetId: ThemeColorPresetId, styleTarget?: StyleTarget): boolean {
+    const preset = THEME_COLOR_PRESETS.find(item => item.id === presetId)
+    if (!preset)
+      return false
+
+    return applyPrimaryColorTokens(preset.hex, styleTarget)
+  }
+
+  function restorePrimaryPreview(styleTarget?: StyleTarget): boolean {
+    return applyPrimaryColorTokens(primaryColor.value, styleTarget)
+  }
+
   function resetPrimaryColor(styleTarget?: StyleTarget): boolean {
     return updatePrimaryColor(DEFAULT_THEME_PRIMARY_COLOR, styleTarget)
   }
@@ -192,6 +204,8 @@ export function useThemeColor() {
     themeColorPresets: THEME_COLOR_PRESETS,
     setPrimaryColor,
     setPrimaryPreset,
+    previewPrimaryPreset,
+    restorePrimaryPreview,
     resetPrimaryColor,
   }
 }

@@ -2,12 +2,14 @@
 import { storeToRefs } from 'pinia'
 import AnimationPanel from '@/components/property-panel/AnimationPanel.vue'
 import PropertyPanel from '@/components/property-panel/PropertyPanel.vue'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useLayoutStore } from '@/store/useLayoutStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 const route = useRoute()
 
 const performerStore = usePerformerStore()
+const editorCommandActions = useEditorCommandActions()
 const layoutStore = useLayoutStore()
 const { selectedPerformers } = storeToRefs(performerStore)
 const { siderCollapsed } = storeToRefs(layoutStore)
@@ -31,7 +33,7 @@ watch(hasSelection, (selected) => {
 function handleNavigate(path: string) {
   // if properties panel is showing, first click just dismisses it
   if (hasSelection.value) {
-    performerStore.clearSelection()
+    void editorCommandActions.performerClearSelection()
     return
   }
 

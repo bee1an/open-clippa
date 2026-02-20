@@ -1,6 +1,7 @@
 import type { PerformerBounds, TextStyleOption } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
 import { Image, Text, Video } from '@clippc/performer'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 export type PerformerType = 'video' | 'image' | 'text'
@@ -54,6 +55,7 @@ function toTopLeftPosition(visualX: number, visualY: number, width: number, heig
 
 export function usePerformerProperties(performerId: Ref<string | null>) {
   const performerStore = usePerformerStore()
+  const editorCommandActions = useEditorCommandActions()
 
   // revision counter to drive reactivity for non-reactive performer instances
   const revision = ref(0)
@@ -133,7 +135,11 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     if (!id || !b)
       return
     const topLeft = toTopLeftPosition(visualX, visualY, b.width, b.height, b.rotation ?? 0)
-    performerStore.updatePerformer(id, { x: topLeft.x, y: topLeft.y })
+    void editorCommandActions.performerUpdateTransform({
+      performerId: id,
+      x: topLeft.x,
+      y: topLeft.y,
+    })
     bump()
   }
 
@@ -160,7 +166,8 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     // new top-left so center stays the same
     const newOffset = rotateVector(hw, hh, angle)
 
-    performerStore.updatePerformer(id, {
+    void editorCommandActions.performerUpdateTransform({
+      performerId: id,
       x: cx - newOffset.x,
       y: cy - newOffset.y,
       rotation: angle,
@@ -172,7 +179,10 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     const id = performerId.value
     if (!id)
       return
-    performerStore.updatePerformer(id, { alpha } as any)
+    void editorCommandActions.performerUpdateTransform({
+      performerId: id,
+      alpha,
+    })
     bump()
   }
 
@@ -198,7 +208,10 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     const p = performer.value
     if (!(p instanceof Text))
       return
-    p.setText(content)
+    void editorCommandActions.performerUpdateTextContent({
+      performerId: p.id,
+      content,
+    })
     bump()
   }
 
@@ -206,7 +219,10 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     const p = performer.value
     if (!(p instanceof Text))
       return
-    p.setStyle(style)
+    void editorCommandActions.performerUpdateTextStyle({
+      performerId: p.id,
+      style,
+    })
     bump()
   }
 

@@ -2,6 +2,7 @@ import type { AiApiKeySource, ChatMessage, ChatRequestMessage } from '@clippc/ai
 import { chatWithTools } from '@clippc/ai'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { getEditorCommandBus } from '@/command/commandBus'
 import { resolveAppAiTools } from '@/ai/context/tools'
 import { useAiSettingsStore } from './useAiSettingsStore'
 
@@ -16,6 +17,7 @@ const CONTEXT_AWARE_SYSTEM_PROMPT = [
   'If the user asks to randomly choose from media library, call media_pick_random_asset first.',
   'If media should be placed on timeline, chain media_add_asset_to_timeline after import or random pick.',
   'If the user asks to crop image/video, use performer_update_transform with crop or clearCrop and target performerId.',
+  'If user asks to undo, redo, rollback, or recover previous state, call history_get_status first and then use history_undo or history_redo.',
   'Only use tool data as factual context. If a tool fails, explain the failure briefly and ask for a retry.',
 ].join(' ')
 
@@ -102,6 +104,7 @@ function buildMissingSettingsError(settings: {
 
 export const useAiChatStore = defineStore('ai-chat', () => {
   const aiSettingsStore = useAiSettingsStore()
+  const commandBus = getEditorCommandBus()
 
   const messages = ref<ChatMessage[]>([])
   const draft = ref('')
@@ -213,6 +216,14 @@ export const useAiChatStore = defineStore('ai-chat', () => {
     const requestMessages = buildRequestMessages(messages.value)
     const requestId = generateMessageId('request')
     let assistantMessageId: string | null = null
+    const historyTransaction = commandBus.beginTransaction({
+      source: 'ai',
+      label: 'AI Reply Commands',
+      mergeKey: requestId,
+    })
+    const historyTransactionId = historyTransaction.ok
+      ? historyTransaction.data.transactionId
+      : null
 
     isStreaming.value = true
     activeRequestId.value = requestId
@@ -288,6 +299,9 @@ export const useAiChatStore = defineStore('ai-chat', () => {
       }
     }
     finally {
+      if (historyTransactionId)
+        commandBus.endTransaction(historyTransactionId)
+
       if (!isRequestStillActive(requestId))
         return
 

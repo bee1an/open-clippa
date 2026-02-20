@@ -5,6 +5,7 @@ import ChatPanel from '@/components/chat/ChatPanel.vue'
 import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
+import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useFilterEngine } from '@/composables/useFilterEngine'
 import { useThemeColor } from '@/composables/useThemeColor'
 import { useTimelineBinding } from '@/composables/useTimelineBinding'
@@ -12,6 +13,7 @@ import { useTransitionEngine } from '@/composables/useTransitionEngine'
 import { useAiSettingsStore } from '@/store/useAiSettingsStore'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useExportTaskStore } from '@/store/useExportTaskStore'
+import { useHistoryStore } from '@/store/useHistoryStore'
 import { useLayoutStore } from '@/store/useLayoutStore'
 
 definePage({ redirect: '/editor/media' })
@@ -20,11 +22,15 @@ const editorStore = useEditorStore()
 const exportTaskStore = useExportTaskStore()
 const aiSettingsStore = useAiSettingsStore()
 const layoutStore = useLayoutStore()
+const historyStore = useHistoryStore()
+const editorCommandActions = useEditorCommandActions()
 const router = useRouter()
 const {
   activePresetId,
   themeColorPresets,
   setPrimaryPreset,
+  previewPrimaryPreset,
+  restorePrimaryPreview,
 } = useThemeColor()
 const themePickerRef = ref<HTMLElement | null>(null)
 const showThemePicker = ref(false)
@@ -66,6 +72,16 @@ const rightPanelToggleClass = computed(() => {
   return siderCollapsed.value
     ? 'text-foreground-muted hover:text-foreground'
     : 'bg-secondary text-foreground'
+})
+const canUndo = computed(() => {
+  return historyStore.status.value.canUndo
+    && !historyStore.state.value.isApplying
+    && !historyStore.state.value.activeTransaction
+})
+const canRedo = computed(() => {
+  return historyStore.status.value.canRedo
+    && !historyStore.state.value.isApplying
+    && !historyStore.state.value.activeTransaction
 })
 
 useFilterEngine()
@@ -109,7 +125,23 @@ function toggleChatPanel(): void {
   aiSettingsStore.setPanelOpen(!chatPanelOpen.value)
 }
 
+function handleUndoClick(): void {
+  if (!canUndo.value)
+    return
+
+  void editorCommandActions.historyUndo()
+}
+
+function handleRedoClick(): void {
+  if (!canRedo.value)
+    return
+
+  void editorCommandActions.historyRedo()
+}
+
 function toggleThemePicker(): void {
+  if (showThemePicker.value)
+    restorePrimaryPreview()
   showThemePicker.value = !showThemePicker.value
 }
 
@@ -118,7 +150,16 @@ function applyThemePreset(presetId: Parameters<typeof setPrimaryPreset>[0]): voi
   showThemePicker.value = false
 }
 
+function previewThemePreset(presetId: Parameters<typeof setPrimaryPreset>[0]): void {
+  previewPrimaryPreset(presetId)
+}
+
+function restoreThemePreview(): void {
+  restorePrimaryPreview()
+}
+
 onClickOutside(themePickerRef, () => {
+  restoreThemePreview()
   showThemePicker.value = false
 })
 
@@ -155,6 +196,7 @@ watch(exportStatus, (nextStatus) => {
           <div
             v-if="showThemePicker"
             class="absolute right-0 top-10 z-100 rounded-lg border border-border bg-background-elevated p-2 shadow-md"
+            @mouseleave="restoreThemePreview"
           >
             <div class="flex items-center gap-1">
               <button
@@ -166,11 +208,38 @@ watch(exportStatus, (nextStatus) => {
                 :aria-label="`切换主题色为 ${preset.label}`"
                 :aria-pressed="activePresetId === preset.id"
                 :style="{ backgroundColor: preset.hex }"
+                @mouseenter="previewThemePreset(preset.id)"
                 @click="applyThemePreset(preset.id)"
               />
             </div>
           </div>
         </div>
+
+        <div w-px h-4 bg-border mx-2 />
+
+        <button
+          w-8 h-8 rounded flex items-center justify-center transition-colors
+          :class="canUndo ? 'text-foreground-muted hover:text-foreground hover:bg-secondary' : 'text-foreground-muted opacity-30 cursor-not-allowed'"
+          :disabled="!canUndo"
+          :title="canUndo ? '撤销 (Cmd/Ctrl+Z)' : '暂无可撤销操作'"
+          aria-label="撤销"
+          data-preserve-canvas-selection="true"
+          @click="handleUndoClick"
+        >
+          <div i-ph-arrow-counter-clockwise-bold text="[18px]" />
+        </button>
+
+        <button
+          w-8 h-8 rounded flex items-center justify-center transition-colors
+          :class="canRedo ? 'text-foreground-muted hover:text-foreground hover:bg-secondary' : 'text-foreground-muted opacity-30 cursor-not-allowed'"
+          :disabled="!canRedo"
+          :title="canRedo ? '重做 (Cmd+Shift+Z / Ctrl+Y)' : '暂无可重做操作'"
+          aria-label="重做"
+          data-preserve-canvas-selection="true"
+          @click="handleRedoClick"
+        >
+          <div i-ph-arrow-clockwise-bold text="[18px]" />
+        </button>
 
         <div w-px h-4 bg-border mx-2 />
 
