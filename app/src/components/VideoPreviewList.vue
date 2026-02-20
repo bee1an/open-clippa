@@ -6,9 +6,9 @@ const hasMediaFiles = computed(() => mediaStore.videoFiles.length > 0 || mediaSt
 </script>
 
 <template>
-  <div h-full>
+  <div h-full min-h-0>
     <!-- 媒体列表 -->
-    <div class="video-list" flex-1 overflow-y-auto hfull p-2>
+    <div class="video-list" flex-1 overflow-y-auto h-full min-h-0 p-2>
       <div v-if="!hasMediaFiles" min-h-full flex items-center justify-center>
         <div class="text-center">
           <p text-sm text-gray-500>

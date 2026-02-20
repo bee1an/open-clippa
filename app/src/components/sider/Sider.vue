@@ -48,7 +48,7 @@ function handleNavigate(path: string) {
 <template>
   <div w-full h-full relative bg-background-elevated>
     <div
-      h-full overflow-hidden bg-background-elevated mr-14 min-w-0
+      h-full overflow-hidden bg-background-elevated mr-16 min-w-0
       class="transition-opacity duration-220 ease-[cubic-bezier(0.25,1,0.5,1)]"
       border="border/50"
       :class="siderCollapsed

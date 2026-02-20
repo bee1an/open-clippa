@@ -51,20 +51,21 @@ function handleItemClick(path: string) {
 
 <template>
   <div
-    h-full w-14 flex-shrink-0 flex flex-col items-center pt-3 gap-1 bg-background-elevated
+    h-full w-16 flex-shrink-0 flex flex-col items-center pt-3 pb-3 gap-2 bg-background-elevated overflow-y-auto overflow-x-hidden
     data-preserve-canvas-selection="true"
   >
     <RouterLink
       v-for="item in navItems"
       :key="item.path"
       :to="item.path"
-      :title="item.title"
       @click="handleItemClick(item.path)"
+      class="w-full select-none"
     >
       <NavItem
         :active="route.path === item.path"
         :icon="item.icon"
         :active-icon="item.activeIcon"
+        :title="item.title"
       />
     </RouterLink>
   </div>

@@ -81,7 +81,7 @@ function importVideoFromUrl() {
 
 <template>
   <div
-    hfull flex="~ col" relative
+    h-full min-h-0 flex="~ col" relative
     :class="{
       'border-2 border-dashed border-primary bg-primary/10 transition-all duration-200': isDragging,
     }"

@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia'
 import { useLayoutStore } from '@/store/useLayoutStore'
 
 // 默认高度和限制
-const DEFAULT_HEIGHT = 250
+const DEFAULT_HEIGHT = 162
 const MIN_HEIGHT = 100
 const MAX_HEIGHT = 500
 

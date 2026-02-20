@@ -363,7 +363,7 @@ watch(() => props.kind, () => {
 </script>
 
 <template>
-  <div class="library-shell hfull flex flex-col text-foreground">
+  <div class="library-shell h-full min-h-0 flex flex-col text-foreground">
     <div class="flex flex-col gap-3 p-3 border-b border-border/70">
       <!-- Header Row: Title & Stats -->
       <div class="flex items-center justify-between">
@@ -446,7 +446,7 @@ watch(() => props.kind, () => {
 
     <div
       ref="listContainerRef"
-      class="flex-1 overflow-y-auto px-3 pb-4 pt-3"
+      class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3"
       @scroll.passive="maybeLoadMoreOnScroll"
     >
       <div
