@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import logoSvg from '@/assets/logo.svg?raw'
 
 // Logo 组件，可以接收尺寸参数
 interface Props {
@@ -39,12 +40,34 @@ function handleClick() {
     :class="[clickable ? 'cursor-pointer hover:opacity-80' : '']"
     @click="handleClick"
   >
-    <img src="/logo.svg" alt="Logo" class="object-contain" :class="iconSizeClasses[size]">
+    <span class="app-logo__icon" :class="iconSizeClasses[size]" v-html="logoSvg" />
     <span
-      font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent tracking-tight
+      class="app-logo__text"
+      font-bold bg-clip-text text-transparent tracking-tight
       :class="sizeClasses[size]"
     >
       lippc
     </span>
   </div>
 </template>
+
+<style scoped>
+.app-logo__icon {
+  display: inline-block;
+  color: hsl(var(--logo-accent-start));
+}
+
+.app-logo__icon :deep(svg) {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.app-logo__text {
+  background-image: linear-gradient(
+    90deg,
+    hsl(var(--logo-accent-start)),
+    hsl(var(--logo-accent-end))
+  );
+}
+</style>

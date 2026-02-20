@@ -6,6 +6,7 @@ import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
 import { useFilterEngine } from '@/composables/useFilterEngine'
+import { useThemeColor } from '@/composables/useThemeColor'
 import { useTimelineBinding } from '@/composables/useTimelineBinding'
 import { useTransitionEngine } from '@/composables/useTransitionEngine'
 import { useAiSettingsStore } from '@/store/useAiSettingsStore'
@@ -20,6 +21,13 @@ const exportTaskStore = useExportTaskStore()
 const aiSettingsStore = useAiSettingsStore()
 const layoutStore = useLayoutStore()
 const router = useRouter()
+const {
+  activePresetId,
+  themeColorPresets,
+  setPrimaryPreset,
+} = useThemeColor()
+const themePickerRef = ref<HTMLElement | null>(null)
+const showThemePicker = ref(false)
 const isClippaReady = ref(false)
 const exportFrameRate = 60
 const showDebugPanel = import.meta.env.DEV
@@ -101,6 +109,19 @@ function toggleChatPanel(): void {
   aiSettingsStore.setPanelOpen(!chatPanelOpen.value)
 }
 
+function toggleThemePicker(): void {
+  showThemePicker.value = !showThemePicker.value
+}
+
+function applyThemePreset(presetId: Parameters<typeof setPrimaryPreset>[0]): void {
+  setPrimaryPreset(presetId)
+  showThemePicker.value = false
+}
+
+onClickOutside(themePickerRef, () => {
+  showThemePicker.value = false
+})
+
 watch(exportStatus, (nextStatus) => {
   if (nextStatus === 'done')
     router.push('/export')
@@ -118,6 +139,41 @@ watch(exportStatus, (nextStatus) => {
       <div flex-1 />
 
       <div flex items-center gap-1>
+        <div ref="themePickerRef" class="relative">
+          <button
+            w-8 h-8 rounded flex items-center justify-center transition-colors
+            :class="showThemePicker ? 'bg-secondary text-foreground' : 'text-foreground-muted hover:text-foreground'"
+            title="切换主题色"
+            aria-label="切换主题色"
+            :aria-expanded="showThemePicker"
+            :aria-haspopup="true"
+            @click="toggleThemePicker"
+          >
+            <div i-ph-palette-bold text="[18px]" />
+          </button>
+
+          <div
+            v-if="showThemePicker"
+            class="absolute right-0 top-10 z-100 rounded-lg border border-border bg-background-elevated p-2 shadow-md"
+          >
+            <div class="flex items-center gap-1">
+              <button
+                v-for="preset in themeColorPresets"
+                :key="preset.id"
+                w-4 h-4 rounded-full border transition-all duration-150
+                :class="activePresetId === preset.id ? 'border-foreground scale-110' : 'border-border hover:border-foreground-muted'"
+                :title="`切换主题色为 ${preset.label}`"
+                :aria-label="`切换主题色为 ${preset.label}`"
+                :aria-pressed="activePresetId === preset.id"
+                :style="{ backgroundColor: preset.hex }"
+                @click="applyThemePreset(preset.id)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div w-px h-4 bg-border mx-2 />
+
         <!-- Left AI Toggle -->
         <button
           w-8 h-8 rounded flex items-center justify-center transition-colors
@@ -187,7 +243,7 @@ watch(exportStatus, (nextStatus) => {
 
           <!-- Right Sider -->
           <aside
-            :style="{ width: siderCollapsed ? '56px' : '320px' }"
+            :style="{ width: siderCollapsed ? '64px' : '320px' }"
             class="shrink-0 bg-background-elevated border transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] z-40 flex flex-col relative group overflow-hidden my-4 ml-4 mr-4 rounded-2xl shadow-sm"
             border="border/50"
           >

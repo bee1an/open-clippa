@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 import App from './App.vue'
+import { initializeThemeColor } from '@/composables/useThemeColor'
 import 'virtual:uno.css'
 import '@/styles/globals.css'
 
@@ -20,6 +21,8 @@ function filterDevRoutes(records: RouteRecordRaw[]): RouteRecordRaw[] {
 }
 
 const routeRecords = import.meta.env.DEV ? routes : filterDevRoutes(routes as RouteRecordRaw[])
+
+initializeThemeColor()
 
 createApp(App)
   .use(

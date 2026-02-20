@@ -18,12 +18,13 @@
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 95%;
 
-    /* 主色调 - 极简主义通常使用单色或克制的强调色 */
-    /* 这里使用一种精致的“白热”色或保持原有的橙色但更收敛 */
-    --primary: 0 0% 95%; /* 变更为白色作为主强调色 (类似 Vercel/Notion Dark) */
-    --primary-foreground: 0 0% 0%;
-    --primary-hover: 0 0% 100%;
-    --primary-glow: 0 0% 100% / 0.1;
+    /* 主色调 - 玫瑰红 #E11D48 */
+    --primary: 347 77% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 347 77% 45%;
+    --primary-glow: 347 77% 50% / 0.2;
+    --logo-accent-start: 347 77% 56%;
+    --logo-accent-end: 347 77% 38%;
 
     /* 次要色 */
     --secondary: 0 0% 15%;
@@ -40,7 +41,7 @@
 
     --input: 0 0% 12%;
     --input-focus: 0 0% 15%;
-    --ring: 0 0% 80%;
+    --ring: 347 77% 50%;
 
     /* 状态色 - 保持但降低饱和度 */
     --destructive: 0 60% 50%;

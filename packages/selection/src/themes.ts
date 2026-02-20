@@ -6,17 +6,17 @@ export interface SelectionTheme extends SelectionStyle {
 
 export const defaultTheme: SelectionTheme = {
   name: 'default',
-  border: '2px solid #3b82f6',
-  background: 'rgba(59, 130, 246, 0.1)',
-  handleColor: '#3b82f6',
+  border: '2px solid #e11d48',
+  background: 'rgba(225, 29, 72, 0.1)',
+  handleColor: '#e11d48',
   handleSize: 10,
 }
 
 export const darkTheme: SelectionTheme = {
   name: 'dark',
-  border: '2px solid #60a5fa',
-  background: 'rgba(96, 165, 250, 0.15)',
-  handleColor: '#60a5fa',
+  border: '2px solid #fb7185',
+  background: 'rgba(251, 113, 133, 0.15)',
+  handleColor: '#fb7185',
   handleSize: 10,
 }
 
