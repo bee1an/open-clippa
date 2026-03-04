@@ -1099,14 +1099,35 @@ export function createEditorControlRuntime(
       if (!assetId)
         return failure('INVALID_ARGUMENT', 'assetId is required')
 
+      const removePerformersBySource = (source: unknown): void => {
+        if (source === undefined || source === null)
+          return
+
+        const matchedPerformerIds = performerStore
+          .getAllPerformers()
+          .filter((performer) => {
+            const performerSource = (performer as { src?: unknown }).src
+            if (performerSource === undefined || performerSource === null)
+              return false
+            return performerSource === source
+          })
+          .map(performer => performer.id)
+
+        matchedPerformerIds.forEach((performerId) => {
+          performerStore.removePerformer(performerId)
+        })
+      }
+
       const videoAsset = mediaStore.videoFiles.find(file => file.id === assetId)
       if (videoAsset) {
+        removePerformersBySource(videoAsset.source)
         mediaStore.removeVideoFile(assetId)
         return success({ assetId })
       }
 
       const imageAsset = mediaStore.imageFiles.find(file => file.id === assetId)
       if (imageAsset) {
+        removePerformersBySource(imageAsset.source)
         mediaStore.removeImageFile(assetId)
         return success({ assetId })
       }

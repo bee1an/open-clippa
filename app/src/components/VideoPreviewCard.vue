@@ -3,7 +3,6 @@ import type { VideoFile } from '@/store'
 import { ms2TimeStr } from 'clippc'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
-import { useMediaStore } from '@/store/useMediaStore'
 
 interface Props {
   videoFile: VideoFile
@@ -12,7 +11,6 @@ interface Props {
 const props = defineProps<Props>()
 
 const editorStore = useEditorStore()
-const mediaStore = useMediaStore()
 const editorCommandActions = useEditorCommandActions()
 
 // 勾选状态
@@ -39,9 +37,15 @@ async function handleMenuAddToTimeline() {
   await addToTimeline()
 }
 
-function removeFromMediaLibrary() {
-  mediaStore.removeVideoFile(props.videoFile.id)
+async function removeFromMediaLibrary() {
   showMenu.value = false
+  const confirmed = window.confirm('删除后会同时移除画布中使用该媒体的内容，是否继续？')
+  if (!confirmed)
+    return
+
+  const result = await editorCommandActions.mediaRemoveAsset({ assetId: props.videoFile.id })
+  if (!result.ok)
+    window.alert(result.error.message)
 }
 
 function toggleMenu() {

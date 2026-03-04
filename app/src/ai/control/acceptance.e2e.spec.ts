@@ -1000,6 +1000,45 @@ describe('aI control acceptance e2e', () => {
     expect(addResult.data.type).toBe('image')
   })
 
+  it('scenario 1e: remove media asset also removes linked performers on canvas', async () => {
+    const harness = createHarness()
+
+    const importMainResult = await harness.runTool('media_import_video_from_url', {
+      url: 'https://cdn.example.com/video/main.mp4',
+    })
+    const importKeepResult = await harness.runTool('media_import_video_from_url', {
+      url: 'https://cdn.example.com/video/keep.mp4',
+    })
+
+    expect(importMainResult.ok).toBe(true)
+    expect(importKeepResult.ok).toBe(true)
+
+    const mainAddResult = await harness.runTool('media_add_asset_to_timeline', {
+      assetId: importMainResult.data.asset.id,
+      startMs: 1000,
+      durationMs: 4000,
+    })
+    const keepAddResult = await harness.runTool('media_add_asset_to_timeline', {
+      assetId: importKeepResult.data.asset.id,
+      startMs: 2000,
+      durationMs: 4000,
+    })
+
+    expect(mainAddResult.ok).toBe(true)
+    expect(keepAddResult.ok).toBe(true)
+
+    const removeResult = await harness.runTool('media_remove_asset', {
+      assetId: importMainResult.data.asset.id,
+    })
+
+    expect(removeResult.ok).toBe(true)
+    const restIds = harness.state.mediaStore.videoFiles.map((file: any) => file.id)
+    expect(restIds).not.toContain(importMainResult.data.asset.id)
+    expect(restIds).toContain(importKeepResult.data.asset.id)
+    expect(harness.state.performers.has(mainAddResult.data.performerId)).toBe(false)
+    expect(harness.state.performers.has(keepAddResult.data.performerId)).toBe(true)
+  })
+
   it('scenario 1c: create text element with default and explicit arguments', async () => {
     const harness = createHarness({
       currentTime: 1337,

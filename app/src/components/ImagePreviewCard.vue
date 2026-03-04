@@ -2,7 +2,6 @@
 import type { ImageFile } from '@/store'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
-import { useMediaStore } from '@/store/useMediaStore'
 
 interface Props {
   imageFile: ImageFile
@@ -13,7 +12,6 @@ const props = defineProps<Props>()
 const DEFAULT_IMAGE_DURATION = 3000
 
 const editorStore = useEditorStore()
-const mediaStore = useMediaStore()
 const editorCommandActions = useEditorCommandActions()
 
 const isSelected = ref(false)
@@ -39,9 +37,15 @@ async function handleMenuAddToTimeline() {
   await addToTimeline()
 }
 
-function removeFromMediaLibrary() {
-  mediaStore.removeImageFile(props.imageFile.id)
+async function removeFromMediaLibrary() {
   showMenu.value = false
+  const confirmed = window.confirm('删除后会同时移除画布中使用该媒体的内容，是否继续？')
+  if (!confirmed)
+    return
+
+  const result = await editorCommandActions.mediaRemoveAsset({ assetId: props.imageFile.id })
+  if (!result.ok)
+    window.alert(result.error.message)
 }
 
 function toggleMenu() {
