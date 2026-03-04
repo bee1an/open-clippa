@@ -159,6 +159,7 @@ export function useProjectPersistence() {
         mediaStore.persistenceRevision,
         editorStore.canvasPresetId,
         performerStore.selectionRevision,
+        performerStore.contentRevision,
         filterStore.layersSignature,
         filterStore.activeLayerId,
         transitionStore.transitionsSignature,

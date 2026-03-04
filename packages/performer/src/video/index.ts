@@ -124,6 +124,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   private _animationController?: AnimationController
   private _cropInsets: CropInsets = { ...EMPTY_CROP }
   private _cropMask?: Graphics
+  private _trackLocalSize: { width: number, height: number } | null = null
 
   private _frameIntervalMs: number = Video._DEFAULT_FRAME_INTERVAL_MS
 
@@ -212,6 +213,8 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     if (!this._videoTrack) {
       throw new Error('未找到视频轨道')
     }
+
+    this._trackLocalSize = this._resolveTrackLocalSize()
 
     // 检查是否可以解码
     if (!(await this._videoTrack.canDecode())) {
@@ -418,10 +421,9 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       if (!sprite)
         return
 
-      const preservedSize = {
-        width: sprite.width,
-        height: sprite.height,
-      }
+      const preservedBounds = this.getBounds()
+      const preservedScaleSignX = sprite.scale.x < 0 ? -1 : 1
+      const preservedScaleSignY = sprite.scale.y < 0 ? -1 : 1
 
       if (videoFrame) {
         this._clearCachedFrame()
@@ -435,10 +437,13 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       if (sprite.texture !== texture)
         sprite.texture = texture
 
-      if (preservedSize.width > 0)
-        sprite.width = preservedSize.width
-      if (preservedSize.height > 0)
-        sprite.height = preservedSize.height
+      const visibleLocal = this._resolveVisibleLocalSize()
+      if (visibleLocal.width > Video._SCALE_EPSILON) {
+        sprite.scale.x = preservedScaleSignX * (Math.max(0, preservedBounds.width) / visibleLocal.width)
+      }
+      if (visibleLocal.height > Video._SCALE_EPSILON) {
+        sprite.scale.y = preservedScaleSignY * (Math.max(0, preservedBounds.height) / visibleLocal.height)
+      }
       this._syncCropState()
 
       this._lastRenderedTime = normalizedTime
@@ -766,6 +771,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     this._videoTrack = null
     this._videoSink = undefined
+    this._trackLocalSize = null
 
     // 清理 Sprite
     if (this._sprite) {
@@ -914,23 +920,68 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   }
 
   private _resolveRawLocalSize(): { width: number, height: number } {
-    if (!this._sprite)
-      return { width: 0.5, height: 0.5 }
+    const trackLocalSize = this._trackLocalSize ?? this._resolveTrackLocalSize()
+
+    if (!this._sprite) {
+      return {
+        width: Math.max(0.5, trackLocalSize?.width ?? 0.5),
+        height: Math.max(0.5, trackLocalSize?.height ?? 0.5),
+      }
+    }
 
     const currentScaleX = this._sprite.scale.x
     const currentScaleY = this._sprite.scale.y
-    const textureWidth = this._sprite.texture?.width ?? 0
-    const textureHeight = this._sprite.texture?.height ?? 0
+    const texture = this._sprite.texture
+    const textureWidth = texture?.width ?? 0
+    const textureHeight = texture?.height ?? 0
+
+    // Before the first decoded frame arrives, sprite dimensions can represent only
+    // the restored visible box, not the media-local size. Prefer track metadata.
+    if (
+      trackLocalSize
+      && (
+        !texture
+        || texture === Texture.EMPTY
+        || textureWidth <= Video._SCALE_EPSILON
+        || textureHeight <= Video._SCALE_EPSILON
+      )
+    ) {
+      return {
+        width: Math.max(0.5, trackLocalSize.width),
+        height: Math.max(0.5, trackLocalSize.height),
+      }
+    }
+
     const localWidth = Math.abs(currentScaleX) > Video._SCALE_EPSILON
       ? this._sprite.width / Math.abs(currentScaleX)
-      : (textureWidth || this._sprite.width)
+      : (textureWidth || trackLocalSize?.width || this._sprite.width)
     const localHeight = Math.abs(currentScaleY) > Video._SCALE_EPSILON
       ? this._sprite.height / Math.abs(currentScaleY)
-      : (textureHeight || this._sprite.height)
+      : (textureHeight || trackLocalSize?.height || this._sprite.height)
 
     return {
       width: Math.max(0.5, localWidth),
       height: Math.max(0.5, localHeight),
+    }
+  }
+
+  private _resolveTrackLocalSize(): { width: number, height: number } | null {
+    if (!this._videoTrack)
+      return null
+
+    const displayWidth = Number.isFinite(this._videoTrack.displayWidth) ? this._videoTrack.displayWidth : 0
+    const displayHeight = Number.isFinite(this._videoTrack.displayHeight) ? this._videoTrack.displayHeight : 0
+    const codedWidth = Number.isFinite(this._videoTrack.codedWidth) ? this._videoTrack.codedWidth : 0
+    const codedHeight = Number.isFinite(this._videoTrack.codedHeight) ? this._videoTrack.codedHeight : 0
+
+    const width = displayWidth > Video._SCALE_EPSILON ? displayWidth : codedWidth
+    const height = displayHeight > Video._SCALE_EPSILON ? displayHeight : codedHeight
+    if (width <= Video._SCALE_EPSILON || height <= Video._SCALE_EPSILON)
+      return null
+
+    return {
+      width,
+      height,
     }
   }
 

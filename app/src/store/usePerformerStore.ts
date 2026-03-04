@@ -92,10 +92,15 @@ export const usePerformerStore = defineStore('performer', () => {
   const selectedPerformers = ref<SelectedPerformer[]>([])
   const pendingSelectionDrag = ref<PendingSelectionDrag | null>(null)
   const selectionRevision = ref(0)
+  const contentRevision = ref(0)
   const animationMap = ref<Record<string, PerformerAnimationSpec>>({})
 
   const bumpSelectionRevision = () => {
     selectionRevision.value += 1
+  }
+
+  const markContentDirty = (): void => {
+    contentRevision.value += 1
   }
 
   const hasTimelineTrainId = (targetId: string): boolean => {
@@ -179,6 +184,9 @@ export const usePerformerStore = defineStore('performer', () => {
         timestamp: Date.now(),
       }
     }
+
+    // Position updates include crop/resize/move transforms and should trigger persistence.
+    markContentDirty()
   }
 
   const fitPerformerToStage = async (performer: CanvasPerformer) => {
@@ -277,6 +285,7 @@ export const usePerformerStore = defineStore('performer', () => {
 
     const performer = createPerformer(nextConfig)
     performerMap.set(performer.id, performer)
+    markContentDirty()
 
     const animation = animationMap.value[performer.id]
     if (animation) {
@@ -330,6 +339,8 @@ export const usePerformerStore = defineStore('performer', () => {
         selectedPerformers.value.splice(selectedIndex, 1)
         bumpSelectionRevision()
       }
+
+      markContentDirty()
     }
   }
 
@@ -337,11 +348,15 @@ export const usePerformerStore = defineStore('performer', () => {
   const updatePerformer = (performerId: string, updates: Partial<PerformerConfig>) => {
     const performer = performerMap.get(performerId)
     if (performer) {
+      let hasPositionDrivenMutation = false
+      let hasManualMutation = false
+
       if (updates.x !== undefined || updates.y !== undefined) {
         const currentBounds = performer.getBaseBounds()
         const newX = updates.x ?? currentBounds.x
         const newY = updates.y ?? currentBounds.y
         performer.setPosition(newX, newY)
+        hasPositionDrivenMutation = true
       }
 
       if (updates.width !== undefined || updates.height !== undefined) {
@@ -353,19 +368,26 @@ export const usePerformerStore = defineStore('performer', () => {
         const widthRatio = currentBounds.width ? newWidth / currentBounds.width : 1
         const heightRatio = currentBounds.height ? newHeight / currentBounds.height : 1
         performer.setScale(currentScaleX * widthRatio, currentScaleY * heightRatio)
+        hasPositionDrivenMutation = true
       }
 
       if (updates.rotation !== undefined) {
         performer.setRotation(updates.rotation)
+        hasPositionDrivenMutation = true
       }
 
       if ((updates as any).alpha !== undefined) {
         performer.setAlpha((updates as any).alpha)
+        hasManualMutation = true
       }
 
       if (updates.zIndex !== undefined) {
         performer.zIndex = updates.zIndex
+        hasManualMutation = true
       }
+
+      if (hasManualMutation || !hasPositionDrivenMutation)
+        markContentDirty()
     }
   }
 
@@ -462,6 +484,7 @@ export const usePerformerStore = defineStore('performer', () => {
     }
 
     animationMap.value = {}
+    markContentDirty()
   }
 
   return {
@@ -469,6 +492,7 @@ export const usePerformerStore = defineStore('performer', () => {
     selectedPerformers,
     pendingSelectionDrag,
     selectionRevision,
+    contentRevision,
     animationMap,
 
     // 方法
@@ -493,5 +517,6 @@ export const usePerformerStore = defineStore('performer', () => {
     setAnimation,
     updateAnimation,
     clearAnimation,
+    markContentDirty,
   }
 })

@@ -251,4 +251,44 @@ describe('usePerformerStore cleanup integration', () => {
     expect(fireMock).toHaveBeenNthCalledWith(1, first)
     expect(fireMock).toHaveBeenNthCalledWith(2, second)
   })
+
+  it('bumps content revision when performer emits position update', () => {
+    const store = usePerformerStore()
+    const performer = store.addPerformer({
+      id: 'video-crop',
+      type: 'video',
+      src: 'https://example.com/video.mp4',
+      start: 0,
+      duration: 2000,
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+    })
+
+    const before = store.contentRevision
+    performer.setPosition(48, 36)
+
+    expect(store.contentRevision).toBeGreaterThan(before)
+  })
+
+  it('bumps content revision when updating alpha without position events', () => {
+    const store = usePerformerStore()
+    const performer = store.addPerformer({
+      id: 'video-alpha',
+      type: 'video',
+      src: 'https://example.com/video.mp4',
+      start: 0,
+      duration: 2000,
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+    })
+
+    const before = store.contentRevision
+    store.updatePerformer(performer.id, { alpha: 0.5 } as any)
+
+    expect(store.contentRevision).toBeGreaterThan(before)
+  })
 })

@@ -1,9 +1,34 @@
-import { Texture } from 'pixi.js'
+import { Sprite, Texture } from 'pixi.js'
 import { describe, expect, it, vi } from 'vitest'
 import { PlayState, ShowState } from '../src/performer'
 import { Video } from '../src/video'
 
 type VideoHarness = Video & Record<string, any>
+type TrackLocalSize = {
+  displayWidth: number
+  displayHeight: number
+  codedWidth: number
+  codedHeight: number
+}
+type CropInsets = {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+const DEFAULT_TRACK_LOCAL_SIZE: TrackLocalSize = {
+  displayWidth: 1920,
+  displayHeight: 1080,
+  codedWidth: 1920,
+  codedHeight: 1080,
+}
+const DEFAULT_CROP: CropInsets = {
+  left: 500,
+  top: 0,
+  right: 400,
+  bottom: 0,
+}
 
 function createVideoHarness(): VideoHarness {
   const video = Object.create(Video.prototype) as VideoHarness
@@ -19,6 +44,24 @@ function createVideoHarness(): VideoHarness {
   video._lastRenderedTime = -1
   video._renderIdleWaiters = new Set()
   return video
+}
+
+function hydratePendingCroppedSprite(video: VideoHarness, targetWidth: number = 276, targetHeight: number = 155): void {
+  video._videoTrack = { ...DEFAULT_TRACK_LOCAL_SIZE }
+  video._cropInsets = { ...DEFAULT_CROP }
+  video._sprite = new Sprite()
+  ;(video._sprite as any).addChild = vi.fn()
+  ;(video._sprite as any).removeChild = vi.fn()
+  video._sprite.width = targetWidth
+  video._sprite.height = targetHeight
+
+  video._syncCropState()
+  const bounds = video.getBounds()
+  if (bounds.width > 0)
+    video._sprite.scale.x *= targetWidth / bounds.width
+  if (bounds.height > 0)
+    video._sprite.scale.y *= targetHeight / bounds.height
+  video._syncCropState()
 }
 
 describe('video core behavior', () => {
@@ -186,6 +229,45 @@ describe('video core behavior', () => {
     })
   })
 
+  it('preserves crop insets before first frame with empty texture', () => {
+    const video = createVideoHarness()
+
+    hydratePendingCroppedSprite(video)
+
+    expect(video._cropInsets).toEqual(DEFAULT_CROP)
+  })
+
+  it('keeps cropped bounds when first decoded texture is applied', async () => {
+    const video = createVideoHarness()
+    const frameClose = vi.fn()
+    const sampleClose = vi.fn()
+    const textureFromSpy = vi.spyOn(Texture, 'from').mockReturnValue({
+      dynamic: false,
+      orig: { width: 1920, height: 1080 },
+      width: 1920,
+      height: 1080,
+      destroy: vi.fn(),
+    } as any)
+
+    hydratePendingCroppedSprite(video)
+
+    const before = video.getBounds()
+    video._getVideoSampleAtTime = vi.fn().mockResolvedValue({
+      toVideoFrame: () => ({ close: frameClose }),
+      close: sampleClose,
+    })
+
+    await video._renderFrameAtTime(120)
+    textureFromSpy.mockRestore()
+
+    const after = video.getBounds()
+    expect(after.width).toBeCloseTo(before.width, 3)
+    expect(after.height).toBeCloseTo(before.height, 3)
+    expect(video._cropInsets).toEqual(DEFAULT_CROP)
+    expect(sampleClose).toHaveBeenCalledTimes(1)
+    expect(frameClose).not.toHaveBeenCalled()
+  })
+
   it('destroys runtime resources and resets playback state', () => {
     const video = createVideoHarness()
     const disposeSpy = vi.fn()
@@ -249,7 +331,21 @@ describe('video core behavior', () => {
     const video = createVideoHarness()
     const frameClose = vi.fn()
     const sampleClose = vi.fn()
-    const nextTexture = { destroy: vi.fn() }
+    const oldFrameClose = vi.fn()
+    const oldTexture = {
+      dynamic: false,
+      orig: { width: 320, height: 180 },
+      width: 320,
+      height: 180,
+      destroy: vi.fn(),
+    }
+    const nextTexture = {
+      dynamic: false,
+      orig: { width: 640, height: 360 },
+      width: 640,
+      height: 360,
+      destroy: vi.fn(),
+    }
     const textureFromSpy = vi.spyOn(Texture, 'from').mockReturnValue(nextTexture as any)
 
     let resolveSample!: (sample: any) => void
@@ -257,23 +353,15 @@ describe('video core behavior', () => {
       resolveSample = resolve
     })
 
-    video._sprite = {
-      texture: { id: 'old-texture' },
-      width: 300,
-      height: 180,
-      scale: { x: 1, y: 1 },
-      x: 0,
-      y: 0,
-      angle: 0,
-      alpha: 1,
+    video._sprite = new Sprite(oldTexture as any)
+    video._sprite.width = 300
+    video._sprite.height = 180
+    video._cachedFrame = {
+      key: -1,
+      texture: oldTexture as any,
+      frame: { close: oldFrameClose },
     }
     video._getVideoSampleAtTime = vi.fn().mockReturnValue(pendingSample)
-    video._resolveCachedTexture = vi.fn().mockReturnValue(null)
-    video._clearCachedFrame = vi.fn(() => {
-      // Simulate PIXI recalculation side effect when texture is detached.
-      video._sprite.width = 1
-      video._sprite.height = 1
-    })
 
     const renderPromise = video._renderFrameAtTime(120)
 
@@ -287,10 +375,13 @@ describe('video core behavior', () => {
 
     await renderPromise
 
-    expect(video._sprite.width).toBe(180)
-    expect(video._sprite.height).toBe(320)
+    const bounds = video.getBounds()
+    expect(bounds.width).toBeCloseTo(180, 3)
+    expect(bounds.height).toBeCloseTo(320, 3)
     expect(sampleClose).toHaveBeenCalledTimes(1)
     expect(frameClose).not.toHaveBeenCalled()
+    expect(oldFrameClose).toHaveBeenCalledTimes(1)
+    expect(oldTexture.destroy).toHaveBeenCalledTimes(1)
     textureFromSpy.mockRestore()
   })
 })
