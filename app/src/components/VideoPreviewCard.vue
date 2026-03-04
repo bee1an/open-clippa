@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { VideoFile } from '@/store'
 import { ms2TimeStr } from 'clippc'
+import { Button } from '@/components/ui/button'
+import { Modal } from '@/components/ui/modal'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 
@@ -17,6 +19,8 @@ const editorCommandActions = useEditorCommandActions()
 const isSelected = ref(false)
 const cardRef = ref<HTMLElement | null>(null)
 const showMenu = ref(false)
+const showDeleteConfirmModal = ref(false)
+const removeErrorMessage = ref('')
 
 onClickOutside(cardRef, () => {
   showMenu.value = false
@@ -37,15 +41,17 @@ async function handleMenuAddToTimeline() {
   await addToTimeline()
 }
 
-async function removeFromMediaLibrary() {
+function requestRemoveFromMediaLibrary() {
   showMenu.value = false
-  const confirmed = window.confirm('删除后会同时移除画布中使用该媒体的内容，是否继续？')
-  if (!confirmed)
-    return
+  removeErrorMessage.value = ''
+  showDeleteConfirmModal.value = true
+}
 
+async function removeFromMediaLibrary() {
+  showDeleteConfirmModal.value = false
   const result = await editorCommandActions.mediaRemoveAsset({ assetId: props.videoFile.id })
   if (!result.ok)
-    window.alert(result.error.message)
+    removeErrorMessage.value = result.error.message
 }
 
 function toggleMenu() {
@@ -130,7 +136,7 @@ function toggleSelect() {
         <button
           w-full text-left text-xs px-2 py-1.5 rounded
           class="hover:bg-secondary text-red-400"
-          @click.stop="removeFromMediaLibrary"
+          @click.stop="requestRemoveFromMediaLibrary"
         >
           从媒体库移除
         </button>
@@ -159,5 +165,39 @@ function toggleSelect() {
         <div v-if="isSelected" i-ph-check-bold text="xs background" />
       </button>
     </div>
+
+    <p v-if="removeErrorMessage" class="mt-1 text-xs text-red-400 break-all">
+      {{ removeErrorMessage }}
+    </p>
+
+    <Modal
+      :model-value="showDeleteConfirmModal"
+      title="确认移除媒体"
+      size="sm"
+      @update:model-value="showDeleteConfirmModal = $event"
+    >
+      <p class="text-sm text-foreground-muted">
+        删除后会同时移除画布中使用该媒体的内容，是否继续？
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            @click="showDeleteConfirmModal = false"
+          >
+            取消
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            class="text-red-400"
+            @click="removeFromMediaLibrary"
+          >
+            移除
+          </Button>
+        </div>
+      </template>
+    </Modal>
   </div>
 </template>

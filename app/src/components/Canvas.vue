@@ -1,24 +1,16 @@
 <script setup lang="ts">
 import type { CanvasSize, Train } from 'clippc'
-import type { VideoPerformerConfig } from '@/store/usePerformerStore'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Select } from '@/components/ui/select'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
-import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
-import { loadVideoMetadata } from '@/utils/media'
 import SelectionGroup from './SelectionGroup.vue'
 
-const DEFAULT_TEST_VIDEOS = [
-  { id: 'video-test-legacy', src: 'https://pixijs.com/assets/video.mp4' },
-  { id: 'video-test-bunny', src: '/bunny.mp4' },
-] as const
 const MAX_TIMELINE_SYNC_RETRIES = 24
 
 const editorStore = useEditorStore()
-const mediaStore = useMediaStore()
 const performerStore = usePerformerStore()
 const editorCommandActions = useEditorCommandActions()
 const { currentTime, duration, canvasPresetId, canvasSize } = storeToRefs(editorStore)
@@ -225,28 +217,11 @@ function findTrainById(id: string): Train | null {
   return null
 }
 
-function resolveDefaultVideoUrl(src: string): string {
-  return new URL(src, window.location.href).toString()
-}
-
 function handleCanvasPresetChange(value: string): void {
   if (value === canvasPresetId.value)
     return
 
   editorStore.setCanvasPreset(value)
-}
-
-function ensureDefaultVideoAssets() {
-  return DEFAULT_TEST_VIDEOS.map((video) => {
-    const sourceUrl = resolveDefaultVideoUrl(video.src)
-    const existingAsset = mediaStore.videoFiles.find(asset => asset.sourceType === 'url' && asset.url === sourceUrl)
-    const asset = existingAsset ?? mediaStore.addVideoFromUrl(sourceUrl)
-    return {
-      ...video,
-      sourceUrl,
-      source: asset.source,
-    }
-  })
 }
 
 function syncTimelineToSelection(train: Train | null) {
@@ -339,50 +314,6 @@ function trySyncSelectionToTimeline(selectedId: string, attempt: number) {
   })
 }
 
-async function ensureDefaultVideoPerformer(): Promise<void> {
-  const defaultVideos = ensureDefaultVideoAssets()
-  const defaultTestVideoIds = defaultVideos.map(video => video.id)
-  const defaultTestVideoIdSet = new Set<string>(defaultTestVideoIds)
-  if (performerStore.getAllPerformers().some(item => defaultTestVideoIdSet.has(item.id)))
-    return
-  if (defaultTestVideoIds.some(id => Boolean(findTrainById(id))))
-    return
-
-  const layoutWidth = canvasSize.value.width / DEFAULT_TEST_VIDEOS.length
-  const layoutHeight = canvasSize.value.height
-  const clipConfigs: Array<Omit<VideoPerformerConfig, 'type'>> = []
-
-  for (const [index, defaultVideo] of defaultVideos.entries()) {
-    const { duration, width, height } = await loadVideoMetadata(defaultVideo.sourceUrl)
-    const sourceDuration = Math.max(1000, Math.round(duration || 5000))
-
-    const sourceWidth = width > 0 ? width : layoutWidth
-    const sourceHeight = height > 0 ? height : layoutHeight
-    const containScale = Math.min(layoutWidth / sourceWidth, layoutHeight / sourceHeight)
-    const displayWidth = Math.max(1, Math.floor(sourceWidth * containScale))
-    const displayHeight = Math.max(1, Math.floor(sourceHeight * containScale))
-
-    clipConfigs.push({
-      id: defaultVideo.id,
-      src: defaultVideo.source,
-      start: 0,
-      duration: sourceDuration,
-      sourceStart: 0,
-      sourceDuration,
-      x: Math.round(index * layoutWidth + (layoutWidth - displayWidth) / 2),
-      y: Math.round((layoutHeight - displayHeight) / 2),
-      width: displayWidth,
-      height: displayHeight,
-      zIndex: index,
-    })
-  }
-
-  for (const clipConfig of clipConfigs) {
-    const performer = performerStore.addPerformer(clipConfig)
-    await clippa.hire(performer)
-  }
-}
-
 onMounted(async () => {
   await clippa.ready
   clippa.stage.mount('canvas')
@@ -416,13 +347,6 @@ onMounted(async () => {
     },
     { flush: 'post' },
   )
-
-  try {
-    await ensureDefaultVideoPerformer()
-  }
-  catch (error) {
-    console.warn('Default test video bootstrap failed:', error)
-  }
 
   syncTimelineToSelection(clippa.timeline.state.activeTrain)
 })
