@@ -1,60 +1,40 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { useDragDrop } from '@/composables/useDragDrop'
-import { useVideoFiles } from '@/composables/useVideoFiles'
+import { pickMediaFileHandles } from '@/persistence/fileSystemAccess'
 import { useMediaStore } from '@/store/useMediaStore'
 
 const mediaStore = useMediaStore()
-const { isVideoFile, isImageFile, filterMediaFiles, handleDroppedFiles } = useVideoFiles()
-const { isDragging, onDragEnter, onDragLeave, onDragOver, onDrop } = useDragDrop()
 const mediaUrl = ref('')
 const mediaUrlError = ref('')
+const localImportError = ref('')
 const isImportingByUrl = ref(false)
+const isImportingLocal = ref(false)
 const showUrlInput = ref(false)
 
-function fileSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = input.files
-  if (files?.length)
-    addMediaFiles(files)
-  input.value = ''
-}
-
-function addMediaFile(file: File) {
-  if (isVideoFile(file)) {
-    mediaStore.addVideoFile(file)
+async function handleImportLocalMedia(): Promise<void> {
+  if (isImportingLocal.value)
     return
+
+  localImportError.value = ''
+  isImportingLocal.value = true
+
+  try {
+    const handles = await pickMediaFileHandles()
+    if (!handles.length)
+      return
+
+    await mediaStore.importFromFileHandles(handles)
   }
+  catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError')
+      return
 
-  if (isImageFile(file))
-    mediaStore.addImageFile(file)
-}
-
-function addMediaFiles(files: FileList | File[]) {
-  const mediaFiles = filterMediaFiles(files)
-  mediaFiles.forEach(addMediaFile)
-}
-
-async function handleDrop(event: DragEvent) {
-  const items = event.dataTransfer?.items
-
-  if (items) {
-    // 处理文件夹和文件的混合拖拽
-    const files = await handleDroppedFiles(items)
-
-    if (files.length > 0)
-      addMediaFiles(files)
+    localImportError.value = error instanceof Error ? error.message : 'Local media import failed'
   }
-  else if (event.dataTransfer?.files.length) {
-    // 兼容直接拖拽文件的情况
-    addMediaFiles(event.dataTransfer.files)
+  finally {
+    isImportingLocal.value = false
   }
-}
-
-// 绑定拖拽事件处理函数
-function onDragDrop(event: DragEvent) {
-  onDrop(event, handleDrop)
 }
 
 function importVideoFromUrl() {
@@ -80,40 +60,22 @@ function importVideoFromUrl() {
 </script>
 
 <template>
-  <div
-    h-full min-h-0 flex="~ col" relative
-    :class="{
-      'border-2 border-dashed border-primary bg-primary/10 transition-all duration-200': isDragging,
-    }"
-    @drop="onDragDrop"
-    @dragover="onDragOver"
-    @dragenter="onDragEnter"
-    @dragleave="onDragLeave"
-  >
-    <!-- Header & Upload -->
+  <div h-full min-h-0 flex="~ col" relative>
     <div class="p-3 border-b border-border/70 space-y-3">
       <div class="flex items-center justify-between">
         <span class="text-sm font-medium text-foreground">你的媒体</span>
       </div>
 
-      <input
-        id="media-upload"
-        type="file"
-        accept="video/*,image/*"
-        multiple
-        hidden
-        @change="fileSelected"
-      >
       <div flex w-full isolate>
-        <label for="media-upload" class="flex-1 cursor-pointer relative z-0 hover:z-10">
-          <div
-            class="flex items-center justify-center w-full h-8 px-3 gap-1.5 whitespace-nowrap text-xs font-medium transition-all duration-150 ease-out border border-border rounded-l-md rounded-r-none bg-background text-foreground hover:bg-accent hover:text-accent-foreground select-none"
-            :class="isDragging ? 'border-primary bg-primary/20' : ''"
-          >
-            <div i-carbon-add text-base />
-            <span>导入媒体</span>
-          </div>
-        </label>
+        <Button
+          variant="outline"
+          class="flex-1 h-8 rounded-l-md rounded-r-none"
+          :disabled="isImportingLocal"
+          @click="handleImportLocalMedia"
+        >
+          <div i-carbon-add text-base />
+          <span>{{ isImportingLocal ? '导入中...' : '导入媒体' }}</span>
+        </Button>
 
         <Button
           variant="outline"
@@ -166,34 +128,15 @@ function importVideoFromUrl() {
           <span>{{ mediaUrlError }}</span>
         </div>
       </div>
+
+      <div v-if="localImportError" class="text-xs text-red-500 flex items-center gap-1 break-all">
+        <div i-carbon-warning-filled class="shrink-0" />
+        <span>{{ localImportError }}</span>
+      </div>
     </div>
 
-    <!-- 视频预览列表 -->
     <div flex-1 overflow-hidden>
       <VideoPreviewList />
-    </div>
-
-    <!-- 拖拽遮罩层 -->
-    <div
-      v-if="isDragging"
-      class="z-20"
-      absolute inset-0 backdrop-blur-sm flex items-center justify-center
-      bg="background/80"
-      @dragenter="onDragEnter"
-      @dragover="onDragOver"
-      @dragleave="onDragLeave"
-      @drop="onDragDrop"
-    >
-      <div
-        text-base font-normal text-primary px-6 py-3 rounded-xl shadow-xl
-        flex items-center gap-3 max-w-fit
-        bg="background/90"
-        border="1 border"
-        transform-gpu transition-all duration-200
-      >
-        <div class="i-carbon-cloud-upload text-xl" />
-        <span>拖入视频或图片文件（支持文件夹）</span>
-      </div>
     </div>
   </div>
 </template>

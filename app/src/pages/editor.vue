@@ -7,6 +7,7 @@ import ExportProgressModal from '@/components/ExportProgressModal.vue'
 import { Button } from '@/components/ui/button'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useFilterEngine } from '@/composables/useFilterEngine'
+import { useProjectPersistence } from '@/composables/useProjectPersistence'
 import { useThemeColor } from '@/composables/useThemeColor'
 import { useTimelineBinding } from '@/composables/useTimelineBinding'
 import { useTransitionEngine } from '@/composables/useTransitionEngine'
@@ -15,6 +16,7 @@ import { useEditorStore } from '@/store/useEditorStore'
 import { useExportTaskStore } from '@/store/useExportTaskStore'
 import { useHistoryStore } from '@/store/useHistoryStore'
 import { useLayoutStore } from '@/store/useLayoutStore'
+import { useProjectStore } from '@/store/useProjectStore'
 
 definePage({ redirect: '/editor/media' })
 
@@ -23,6 +25,8 @@ const exportTaskStore = useExportTaskStore()
 const aiSettingsStore = useAiSettingsStore()
 const layoutStore = useLayoutStore()
 const historyStore = useHistoryStore()
+const projectStore = useProjectStore()
+const projectPersistence = useProjectPersistence()
 const editorCommandActions = useEditorCommandActions()
 const router = useRouter()
 const {
@@ -83,6 +87,8 @@ const canRedo = computed(() => {
     && !historyStore.state.value.isApplying
     && !historyStore.state.value.activeTransaction
 })
+const isHydratingProject = computed(() => projectPersistence.isHydrating.value)
+const projectInitErrorMessage = ref('')
 
 useFilterEngine()
 useTimelineBinding()
@@ -90,13 +96,24 @@ useTransitionEngine()
 
 // 等待 clippa 准备就绪
 onMounted(async () => {
+  if (!projectStore.activeProjectId) {
+    await router.replace('/')
+    return
+  }
+
   try {
+    await projectPersistence.initialize()
     await editorStore.clippa.ready
     isClippaReady.value = true
   }
   catch (error) {
     console.error('Clippa ready failed:', error)
+    projectInitErrorMessage.value = error instanceof Error ? error.message : 'Failed to initialize project'
   }
+})
+
+onUnmounted(() => {
+  void projectPersistence.flushSave()
 })
 
 async function exportHandler() {
@@ -273,7 +290,7 @@ watch(exportStatus, (nextStatus) => {
 
         <Button
           h-8 px-3 rounded text-xs font-medium bg-foreground text-background hover:bg-foreground-90 transition-colors gap-1.5 shadow-sm
-          :disabled="!isClippaReady || isExporting"
+          :disabled="!isClippaReady || isExporting || isHydratingProject"
           @click="exportHandler"
         >
           <div i-ph-export-bold text-sm />
@@ -284,6 +301,22 @@ watch(exportStatus, (nextStatus) => {
 
     <!-- Main Workspace -->
     <div flex flex-1 w-full overflow-hidden relative>
+      <div
+        v-if="projectInitErrorMessage"
+        class="absolute top-3 left-1/2 z-70 -translate-x-1/2 rounded-md border border-red-400/40 bg-background-elevated px-3 py-1.5 text-xs text-red-400"
+      >
+        {{ projectInitErrorMessage }}
+      </div>
+
+      <div
+        v-if="isHydratingProject"
+        class="absolute inset-0 z-60 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+      >
+        <div class="rounded-md border border-border bg-background-elevated px-4 py-2 text-sm text-foreground">
+          Restoring project...
+        </div>
+      </div>
+
       <!-- Left Chat Panel -->
       <aside
         :style="{

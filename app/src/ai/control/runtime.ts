@@ -934,7 +934,7 @@ export function createEditorControlRuntime(
         const performer = performerStore.addPerformer({
           id: generateId('video'),
           type: 'video',
-          src: videoAsset.source,
+          src: videoAsset.url,
           start: startMs,
           duration: isFiniteNumber(input.durationMs) && input.durationMs > 0
             ? input.durationMs
@@ -962,7 +962,7 @@ export function createEditorControlRuntime(
       const performer = performerStore.addPerformer({
         id: generateId('image'),
         type: 'image',
-        src: imageAsset!.source,
+        src: imageAsset!.url,
         start: startMs,
         duration: isFiniteNumber(input.durationMs) && input.durationMs > 0
           ? input.durationMs
@@ -1099,8 +1099,12 @@ export function createEditorControlRuntime(
       if (!assetId)
         return failure('INVALID_ARGUMENT', 'assetId is required')
 
-      const removePerformersBySource = (source: unknown): void => {
-        if (source === undefined || source === null)
+      const removePerformersByAsset = (asset: { source?: unknown, url?: string }): void => {
+        const candidates = new Set<unknown>([
+          asset.source,
+          asset.url,
+        ])
+        if (candidates.size === 0)
           return
 
         const matchedPerformerIds = performerStore
@@ -1109,7 +1113,7 @@ export function createEditorControlRuntime(
             const performerSource = (performer as { src?: unknown }).src
             if (performerSource === undefined || performerSource === null)
               return false
-            return performerSource === source
+            return candidates.has(performerSource)
           })
           .map(performer => performer.id)
 
@@ -1120,14 +1124,14 @@ export function createEditorControlRuntime(
 
       const videoAsset = mediaStore.videoFiles.find(file => file.id === assetId)
       if (videoAsset) {
-        removePerformersBySource(videoAsset.source)
+        removePerformersByAsset(videoAsset)
         mediaStore.removeVideoFile(assetId)
         return success({ assetId })
       }
 
       const imageAsset = mediaStore.imageFiles.find(file => file.id === assetId)
       if (imageAsset) {
-        removePerformersBySource(imageAsset.source)
+        removePerformersByAsset(imageAsset)
         mediaStore.removeImageFile(assetId)
         return success({ assetId })
       }

@@ -1,10 +1,13 @@
 import { defineStore } from 'pinia'
 import { reactive, ref } from 'vue'
+import { readFileFromHandle } from '@/persistence/fileSystemAccess'
 
 const REMOTE_ASSET_PROTOCOLS = new Set(['http:', 'https:'])
 const PEXELS_RANDOM_ENDPOINT = '/api/pexels/random'
 const PEXELS_ORIENTATION_VALUES = ['landscape', 'portrait', 'square'] as const
 const PEXELS_ORIENTATION_SET = new Set<string>(PEXELS_ORIENTATION_VALUES)
+const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp']
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic']
 
 export type PexelsOrientation = typeof PEXELS_ORIENTATION_VALUES[number]
 export type MediaStoreErrorCode = 'INVALID_ARGUMENT' | 'NOT_READY'
@@ -118,6 +121,23 @@ function inferImageNameFromUrl(url: string): string {
 
 function isRemoteUrlSource(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
+}
+
+function hasExtension(name: string, extensions: string[]): boolean {
+  const normalizedName = name.toLowerCase()
+  return extensions.some(extension => normalizedName.endsWith(extension))
+}
+
+function isVideoFileLike(file: File): boolean {
+  if (file.type.toLowerCase().startsWith('video/'))
+    return true
+  return hasExtension(file.name, VIDEO_EXTENSIONS)
+}
+
+function isImageFileLike(file: File): boolean {
+  if (file.type.toLowerCase().startsWith('image/'))
+    return true
+  return hasExtension(file.name, IMAGE_EXTENSIONS)
 }
 
 function resolveOptionalString(value: string | undefined): string | undefined {
@@ -376,7 +396,8 @@ export interface VideoFile {
   name: string
   file?: File
   source: string | File | Blob
-  sourceType: 'file' | 'url'
+  sourceType: 'file' | 'url' | 'handle'
+  fileHandle?: FileSystemFileHandle
   url: string
   duration: number
   size: number
@@ -393,7 +414,8 @@ export interface ImageFile {
   name: string
   file?: File
   source: string | File | Blob
-  sourceType: 'file' | 'url'
+  sourceType: 'file' | 'url' | 'handle'
+  fileHandle?: FileSystemFileHandle
   url: string
   size?: number
   createdAt?: Date
@@ -403,6 +425,11 @@ export const useMediaStore = defineStore('media', () => {
   const videoFiles = ref<VideoFile[]>([])
   const imageFiles = ref<ImageFile[]>([])
   const isGeneratingThumbnail = ref(false)
+  const persistenceRevision = ref(0)
+
+  function markPersistenceDirty(): void {
+    persistenceRevision.value += 1
+  }
 
   function moveVideoFileToTop(targetId: string): void {
     const index = videoFiles.value.findIndex(file => file.id === targetId)
@@ -445,14 +472,23 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   // 添加视频文件
-  function addVideoFile(file: File): VideoFile {
+  function addVideoFile(
+    file: File,
+    options: {
+      id?: string
+      sourceType?: 'file' | 'handle'
+      fileHandle?: FileSystemFileHandle
+    } = {},
+  ): VideoFile {
+    const objectUrl = URL.createObjectURL(file)
     const videoFile: VideoFile = reactive({
-      id: crypto.randomUUID(),
+      id: options.id ?? crypto.randomUUID(),
       name: file.name,
       file,
-      source: file,
-      sourceType: 'file',
-      url: URL.createObjectURL(file),
+      source: objectUrl,
+      sourceType: options.sourceType ?? 'file',
+      fileHandle: options.fileHandle,
+      url: objectUrl,
       duration: 0,
       size: file.size,
       createdAt: new Date(),
@@ -466,12 +502,13 @@ export const useMediaStore = defineStore('media', () => {
 
     // 异步生成缩略图和获取视频信息
     generateVideoInfo(videoFile)
+    markPersistenceDirty()
 
     return videoFile
   }
 
   // 通过 URL 添加视频资源
-  function addVideoFromUrl(url: string, name?: string): VideoFile {
+  function addVideoFromUrl(url: string, name?: string, id?: string): VideoFile {
     const normalizedUrl = normalizeRemoteVideoUrl(url)
     const existing = findRemoteVideoByUrl(normalizedUrl)
     if (existing) {
@@ -482,7 +519,7 @@ export const useMediaStore = defineStore('media', () => {
     const resolvedName = name?.trim().length ? name.trim() : inferVideoNameFromUrl(normalizedUrl)
 
     const videoFile: VideoFile = reactive({
-      id: crypto.randomUUID(),
+      id: id ?? crypto.randomUUID(),
       name: resolvedName,
       source: normalizedUrl,
       sourceType: 'url',
@@ -497,7 +534,20 @@ export const useMediaStore = defineStore('media', () => {
 
     videoFiles.value.unshift(videoFile)
     generateVideoInfo(videoFile)
+    markPersistenceDirty()
     return videoFile
+  }
+
+  async function addVideoFromFileHandle(handle: FileSystemFileHandle, options: { id?: string } = {}): Promise<VideoFile> {
+    const file = await readFileFromHandle(handle)
+    if (!isVideoFileLike(file))
+      throw new MediaStoreError('INVALID_ARGUMENT', `Unsupported video file type: ${file.name}`)
+
+    return addVideoFile(file, {
+      id: options.id,
+      sourceType: 'handle',
+      fileHandle: handle,
+    })
   }
 
   // 删除视频文件
@@ -518,6 +568,7 @@ export const useMediaStore = defineStore('media', () => {
         revokeObjectUrlIfNeeded(frame.url)
       })
       videoFiles.value.splice(index, 1)
+      markPersistenceDirty()
     }
   }
 
@@ -537,27 +588,38 @@ export const useMediaStore = defineStore('media', () => {
       })
     })
     videoFiles.value = []
+    markPersistenceDirty()
   }
 
   // 添加图片文件
-  function addImageFile(file: File): ImageFile {
+  function addImageFile(
+    file: File,
+    options: {
+      id?: string
+      sourceType?: 'file' | 'handle'
+      fileHandle?: FileSystemFileHandle
+    } = {},
+  ): ImageFile {
+    const objectUrl = URL.createObjectURL(file)
     const imageFile: ImageFile = reactive({
-      id: crypto.randomUUID(),
+      id: options.id ?? crypto.randomUUID(),
       name: file.name,
       file,
-      source: file,
-      sourceType: 'file',
-      url: URL.createObjectURL(file),
+      source: objectUrl,
+      sourceType: options.sourceType ?? 'file',
+      fileHandle: options.fileHandle,
+      url: objectUrl,
       size: file.size,
       createdAt: new Date(),
     })
 
     imageFiles.value.unshift(imageFile)
+    markPersistenceDirty()
     return imageFile
   }
 
   // 通过 URL 添加图片资源
-  function addImageFromUrl(url: string, name?: string): ImageFile {
+  function addImageFromUrl(url: string, name?: string, id?: string): ImageFile {
     const normalizedUrl = normalizeRemoteImageUrl(url)
     const existing = findRemoteImageByUrl(normalizedUrl)
     if (existing) {
@@ -568,7 +630,7 @@ export const useMediaStore = defineStore('media', () => {
     const resolvedName = name?.trim().length ? name.trim() : inferImageNameFromUrl(normalizedUrl)
 
     const imageFile: ImageFile = reactive({
-      id: crypto.randomUUID(),
+      id: id ?? crypto.randomUUID(),
       name: resolvedName,
       source: normalizedUrl,
       sourceType: 'url',
@@ -578,7 +640,20 @@ export const useMediaStore = defineStore('media', () => {
     })
 
     imageFiles.value.unshift(imageFile)
+    markPersistenceDirty()
     return imageFile
+  }
+
+  async function addImageFromFileHandle(handle: FileSystemFileHandle, options: { id?: string } = {}): Promise<ImageFile> {
+    const file = await readFileFromHandle(handle)
+    if (!isImageFileLike(file))
+      throw new MediaStoreError('INVALID_ARGUMENT', `Unsupported image file type: ${file.name}`)
+
+    return addImageFile(file, {
+      id: options.id,
+      sourceType: 'handle',
+      fileHandle: handle,
+    })
   }
 
   // 删除图片文件
@@ -588,6 +663,7 @@ export const useMediaStore = defineStore('media', () => {
       const imageFile = imageFiles.value[index]
       revokeObjectUrlIfNeeded(imageFile.url)
       imageFiles.value.splice(index, 1)
+      markPersistenceDirty()
     }
   }
 
@@ -597,6 +673,33 @@ export const useMediaStore = defineStore('media', () => {
       revokeObjectUrlIfNeeded(imageFile.url)
     })
     imageFiles.value = []
+    markPersistenceDirty()
+  }
+
+  function clearAllMedia(): void {
+    clearVideoFiles()
+    clearImageFiles()
+  }
+
+  async function importFromFileHandles(handles: FileSystemFileHandle[]): Promise<void> {
+    for (const handle of handles) {
+      const file = await readFileFromHandle(handle)
+
+      if (isVideoFileLike(file)) {
+        addVideoFile(file, {
+          sourceType: 'handle',
+          fileHandle: handle,
+        })
+        continue
+      }
+
+      if (isImageFileLike(file)) {
+        addImageFile(file, {
+          sourceType: 'handle',
+          fileHandle: handle,
+        })
+      }
+    }
   }
 
   async function importRandomImageFromPexels(
@@ -695,16 +798,21 @@ export const useMediaStore = defineStore('media', () => {
     videoFiles,
     imageFiles,
     isGeneratingThumbnail,
+    persistenceRevision,
     addVideoFile,
     addVideoFromUrl,
+    addVideoFromFileHandle,
     removeVideoFile,
     clearVideoFiles,
     addImageFile,
     addImageFromUrl,
+    addImageFromFileHandle,
+    importFromFileHandles,
     importRandomImageFromPexels,
     importRandomVideoFromPexels,
     removeImageFile,
     clearImageFiles,
+    clearAllMedia,
     formatFileSize,
     formatDuration,
   }
