@@ -109,6 +109,11 @@ export function useKeyboardShortcuts() {
   })
 
   function togglePlayPause() {
+    if (duration.value <= 0) {
+      isPlaying.value = false
+      return
+    }
+
     try {
       if (isPlaying.value) {
         clippa.pause()

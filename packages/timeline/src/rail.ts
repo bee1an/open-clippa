@@ -1149,6 +1149,8 @@ export class Rail extends EventBus<RailEvents> {
       this._refreshAdjacentVisuals()
     else
       this._refreshVisualLayoutAndAdjacentVisuals()
+
+    this.emit('trainsPosUpdated')
   }
 
   /**
@@ -1172,6 +1174,7 @@ export class Rail extends EventBus<RailEvents> {
     }
 
     this._refreshVisualLayoutAndAdjacentVisuals()
+    this.emit('trainsPosUpdated')
   }
 
   /**

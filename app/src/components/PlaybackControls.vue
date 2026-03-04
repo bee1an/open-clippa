@@ -56,6 +56,7 @@ function formatTime(ms: number) {
 
 const formattedCurrentTime = computed(() => formatTime(currentTime.value))
 const formattedDuration = computed(() => formatTime(duration.value))
+const hasPlayableContent = computed(() => duration.value > 0)
 const playbackProgress = computed(() => {
   if (duration.value <= 0)
     return 0
@@ -131,6 +132,8 @@ function handleZoomFit(): void {
       <div flex items-center gap-3 w-full>
         <button
           flex items-center justify-center w-7 h-7 rounded text-foreground hover:scale-110 transition-transform shrink-0
+          :disabled="!hasPlayableContent"
+          class="disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
           :title="isPlaying ? '暂停 (空格)' : '播放 (空格)'"
           @click="togglePlayPause"
         >
@@ -201,6 +204,8 @@ function handleZoomFit(): void {
         <!-- Rewind -->
         <button
           flex items-center justify-center w-7 h-7 rounded hover:bg-secondary text-foreground-muted hover:text-foreground transition-colors
+          :disabled="!hasPlayableContent"
+          class="disabled:opacity-30 disabled:pointer-events-none"
           title="快退 10 秒 (←)"
           @click="handleRewind"
         >
@@ -210,6 +215,8 @@ function handleZoomFit(): void {
         <!-- Play/Pause -->
         <button
           flex items-center justify-center w-6 h-6 rounded text-foreground hover:scale-110 transition-transform
+          :disabled="!hasPlayableContent"
+          class="disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
           :title="isPlaying ? '暂停 (空格)' : '播放 (空格)'"
           @click="togglePlayPause"
         >
@@ -220,6 +227,8 @@ function handleZoomFit(): void {
         <!-- Fast Forward -->
         <button
           flex items-center justify-center w-7 h-7 rounded hover:bg-secondary text-foreground-muted hover:text-foreground transition-colors
+          :disabled="!hasPlayableContent"
+          class="disabled:opacity-30 disabled:pointer-events-none"
           title="快进 10 秒 (→)"
           @click="handleFastForward"
         >
