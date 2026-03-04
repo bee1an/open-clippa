@@ -7,6 +7,7 @@ import type {
   FilterUpdateConfigInput,
   FilterUpdateZIndexInput,
   MediaAddAssetToTimelineInput,
+  MediaRemoveAssetInput,
   PerformerClearAnimationInput,
   PerformerRemoveInput,
   PerformerSelectInput,
@@ -51,6 +52,7 @@ export function useEditorCommandActions() {
     timelineClearSelection: () => callRuntime(() => runtime.timelineClearSelection()),
 
     mediaAddAssetToTimeline: (input: MediaAddAssetToTimelineInput) => callRuntime(() => runtime.mediaAddAssetToTimeline(input)),
+    mediaRemoveAsset: (input: MediaRemoveAssetInput) => callRuntime(() => runtime.mediaRemoveAsset(input)),
 
     createTextElement: (input: CreateTextElementInput) => callRuntime(() => runtime.createTextElement(input)),
     performerUpdateTransform: (input: PerformerUpdateTransformInput) => callRuntime(() => runtime.performerUpdateTransform(input)),

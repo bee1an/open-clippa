@@ -79,6 +79,7 @@ const editorStore = useEditorStore()
 const editorCommandActions = useEditorCommandActions()
 
 const query = ref('')
+const submittedQuery = ref('')
 const activeCategoryKey = ref<string | null>(null)
 const page = ref(1)
 const total = ref<number | null>(null)
@@ -92,7 +93,6 @@ const importError = ref('')
 const isImporting = ref(false)
 const importingIds = ref<string[]>([])
 const addingToCanvasIds = ref<string[]>([])
-const selectedExternalIds = ref<string[]>([])
 const listContainerRef = ref<HTMLElement | null>(null)
 const gridSkeletonItems = Array.from({ length: 8 }, (_, index) => index)
 const rowSkeletonItems = Array.from({ length: 6 }, (_, index) => index)
@@ -100,6 +100,7 @@ const rowSkeletonItems = Array.from({ length: 6 }, (_, index) => index)
 let categoryLoadVersion = 0
 
 const trimmedQuery = computed(() => query.value.trim())
+const trimmedSubmittedQuery = computed(() => submittedQuery.value.trim())
 const categoryPresets = computed<CategoryPreset[]>(() => (
   props.kind === 'video' ? VIDEO_CATEGORY_PRESETS : IMAGE_CATEGORY_PRESETS
 ))
@@ -108,13 +109,13 @@ const activeCategoryPreset = computed<CategoryPreset | null>(() => {
     return null
   return categoryPresets.value.find(preset => preset.key === activeCategoryKey.value) ?? null
 })
-const isCategoryRowsMode = computed(() => trimmedQuery.value.length === 0 && !activeCategoryPreset.value)
-const isCategoryMoreMode = computed(() => trimmedQuery.value.length === 0 && !!activeCategoryPreset.value)
+const isCategoryRowsMode = computed(() => trimmedSubmittedQuery.value.length === 0 && !activeCategoryPreset.value)
+const isCategoryMoreMode = computed(() => trimmedSubmittedQuery.value.length === 0 && !!activeCategoryPreset.value)
 const activeGridQuery = computed(() => {
   if (isCategoryMoreMode.value)
     return activeCategoryPreset.value?.query
-  if (trimmedQuery.value.length > 0)
-    return trimmedQuery.value
+  if (trimmedSubmittedQuery.value.length > 0)
+    return trimmedSubmittedQuery.value
   return undefined
 })
 
@@ -130,16 +131,18 @@ const allLoadedAssets = computed<LibraryAsset[]>(() => {
   })
   return Array.from(deduped.values())
 })
+const importedVideoSourceSet = computed(() => {
+  return new Set(mediaStore.videoFiles.map(file => (typeof file.source === 'string' ? file.source : file.url)))
+})
+const importedImageSourceSet = computed(() => {
+  return new Set(mediaStore.imageFiles.map(file => (typeof file.source === 'string' ? file.source : file.url)))
+})
+const importedSourceSet = computed(() => {
+  return props.kind === 'video'
+    ? importedVideoSourceSet.value
+    : importedImageSourceSet.value
+})
 
-const allLoadedExternalIds = computed(() => allLoadedAssets.value.map(asset => asset.externalId))
-const loadedAssetIdSet = computed(() => new Set(allLoadedExternalIds.value))
-const selectedCount = computed(() => {
-  return selectedExternalIds.value.filter(id => loadedAssetIdSet.value.has(id)).length
-})
-const allLoadedSelected = computed(() => {
-  return allLoadedExternalIds.value.length > 0
-    && allLoadedExternalIds.value.every(id => selectedExternalIds.value.includes(id))
-})
 const libraryTitle = computed(() => (props.kind === 'video' ? '视频库' : '图片库'))
 const libraryHint = computed(() => (props.kind === 'video' ? '视频素材' : '图片素材'))
 const importLibraryLabel = computed(() => '导入媒体库')
@@ -237,6 +240,34 @@ function maybeLoadMoreOnScroll(): void {
   void loadAssets()
 }
 
+function handleCategoryRowWheel(event: WheelEvent): void {
+  const scroller = event.currentTarget as HTMLElement | null
+  if (!scroller)
+    return
+
+  const maxHorizontalOffset = scroller.scrollWidth - scroller.clientWidth
+  if (maxHorizontalOffset <= 0)
+    return
+
+  const preferredHorizontalDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+    ? event.deltaY
+    : event.deltaX
+  if (preferredHorizontalDelta === 0)
+    return
+
+  const epsilon = 1
+  const currentOffset = scroller.scrollLeft
+  const canScrollLeft = currentOffset > epsilon
+  const canScrollRight = currentOffset < maxHorizontalOffset - epsilon
+  const isMovingLeft = preferredHorizontalDelta < 0
+  const canConsumeWheel = isMovingLeft ? canScrollLeft : canScrollRight
+  if (!canConsumeWheel)
+    return
+
+  event.preventDefault()
+  scroller.scrollLeft += preferredHorizontalDelta
+}
+
 async function loadAssets(options: { reset?: boolean } = {}): Promise<void> {
   if (isCategoryRowsMode.value)
     return
@@ -252,7 +283,6 @@ async function loadAssets(options: { reset?: boolean } = {}): Promise<void> {
     isLoading.value = true
     loadError.value = ''
     assets.value = []
-    selectedExternalIds.value = []
     total.value = null
     hasMore.value = true
     page.value = 1
@@ -345,7 +375,6 @@ async function loadCategoryRows(): Promise<void> {
   const version = ++categoryLoadVersion
 
   loadError.value = ''
-  selectedExternalIds.value = []
   categoryRows.value = categoryPresets.value.map(preset => ({
     ...preset,
     assets: [],
@@ -365,7 +394,7 @@ async function retryCategoryRow(rowKey: string): Promise<void> {
 }
 
 async function openCategoryMore(rowKey: string): Promise<void> {
-  if (trimmedQuery.value.length > 0)
+  if (trimmedSubmittedQuery.value.length > 0)
     return
 
   const row = categoryRows.value.find(item => item.key === rowKey)
@@ -396,38 +425,8 @@ function backToCategoryRows(): void {
     container.scrollTop = 0
 }
 
-function isSelected(externalId: string): boolean {
-  return selectedExternalIds.value.includes(externalId)
-}
-
-function toggleSelected(externalId: string): void {
-  if (isImporting.value)
-    return
-
-  if (isSelected(externalId)) {
-    selectedExternalIds.value = selectedExternalIds.value.filter(id => id !== externalId)
-    return
-  }
-
-  selectedExternalIds.value = [...selectedExternalIds.value, externalId]
-}
-
-function toggleSelectLoaded(): void {
-  if (isImporting.value)
-    return
-
-  if (allLoadedSelected.value) {
-    selectedExternalIds.value = []
-    return
-  }
-
-  selectedExternalIds.value = allLoadedExternalIds.value
-}
-
-function clearSelection(): void {
-  if (isImporting.value)
-    return
-  selectedExternalIds.value = []
+function isAssetImported(asset: LibraryAsset): boolean {
+  return importedSourceSet.value.has(asset.sourceUrl)
 }
 
 function importAssetToMediaLibrary(asset: LibraryAsset): ImageFile | VideoFile {
@@ -492,7 +491,6 @@ async function importAssetsToMediaLibrary(targetAssets: LibraryAsset[]): Promise
   addingToCanvasIds.value = []
   try {
     targetAssets.forEach(asset => importAssetToMediaLibrary(asset))
-    selectedExternalIds.value = []
   }
   catch (error) {
     importError.value = error instanceof Error ? error.message : '导入素材失败'
@@ -508,32 +506,41 @@ async function importAsset(asset: LibraryAsset): Promise<void> {
   await importAssetsToMediaLibrary([asset])
 }
 
-async function importSelectedAssets(): Promise<void> {
-  const selected = allLoadedAssets.value.filter(asset => selectedExternalIds.value.includes(asset.externalId))
-  await importAssetsToMediaLibrary(selected)
-}
-
 function onSearch(): void {
-  if (isCategoryRowsMode.value) {
+  const nextSubmittedQuery = trimmedQuery.value
+  submittedQuery.value = nextSubmittedQuery
+
+  if (nextSubmittedQuery.length === 0) {
+    if (activeCategoryKey.value) {
+      void loadAssets({ reset: true })
+      return
+    }
+
     void loadCategoryRows()
     return
   }
+
+  if (activeCategoryKey.value)
+    activeCategoryKey.value = null
 
   void loadAssets({ reset: true })
 }
 
 function clearQuery(): void {
-  if (trimmedQuery.value.length === 0)
+  if (trimmedQuery.value.length === 0 && trimmedSubmittedQuery.value.length === 0)
     return
 
   activeCategoryKey.value = null
+  submittedQuery.value = ''
   query.value = ''
+
+  void loadCategoryRows()
 }
 
 watch(() => props.kind, () => {
   activeCategoryKey.value = null
 
-  if (trimmedQuery.value.length === 0) {
+  if (trimmedSubmittedQuery.value.length === 0) {
     void loadCategoryRows()
     return
   }
@@ -541,12 +548,15 @@ watch(() => props.kind, () => {
   void loadAssets({ reset: true })
 }, { immediate: true })
 
-watch(trimmedQuery, (value, previousValue) => {
-  if (value.length > 0 && activeCategoryKey.value)
-    activeCategoryKey.value = null
+watch(trimmedQuery, (value) => {
+  if (value.length > 0)
+    return
+  if (trimmedSubmittedQuery.value.length === 0)
+    return
 
-  if (value.length === 0 && previousValue.length > 0)
-    void loadCategoryRows()
+  submittedQuery.value = ''
+  activeCategoryKey.value = null
+  void loadCategoryRows()
 })
 </script>
 
@@ -560,9 +570,6 @@ watch(trimmedQuery, (value, previousValue) => {
         </div>
         <div class="flex items-center gap-2 text-[10px] text-foreground-muted">
           <span>{{ loadedSummary }}</span>
-          <span v-if="selectedCount > 0" class="text-primary font-medium">
-            已选 {{ selectedCount }}
-          </span>
         </div>
       </div>
 
@@ -585,39 +592,6 @@ watch(trimmedQuery, (value, previousValue) => {
             <div i-carbon-close text-xs />
           </button>
         </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-1">
-          <Button
-            size="xs"
-            variant="ghost"
-            class="h-7 px-2 text-[10px]"
-            :disabled="allLoadedAssets.length === 0 || isImporting"
-            @click="toggleSelectLoaded"
-          >
-            {{ allLoadedSelected ? '取消全选' : '全选' }}
-          </Button>
-          <Button
-            size="xs"
-            variant="ghost"
-            class="h-7 px-2 text-[10px]"
-            :disabled="selectedCount === 0 || isImporting"
-            @click="clearSelection"
-          >
-            清空
-          </Button>
-        </div>
-        <Button
-          size="xs"
-          class="h-7 px-3 text-[10px]"
-          :disabled="selectedCount === 0 || isImporting"
-          @click="importSelectedAssets"
-        >
-          <div v-if="isImporting && addingToCanvasIds.length === 0" i-carbon-circle-dash animate-spin mr-1 />
-          {{ importLibraryLabel }} ({{ selectedCount }})
-        </Button>
       </div>
 
       <div v-if="importError" class="flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-1.5 text-[10px] text-destructive break-all">
@@ -659,6 +633,7 @@ watch(trimmedQuery, (value, previousValue) => {
             <div
               v-if="row.isLoading"
               class="category-row-scroller flex gap-2 overflow-x-auto pb-1"
+              @wheel="handleCategoryRowWheel"
             >
               <div
                 v-for="item in rowSkeletonItems"
@@ -691,23 +666,14 @@ watch(trimmedQuery, (value, previousValue) => {
             <div
               v-else
               class="category-row-scroller flex gap-2 overflow-x-auto pb-1"
+              @wheel="handleCategoryRowWheel"
             >
               <div
                 v-for="asset in row.assets"
                 :key="`${row.key}-${asset.externalId}`"
-                tabindex="0"
-                role="button"
-                :aria-pressed="isSelected(asset.externalId)"
-                :aria-label="`选择素材 ${asset.name}`"
-                class="library-card library-card--row group w-[118px] shrink-0 cursor-pointer rounded-xl border bg-background-elevated/90 p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                :class="isSelected(asset.externalId)
-                  ? 'border-primary/70 bg-secondary/30 shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]'
-                  : 'border-border/80 hover:border-border-emphasis hover:bg-secondary/20'"
-                @click="toggleSelected(asset.externalId)"
-                @keydown.enter.prevent="toggleSelected(asset.externalId)"
-                @keydown.space.prevent="toggleSelected(asset.externalId)"
+                class="library-card library-card--row w-[118px] shrink-0 rounded-xl border border-border/80 bg-background-elevated/90 p-1 hover:border-border-emphasis hover:bg-secondary/20"
               >
-                <div class="relative aspect-video overflow-hidden rounded-lg border border-border/60 bg-black/40">
+                <div class="group relative aspect-video overflow-hidden rounded-lg border border-border/60 bg-black/40">
                   <img
                     :src="asset.previewUrl"
                     :alt="asset.name"
@@ -724,54 +690,50 @@ watch(trimmedQuery, (value, previousValue) => {
                   </div>
 
                   <div
-                    class="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full border border-white/70 bg-black/55 transition-colors"
-                    :class="isSelected(asset.externalId) ? 'border-primary bg-primary text-primary-foreground' : 'text-white'"
+                    class="absolute right-1 top-1 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
                   >
-                    <div
-                      v-if="isSelected(asset.externalId)"
-                      i-ph-check-bold
-                      class="text-[9px]"
-                    />
-                  </div>
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        class="flex h-5 items-center justify-center rounded-md border border-white/30 bg-black/65 px-1.5 text-[10px] text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                        :disabled="isImporting || isAssetImported(asset)"
+                        :title="importLibraryLabel"
+                        :aria-label="`导入媒体库：${asset.name}`"
+                        @click.stop="importAsset(asset)"
+                        @keydown.enter.stop
+                        @keydown.space.stop
+                      >
+                        <div
+                          v-if="importingIds.includes(asset.externalId) && !addingToCanvasIds.includes(asset.externalId)"
+                          i-carbon-circle-dash
+                          class="text-[10px] animate-spin"
+                        />
+                        <div
+                          v-else-if="isAssetImported(asset)"
+                          i-ph-check-bold
+                          class="text-[10px]"
+                        />
+                        <span v-else>导入</span>
+                      </button>
 
-                  <div
-                    class="absolute right-1 top-1 flex items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
-                  >
-                    <button
-                      type="button"
-                      class="flex h-5 w-5 items-center justify-center rounded-md border border-white/30 bg-black/65 text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
-                      :disabled="isImporting"
-                      :title="importLibraryLabel"
-                      :aria-label="`导入媒体库：${asset.name}`"
-                      @click.stop="importAsset(asset)"
-                      @keydown.enter.stop
-                      @keydown.space.stop
-                    >
-                      <div
-                        v-if="importingIds.includes(asset.externalId) && !addingToCanvasIds.includes(asset.externalId)"
-                        i-carbon-circle-dash
-                        class="text-[10px] animate-spin"
-                      />
-                      <div v-else i-carbon-download class="text-[10px]" />
-                    </button>
-
-                    <button
-                      type="button"
-                      class="flex h-5 w-5 items-center justify-center rounded-md border border-white/30 bg-black/65 text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
-                      :disabled="isImporting"
-                      title="添加到画布"
-                      :aria-label="`添加到画布：${asset.name}`"
-                      @click.stop="addAssetToCanvas(asset)"
-                      @keydown.enter.stop
-                      @keydown.space.stop
-                    >
-                      <div
-                        v-if="addingToCanvasIds.includes(asset.externalId)"
-                        i-carbon-circle-dash
-                        class="text-[10px] animate-spin"
-                      />
-                      <div v-else i-carbon-add class="text-[10px]" />
-                    </button>
+                      <button
+                        type="button"
+                        class="flex h-5 w-5 items-center justify-center rounded-md border border-white/30 bg-black/65 text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                        :disabled="isImporting"
+                        title="添加到画布"
+                        :aria-label="`添加到画布：${asset.name}`"
+                        @click.stop="addAssetToCanvas(asset)"
+                        @keydown.enter.stop
+                        @keydown.space.stop
+                      >
+                        <div
+                          v-if="addingToCanvasIds.includes(asset.externalId)"
+                          i-carbon-circle-dash
+                          class="text-[10px] animate-spin"
+                        />
+                        <div v-else i-carbon-add class="text-[10px]" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -836,19 +798,9 @@ watch(trimmedQuery, (value, previousValue) => {
           <div
             v-for="asset in assets"
             :key="asset.externalId"
-            tabindex="0"
-            role="button"
-            :aria-pressed="isSelected(asset.externalId)"
-            :aria-label="`选择素材 ${asset.name}`"
-            class="library-card group cursor-pointer rounded-xl border bg-background-elevated/90 p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            :class="isSelected(asset.externalId)
-              ? 'border-primary/70 bg-secondary/30 shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]'
-              : 'border-border/80 hover:border-border-emphasis hover:bg-secondary/20'"
-            @click="toggleSelected(asset.externalId)"
-            @keydown.enter.prevent="toggleSelected(asset.externalId)"
-            @keydown.space.prevent="toggleSelected(asset.externalId)"
+            class="library-card rounded-xl border border-border/80 bg-background-elevated/90 p-1 hover:border-border-emphasis hover:bg-secondary/20"
           >
-            <div class="relative aspect-video overflow-hidden rounded-lg border border-border/60 bg-black/40">
+            <div class="group relative aspect-video overflow-hidden rounded-lg border border-border/60 bg-black/40">
               <img
                 :src="asset.previewUrl"
                 :alt="asset.name"
@@ -865,54 +817,50 @@ watch(trimmedQuery, (value, previousValue) => {
               </div>
 
               <div
-                class="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-white/70 bg-black/55 transition-colors"
-                :class="isSelected(asset.externalId) ? 'border-primary bg-primary text-primary-foreground' : 'text-white'"
+                class="absolute right-1.5 top-1.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
               >
-                <div
-                  v-if="isSelected(asset.externalId)"
-                  i-ph-check-bold
-                  class="text-xs"
-                />
-              </div>
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    class="flex h-6 items-center justify-center rounded-md border border-white/30 bg-black/65 px-2 text-[10px] text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                    :disabled="isImporting || isAssetImported(asset)"
+                    :title="importLibraryLabel"
+                    :aria-label="`导入媒体库：${asset.name}`"
+                    @click.stop="importAsset(asset)"
+                    @keydown.enter.stop
+                    @keydown.space.stop
+                  >
+                    <div
+                      v-if="importingIds.includes(asset.externalId) && !addingToCanvasIds.includes(asset.externalId)"
+                      i-carbon-circle-dash
+                      class="text-xs animate-spin"
+                    />
+                    <div
+                      v-else-if="isAssetImported(asset)"
+                      i-ph-check-bold
+                      class="text-xs"
+                    />
+                    <span v-else>导入</span>
+                  </button>
 
-              <div
-                class="absolute right-1.5 top-1.5 flex items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
-              >
-                <button
-                  type="button"
-                  class="flex h-6 w-6 items-center justify-center rounded-md border border-white/30 bg-black/65 text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
-                  :disabled="isImporting"
-                  :title="importLibraryLabel"
-                  :aria-label="`导入媒体库：${asset.name}`"
-                  @click.stop="importAsset(asset)"
-                  @keydown.enter.stop
-                  @keydown.space.stop
-                >
-                  <div
-                    v-if="importingIds.includes(asset.externalId) && !addingToCanvasIds.includes(asset.externalId)"
-                    i-carbon-circle-dash
-                    class="text-xs animate-spin"
-                  />
-                  <div v-else i-carbon-download class="text-xs" />
-                </button>
-
-                <button
-                  type="button"
-                  class="flex h-6 w-6 items-center justify-center rounded-md border border-white/30 bg-black/65 text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
-                  :disabled="isImporting"
-                  title="添加到画布"
-                  :aria-label="`添加到画布：${asset.name}`"
-                  @click.stop="addAssetToCanvas(asset)"
-                  @keydown.enter.stop
-                  @keydown.space.stop
-                >
-                  <div
-                    v-if="addingToCanvasIds.includes(asset.externalId)"
-                    i-carbon-circle-dash
-                    class="text-xs animate-spin"
-                  />
-                  <div v-else i-carbon-add class="text-xs" />
-                </button>
+                  <button
+                    type="button"
+                    class="flex h-6 w-6 items-center justify-center rounded-md border border-white/30 bg-black/65 text-white transition-colors hover:bg-black/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                    :disabled="isImporting"
+                    title="添加到画布"
+                    :aria-label="`添加到画布：${asset.name}`"
+                    @click.stop="addAssetToCanvas(asset)"
+                    @keydown.enter.stop
+                    @keydown.space.stop
+                  >
+                    <div
+                      v-if="addingToCanvasIds.includes(asset.externalId)"
+                      i-carbon-circle-dash
+                      class="text-xs animate-spin"
+                    />
+                    <div v-else i-carbon-add class="text-xs" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -983,7 +931,14 @@ watch(trimmedQuery, (value, previousValue) => {
 }
 
 .category-row-scroller {
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.category-row-scroller::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

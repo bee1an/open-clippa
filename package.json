@@ -20,7 +20,8 @@
     "cz": "cz",
     "prepare": "husky",
     "commitlint": "commitlint --edit",
-    "typecheck": "tsc --noEmit && corepack pnpm -C app typecheck"
+    "typecheck:tests": "vitest --config vitest.packages.config.ts --typecheck --run",
+    "typecheck": "tsc --noEmit && pnpm typecheck:tests && corepack pnpm -C app typecheck"
   },
   "dependencies": {
     "mediabunny": "catalog:",
