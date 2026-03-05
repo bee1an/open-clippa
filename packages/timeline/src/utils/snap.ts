@@ -7,15 +7,17 @@ export interface TimelineSnapPlayhead {
 
 export interface TimelineSnapTarget {
   id: string
+  railZIndex: number
   x: number
   width: number
   start: number
   duration: number
+  anchorMode?: 'time' | 'visual'
 }
 
 export interface TimelineMoveSnapMeta {
   guideX: number
-  rawStartMs: number
+  rawStartMs?: number
 }
 
 export function buildTimelineLeftSnapCandidates(input: {
@@ -33,23 +35,25 @@ export function buildTimelineLeftSnapCandidates(input: {
     if (target.id === trainId)
       continue
 
+    const useVisualAnchor = target.anchorMode === 'visual'
+
     const beforeX = Math.max(0, target.x - width - connectionGapPx)
     result.push({
-      id: `target:${target.id}:before`,
+      id: `target:${target.railZIndex}:${target.id}:before`,
       value: beforeX,
       meta: {
         guideX: target.x,
-        rawStartMs: Math.max(0, target.start - duration),
+        rawStartMs: useVisualAnchor ? undefined : Math.max(0, target.start - duration),
       },
     })
 
     const afterX = target.x + target.width + connectionGapPx
     result.push({
-      id: `target:${target.id}:after`,
+      id: `target:${target.railZIndex}:${target.id}:after`,
       value: afterX,
       meta: {
         guideX: target.x + target.width,
-        rawStartMs: target.start + target.duration,
+        rawStartMs: useVisualAnchor ? undefined : target.start + target.duration,
       },
     })
   }
@@ -101,12 +105,12 @@ export function buildTimelineEdgeSnapCandidates(input: {
 
     result.push(
       {
-        id: `${prefix}:target:${target.id}:left`,
+        id: `${prefix}:target:${target.railZIndex}:${target.id}:left`,
         value: targetLeft,
         meta: { guideX: targetLeft },
       },
       {
-        id: `${prefix}:target:${target.id}:right`,
+        id: `${prefix}:target:${target.railZIndex}:${target.id}:right`,
         value: targetRight,
         meta: { guideX: targetRight },
       },
@@ -114,7 +118,7 @@ export function buildTimelineEdgeSnapCandidates(input: {
 
     if (input.edge === 'left') {
       result.push({
-        id: `${prefix}:target:${target.id}:after-gap`,
+        id: `${prefix}:target:${target.railZIndex}:${target.id}:after-gap`,
         value: targetRight + input.connectionGapPx,
         meta: { guideX: targetRight },
       })
@@ -122,7 +126,7 @@ export function buildTimelineEdgeSnapCandidates(input: {
     }
 
     result.push({
-      id: `${prefix}:target:${target.id}:before-gap`,
+      id: `${prefix}:target:${target.railZIndex}:${target.id}:before-gap`,
       value: Math.max(0, targetLeft - input.connectionGapPx),
       meta: { guideX: targetLeft },
     })

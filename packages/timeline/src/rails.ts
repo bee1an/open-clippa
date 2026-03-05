@@ -2,17 +2,19 @@ import type { FederatedPointerEvent } from 'pixi.js'
 import type { RailTransitionHandle } from './rail'
 import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
+import type { TimelineSnapTarget } from './utils/snap'
 import {
   TIMELINE_AUTO_PAGE_TURN_THRESHOLD,
   TIMELINE_RULER_HEIGHT,
   TIMELINE_TRAIN_SEAM_EPSILON,
 } from '@clippc/constants'
 import { EventBus, getMsByPx, getPxByMs } from '@clippc/utils'
-import { Container } from 'pixi.js'
+import { Container, Graphics } from 'pixi.js'
 import { Rail } from './rail'
 import { GAP, RailGap } from './railGap'
 import { ScrollBox } from './scrollBox'
 import { State } from './state'
+import { collectRailsSnapTargets } from './utils/railsSnapTargets'
 
 export interface RailsOption {
   screenWidth: number
@@ -48,6 +50,9 @@ type GlobalGapRange = {
 const TRAILING_OPERATION_PADDING_RATIO = 0.2
 const TRAILING_OPERATION_PADDING_MIN_PX = 96
 const TRAILING_OPERATION_PADDING_MAX_PX = 320
+const RAILS_SNAP_GUIDE_COLOR = '#60a5fa'
+const RAILS_SNAP_GUIDE_ALPHA = 0.95
+const RAILS_SNAP_GUIDE_WIDTH = 1.5
 
 export class Rails extends EventBus<RailsEvents> {
   scrollBox: ScrollBox
@@ -91,6 +96,10 @@ export class Rails extends EventBus<RailsEvents> {
   private _activeTransitionPairKey: string | null = null
   private _activeGapRail: Rail | null = null
   private _resolveSnapPlayhead?: () => { x: number, time: number } | null
+  private _globalSnapGuideLayer!: Graphics
+  private _activeSnapGuideX: number | null = null
+  private _snapGuideOwnerRail: Rail | null = null
+  private _snapGuideOwnerRailZIndex: number | null = null
   get offsetX(): number {
     return this.scrollBox.offsetX
   }
@@ -172,6 +181,8 @@ export class Rails extends EventBus<RailsEvents> {
     this.container.addChild(this.railsContainer)
 
     this._drawBody()
+    this._globalSnapGuideLayer = this._createGlobalSnapGuideLayer()
+    this._moveGlobalSnapGuideLayerToTop()
 
     this._bindEvents()
   }
@@ -289,6 +300,63 @@ export class Rails extends EventBus<RailsEvents> {
     }
   }
 
+  private _createGlobalSnapGuideLayer(): Graphics {
+    const layer = new Graphics({ label: 'rails-snap-guide' })
+    layer.eventMode = 'none'
+    layer.visible = true
+    this.railsContainer.addChild(layer)
+    return layer
+  }
+
+  private _moveGlobalSnapGuideLayerToTop(): void {
+    if (!this._globalSnapGuideLayer)
+      return
+
+    this.railsContainer.addChild(this._globalSnapGuideLayer)
+  }
+
+  private _renderGlobalSnapGuide(): void {
+    if (!this._globalSnapGuideLayer)
+      return
+
+    this._globalSnapGuideLayer.clear()
+    if (this._activeSnapGuideX === null)
+      return
+
+    this._globalSnapGuideLayer
+      .moveTo(this._activeSnapGuideX, 0)
+      .lineTo(this._activeSnapGuideX, this.getRailsTotalHeight())
+      .stroke({
+        color: RAILS_SNAP_GUIDE_COLOR,
+        alpha: RAILS_SNAP_GUIDE_ALPHA,
+        width: RAILS_SNAP_GUIDE_WIDTH,
+      })
+  }
+
+  private _clearGlobalSnapGuide(): void {
+    this._activeSnapGuideX = null
+    this._snapGuideOwnerRail = null
+    this._snapGuideOwnerRailZIndex = null
+    this._renderGlobalSnapGuide()
+  }
+
+  private _collectSnapTargets(forRailZIndex: number, trainId: string): TimelineSnapTarget[] {
+    return collectRailsSnapTargets({
+      forRailZIndex,
+      trainId,
+      rails: this.rails.map(rail => ({
+        zIndex: rail.zIndex,
+        trains: rail.trains.map(train => ({
+          id: train.id,
+          x: train.x,
+          width: train.width,
+          start: train.start,
+          duration: train.duration,
+        })),
+      })),
+    })
+  }
+
   private _resolveTransitionHandlesForRail(zIndex: number): RailTransitionHandle[] {
     return this._transitionHandles
       .filter(handle => handle.railZIndex === zIndex)
@@ -310,6 +378,8 @@ export class Rails extends EventBus<RailsEvents> {
         railStyle,
         trainsOption: trainsOptions,
         resolveSnapPlayhead: this._resolveSnapPlayhead,
+        resolveSnapTargets: ({ railZIndex, trainId }) => this._collectSnapTargets(railZIndex, trainId),
+        enableLocalSnapGuide: false,
       },
     )
 
@@ -397,9 +467,23 @@ export class Rails extends EventBus<RailsEvents> {
       })
     })
 
+    rail.on('snapGuideChanged', (x) => {
+      if (x === null) {
+        if (this._snapGuideOwnerRail === rail || this._snapGuideOwnerRailZIndex === rail.zIndex)
+          this._clearGlobalSnapGuide()
+        return
+      }
+
+      this._activeSnapGuideX = x
+      this._snapGuideOwnerRail = rail
+      this._snapGuideOwnerRailZIndex = rail.zIndex
+      this._renderGlobalSnapGuide()
+    })
+
     this._insertRailByZIndex(rail, zIndex)
 
     this.railsContainer.addChild(rail.container)
+    this._moveGlobalSnapGuideLayerToTop()
     rail.setTransitionHandles(this._resolveTransitionHandlesForRail(rail.zIndex))
     rail.setActiveTransitionPairKey(this._activeTransitionPairKey)
 
@@ -416,6 +500,7 @@ export class Rails extends EventBus<RailsEvents> {
     this._insertGapByZIndex(gap, zIndex)
 
     this.railsContainer.addChild(gap.container)
+    this._moveGlobalSnapGuideLayerToTop()
 
     return gap
   }
@@ -549,6 +634,8 @@ export class Rails extends EventBus<RailsEvents> {
     this.container.on('pointerup', () => {
       if (!this.state.trainDragging)
         return
+
+      this._clearGlobalSnapGuide()
 
       const gap = this.railGaps.find(gap => gap.active)
       this.railGaps.forEach((item) => {
@@ -688,6 +775,9 @@ export class Rails extends EventBus<RailsEvents> {
     const targetIndex = this.rails.findIndex(curRail => curRail === rail)
     if (targetIndex === -1)
       return
+
+    if (this._snapGuideOwnerRail === rail || this._snapGuideOwnerRailZIndex === rail.zIndex)
+      this._clearGlobalSnapGuide()
 
     const removedZIndex = rail.zIndex
 
@@ -918,6 +1008,12 @@ export class Rails extends EventBus<RailsEvents> {
       rail.setTransitionHandles(this._resolveTransitionHandlesForRail(rail.zIndex))
       rail.setActiveTransitionPairKey(this._activeTransitionPairKey)
     })
+
+    if (this._snapGuideOwnerRail) {
+      this._snapGuideOwnerRailZIndex = this._snapGuideOwnerRail.zIndex
+    }
+    this._moveGlobalSnapGuideLayerToTop()
+    this._renderGlobalSnapGuide()
   }
 
   /**
@@ -997,5 +1093,7 @@ export class Rails extends EventBus<RailsEvents> {
 
     this.rails.forEach(helper)
     this.railGaps.forEach(helper)
+    this._moveGlobalSnapGuideLayerToTop()
+    this._renderGlobalSnapGuide()
   }
 }

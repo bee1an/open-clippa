@@ -12,6 +12,7 @@ describe('timeline snap candidates', () => {
       targets: [
         {
           id: 'target-1',
+          railZIndex: 3,
           x: 200,
           width: 120,
           start: 2000,
@@ -21,8 +22,8 @@ describe('timeline snap candidates', () => {
     })
 
     expect(candidates.map(item => item.id)).toEqual([
-      'target:target-1:before',
-      'target:target-1:after',
+      'target:3:target-1:before',
+      'target:3:target-1:after',
       'playhead:left',
       'playhead:right',
     ])
@@ -45,6 +46,7 @@ describe('timeline snap candidates', () => {
       targets: [
         {
           id: 'target-1',
+          railZIndex: 2,
           x: 100,
           width: 60,
           start: 1000,
@@ -54,9 +56,9 @@ describe('timeline snap candidates', () => {
     })
 
     expect(candidates.map(item => item.id)).toEqual([
-      'right:target:target-1:left',
-      'right:target:target-1:right',
-      'right:target:target-1:before-gap',
+      'right:target:2:target-1:left',
+      'right:target:2:target-1:right',
+      'right:target:2:target-1:before-gap',
       'right:playhead',
     ])
     expect(candidates[0]?.value).toBe(100)
@@ -78,6 +80,7 @@ describe('timeline snap candidates', () => {
       targets: [
         {
           id: 'target-1',
+          railZIndex: 1,
           x: 100,
           width: 60,
           start: 1000,
@@ -95,6 +98,7 @@ describe('timeline snap candidates', () => {
       targets: [
         {
           id: 'target-1',
+          railZIndex: 1,
           x: 100,
           width: 60,
           start: 1000,
@@ -104,5 +108,40 @@ describe('timeline snap candidates', () => {
     })
 
     expect(narrow.map(item => item.value)).toEqual(wide.map(item => item.value))
+  })
+
+  it('omits raw start meta for visual-anchor targets', () => {
+    const candidates = buildTimelineLeftSnapCandidates({
+      trainId: 'current',
+      width: 100,
+      duration: 1000,
+      connectionGapPx: 4,
+      playhead: null,
+      targets: [
+        {
+          id: 'same-rail',
+          railZIndex: 1,
+          x: 120,
+          width: 60,
+          start: 1000,
+          duration: 500,
+          anchorMode: 'time',
+        },
+        {
+          id: 'other-rail',
+          railZIndex: 0,
+          x: 240,
+          width: 80,
+          start: 2000,
+          duration: 500,
+          anchorMode: 'visual',
+        },
+      ],
+    })
+
+    const sameRailBefore = candidates.find(item => item.id === 'target:1:same-rail:before')
+    const crossRailBefore = candidates.find(item => item.id === 'target:0:other-rail:before')
+    expect(sameRailBefore?.meta?.rawStartMs).toBe(0)
+    expect(crossRailBefore?.meta?.rawStartMs).toBeUndefined()
   })
 })

@@ -2,6 +2,7 @@ import type { AxisSnapState } from '@clippc/utils'
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
+import type { TimelineSnapTarget } from './utils/snap'
 import {
   PRIMARYCOLOR,
   TIMELINE_FILTER_TRAIN_HEIGHT,
@@ -49,6 +50,8 @@ export interface RailOption {
   railStyle?: TrainRailStyle
   trainsOption: TrainOption[]
   resolveSnapPlayhead?: () => { x: number, time: number } | null
+  resolveSnapTargets?: (input: { railZIndex: number, trainId: string }) => TimelineSnapTarget[]
+  enableLocalSnapGuide?: boolean
 }
 
 export interface RailTransitionHandle {
@@ -85,6 +88,7 @@ export type RailEvents = {
   gapSelectionChanged: [ClosableGap | null]
 
   transitionHandleClick: [RailTransitionHandle]
+  snapGuideChanged: [number | null]
 }
 
 type ClosableGap = {
@@ -125,7 +129,7 @@ const RAIL_SNAP_GUIDE_WIDTH = 1.5
 
 type RailMoveSnapMeta = {
   guideX: number
-  rawStartMs: number
+  rawStartMs?: number
 }
 
 type RailEdgeSnapMeta = {
@@ -156,6 +160,8 @@ export class Rail extends EventBus<RailEvents> {
   private _hoveredTransitionPairKey: string | null = null
   private _activeTransitionPairKey: string | null = null
   private _resolveSnapPlayhead?: () => { x: number, time: number } | null
+  private _resolveSnapTargets?: (input: { railZIndex: number, trainId: string }) => TimelineSnapTarget[]
+  private _enableLocalSnapGuide: boolean = true
   private _moveSnapState = new Map<Train, AxisSnapState | null>()
   private _moveSnapRawStartMs = new Map<Train, number>()
   private _leftResizeSnapState = new Map<Train, AxisSnapState | null>()
@@ -287,6 +293,8 @@ export class Rail extends EventBus<RailEvents> {
     this.zIndex = option.zIndex
     this.railStyle = option.railStyle ?? 'default'
     this._resolveSnapPlayhead = option.resolveSnapPlayhead
+    this._resolveSnapTargets = option.resolveSnapTargets
+    this._enableLocalSnapGuide = option.enableLocalSnapGuide ?? true
     this.height = getRailHeightByStyle(this.railStyle)
 
     this.container = new Container({ y: this.y, label: 'rail', sortableChildren: true })
@@ -317,13 +325,7 @@ export class Rail extends EventBus<RailEvents> {
       trainId: train.id,
       width: train.width,
       duration: train.duration,
-      targets: this.trains.map(item => ({
-        id: item.id,
-        x: item.x,
-        width: item.width,
-        start: item.start,
-        duration: item.duration,
-      })),
+      targets: this._resolveCandidateTargets(train.id),
       connectionGapPx: this._getConnectionGapPx(),
       playhead: this._resolveSnapPlayhead?.() ?? null,
     })
@@ -339,7 +341,11 @@ export class Rail extends EventBus<RailEvents> {
 
     this._moveSnapState.set(train, result.state)
     if (result.snapped && result.candidate) {
-      this._moveSnapRawStartMs.set(train, result.candidate.meta?.rawStartMs ?? this.getRawMsByVisualPx(train, result.value))
+      const resolvedRawStartMs = result.candidate.meta?.rawStartMs
+      const nextRawStartMs = Number.isFinite(resolvedRawStartMs)
+        ? Math.max(0, resolvedRawStartMs!)
+        : this.getRawMsByVisualPx(train, result.value)
+      this._moveSnapRawStartMs.set(train, nextRawStartMs)
       this._setSnapGuideX(result.candidate.meta?.guideX ?? result.value)
       train.updateState('static')
       event.xValue = Math.max(0, result.value)
@@ -386,13 +392,7 @@ export class Rail extends EventBus<RailEvents> {
       trainId: train.id,
       width: candidateWidth,
       duration: Math.max(1, getMsByPx(candidateWidth, this.state.pxPerMs)),
-      targets: this.trains.map(item => ({
-        id: item.id,
-        x: item.x,
-        width: item.width,
-        start: item.start,
-        duration: item.duration,
-      })),
+      targets: this._resolveCandidateTargets(train.id),
       connectionGapPx: this._getConnectionGapPx(),
       playhead: this._resolveSnapPlayhead?.() ?? null,
       edge: 'left',
@@ -465,13 +465,7 @@ export class Rail extends EventBus<RailEvents> {
       trainId: train.id,
       width: candidateWidth,
       duration: Math.max(1, getMsByPx(candidateWidth, this.state.pxPerMs)),
-      targets: this.trains.map(item => ({
-        id: item.id,
-        x: item.x,
-        width: item.width,
-        start: item.start,
-        duration: item.duration,
-      })),
+      targets: this._resolveCandidateTargets(train.id),
       connectionGapPx: this._getConnectionGapPx(),
       playhead: this._resolveSnapPlayhead?.() ?? null,
       edge: 'right',
@@ -586,6 +580,9 @@ export class Rail extends EventBus<RailEvents> {
   private _renderSnapGuide(): void {
     this._snapGuideLayer.clear()
 
+    if (!this._enableLocalSnapGuide)
+      return
+
     if (this._activeSnapGuideX === null)
       return
 
@@ -601,7 +598,27 @@ export class Rail extends EventBus<RailEvents> {
       return
 
     this._activeSnapGuideX = normalized
+    this.emit('snapGuideChanged', normalized)
     this._renderSnapGuide()
+  }
+
+  private _resolveCandidateTargets(trainId: string): TimelineSnapTarget[] {
+    if (this._resolveSnapTargets) {
+      return this._resolveSnapTargets({
+        railZIndex: this.zIndex,
+        trainId,
+      })
+    }
+
+    return this.trains.map(item => ({
+      id: item.id,
+      railZIndex: this.zIndex,
+      x: item.x,
+      width: item.width,
+      start: item.start,
+      duration: item.duration,
+      anchorMode: 'time',
+    }))
   }
 
   private _createGapInteractionLayer(): Graphics {
