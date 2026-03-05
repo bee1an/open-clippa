@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { useProjectStore } from '@/store/useProjectStore'
+import { buildRouteWithProjectId } from '@/utils/projectRoute'
 
 const projectStore = useProjectStore()
 const router = useRouter()
@@ -24,9 +25,9 @@ async function handleCreateProject(): Promise<void> {
 
   creating.value = true
   try {
-    await projectStore.createAndOpenProject(newProjectName.value)
+    const project = await projectStore.createAndOpenProject(newProjectName.value)
     newProjectName.value = ''
-    await router.push('/editor/media')
+    await router.push(buildRouteWithProjectId('/editor/media', project.id))
   }
   catch {}
   finally {
@@ -41,7 +42,7 @@ async function handleOpenProject(projectId: string): Promise<void> {
   openingProjectId.value = projectId
   try {
     await projectStore.openProject(projectId)
-    await router.push('/editor/media')
+    await router.push(buildRouteWithProjectId('/editor/media', projectId))
   }
   catch {}
   finally {
@@ -84,10 +85,10 @@ function handleDeleteModalUpdate(value: boolean): void {
     <div class="max-w-4xl mx-auto space-y-6">
       <header class="space-y-2">
         <h1 class="text-2xl md:text-3xl font-semibold">
-          Projects
+          项目
         </h1>
         <p class="text-sm text-foreground-muted">
-          Create or open a project to continue editing.
+          创建或打开一个项目以继续编辑
         </p>
       </header>
 
@@ -97,7 +98,7 @@ function handleDeleteModalUpdate(value: boolean): void {
             v-model="newProjectName"
             type="text"
             class="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            placeholder="Project name (optional)"
+            placeholder="项目名称（可选）"
             @keydown.enter.prevent="handleCreateProject"
           >
           <Button
@@ -105,7 +106,7 @@ function handleDeleteModalUpdate(value: boolean): void {
             :disabled="creating || loading"
             @click="handleCreateProject"
           >
-            {{ creating ? 'Creating...' : 'Create Project' }}
+            {{ creating ? '创建中...' : '创建项目' }}
           </Button>
         </div>
         <p v-if="errorMessage" class="text-sm text-red-400">
@@ -115,11 +116,11 @@ function handleDeleteModalUpdate(value: boolean): void {
 
       <section class="rounded-xl border border-border bg-background-elevated p-4 md:p-5">
         <div v-if="loading" class="text-sm text-foreground-muted">
-          Loading projects...
+          正在加载项目...
         </div>
 
         <div v-else-if="projects.length === 0" class="text-sm text-foreground-muted">
-          No project yet. Create your first project above.
+          还没有项目，请先创建第一个项目
         </div>
 
         <div v-else class="space-y-2">
@@ -133,7 +134,7 @@ function handleDeleteModalUpdate(value: boolean): void {
                 {{ project.name }}
               </h2>
               <p class="text-xs text-foreground-muted mt-1">
-                Updated {{ formatTime(project.updatedAt) }}
+                更新时间 {{ formatTime(project.updatedAt) }}
               </p>
             </div>
 
@@ -144,7 +145,7 @@ function handleDeleteModalUpdate(value: boolean): void {
                 :disabled="openingProjectId === project.id || deletingProjectId === project.id"
                 @click="handleOpenProject(project.id)"
               >
-                {{ openingProjectId === project.id ? 'Opening...' : 'Open' }}
+                {{ openingProjectId === project.id ? '打开中...' : '打开' }}
               </Button>
               <Button
                 variant="outline"
@@ -152,7 +153,7 @@ function handleDeleteModalUpdate(value: boolean): void {
                 :disabled="deletingProjectId === project.id || openingProjectId === project.id"
                 @click="requestDeleteProject(project.id)"
               >
-                {{ deletingProjectId === project.id ? 'Deleting...' : 'Delete' }}
+                {{ deletingProjectId === project.id ? '删除中...' : '删除' }}
               </Button>
             </div>
           </article>
@@ -166,7 +167,7 @@ function handleDeleteModalUpdate(value: boolean): void {
         @update:model-value="handleDeleteModalUpdate"
       >
         <p class="text-sm text-foreground-muted">
-          Delete this project and all saved states?
+          删除该项目及其所有保存状态？
         </p>
         <template #footer>
           <div class="flex justify-end gap-2">
@@ -175,7 +176,7 @@ function handleDeleteModalUpdate(value: boolean): void {
               size="sm"
               @click="pendingDeleteProjectId = null"
             >
-              Cancel
+              取消
             </Button>
             <Button
               variant="secondary"
@@ -183,7 +184,7 @@ function handleDeleteModalUpdate(value: boolean): void {
               class="text-red-400"
               @click="handleDeleteProject"
             >
-              Delete
+              删除
             </Button>
           </div>
         </template>

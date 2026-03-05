@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import DebugPanel from '@/components/DebugPanel.vue'
 import ExportProgressModal from '@/components/ExportProgressModal.vue'
@@ -17,8 +17,14 @@ import { useExportTaskStore } from '@/store/useExportTaskStore'
 import { useHistoryStore } from '@/store/useHistoryStore'
 import { useLayoutStore } from '@/store/useLayoutStore'
 import { useProjectStore } from '@/store/useProjectStore'
+import { buildRouteWithProjectId, resolveRouteProjectId } from '@/utils/projectRoute'
 
-definePage({ redirect: '/editor/media' })
+definePage({
+  redirect: (to) => {
+    const projectId = resolveRouteProjectId(to.params.projectId as string | string[] | undefined)
+    return buildRouteWithProjectId('/editor/media', projectId, to.query)
+  },
+})
 
 const editorStore = useEditorStore()
 const exportTaskStore = useExportTaskStore()
@@ -29,6 +35,7 @@ const projectStore = useProjectStore()
 const projectPersistence = useProjectPersistence()
 const editorCommandActions = useEditorCommandActions()
 const router = useRouter()
+const route = useRoute()
 const {
   activePresetId,
   themeColorPresets,
@@ -45,6 +52,7 @@ const { panelOpen: chatPanelOpen } = storeToRefs(aiSettingsStore)
 const { siderCollapsed } = storeToRefs(layoutStore)
 const {
   status: exportStatus,
+  isStarting: exportIsStarting,
   modalOpen: exportModalOpen,
   currentFrame: exportCurrentFrame,
   totalFrames: exportTotalFrames,
@@ -53,6 +61,7 @@ const {
   errorMessage: exportErrorMessage,
 } = storeToRefs(exportTaskStore)
 const isExporting = computed(() => exportStatus.value === 'exporting')
+const isExportBusy = computed(() => isExporting.value || exportIsStarting.value)
 const SIDER_MAIN_ICON = {
   expanded: 'i-ph-sidebar-simple-fill [transform:scaleX(-1)]',
   collapsed: 'i-ph-sidebar-simple-bold [transform:scaleX(-1)]',
@@ -88,7 +97,16 @@ const canRedo = computed(() => {
     && !historyStore.state.value.activeTransaction
 })
 const isHydratingProject = computed(() => projectPersistence.isHydrating.value)
+const exportFrameCount = computed(() => Math.ceil((editorStore.duration / 1000) * exportFrameRate))
+const canExport = computed(() => {
+  return isClippaReady.value
+    && !isExportBusy.value
+    && !isHydratingProject.value
+    && exportFrameCount.value > 0
+})
+const requiresHandlePermission = computed(() => projectPersistence.requiresHandlePermission.value)
 const projectInitErrorMessage = ref('')
+const routeProjectId = computed(() => resolveRouteProjectId(route.params.projectId as string | string[] | undefined) ?? projectStore.activeProjectId)
 
 useFilterEngine()
 useTimelineBinding()
@@ -97,7 +115,7 @@ useTransitionEngine()
 // 等待 clippa 准备就绪
 onMounted(async () => {
   if (!projectStore.activeProjectId) {
-    await router.replace('/')
+    window.location.replace('/')
     return
   }
 
@@ -117,7 +135,7 @@ onUnmounted(() => {
 })
 
 async function exportHandler() {
-  if (isExporting.value)
+  if (!canExport.value)
     return
 
   try {
@@ -136,6 +154,10 @@ function handleExportModalUpdate(value: boolean) {
 
 async function handleExportCancel() {
   await exportTaskStore.cancelExport()
+}
+
+async function handleRestoreLocalMedia() {
+  await projectPersistence.restoreWithUserPermission()
 }
 
 function toggleChatPanel(): void {
@@ -182,7 +204,7 @@ onClickOutside(themePickerRef, () => {
 
 watch(exportStatus, (nextStatus) => {
   if (nextStatus === 'done')
-    router.push('/export')
+    router.push(buildRouteWithProjectId('/export', routeProjectId.value))
 })
 </script>
 
@@ -290,7 +312,8 @@ watch(exportStatus, (nextStatus) => {
 
         <Button
           h-8 px-3 rounded text-xs font-medium bg-foreground text-background hover:bg-foreground-90 transition-colors gap-1.5 shadow-sm
-          :disabled="!isClippaReady || isExporting || isHydratingProject"
+          class="disabled:cursor-not-allowed disabled:pointer-events-none"
+          :disabled="!canExport"
           @click="exportHandler"
         >
           <div i-ph-export-bold text-sm />
@@ -306,6 +329,21 @@ watch(exportStatus, (nextStatus) => {
         class="absolute top-3 left-1/2 z-70 -translate-x-1/2 rounded-md border border-red-400/40 bg-background-elevated px-3 py-1.5 text-xs text-red-400"
       >
         {{ projectInitErrorMessage }}
+      </div>
+
+      <div
+        v-if="requiresHandlePermission && !isHydratingProject"
+        class="absolute top-3 left-1/2 z-70 -translate-x-1/2 rounded-md border border-amber-400/40 bg-background-elevated px-3 py-2 text-xs text-amber-300 flex items-center gap-2"
+      >
+        <span>需要授权以恢复本地导入媒体，恢复前不会自动保存</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          class="h-6 px-2 text-[11px]"
+          @click="handleRestoreLocalMedia"
+        >
+          立即恢复
+        </Button>
       </div>
 
       <div

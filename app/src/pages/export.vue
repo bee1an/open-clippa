@@ -5,11 +5,15 @@ import { ms2TimeStr } from 'clippc'
 import { ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Mp4OutputFormat, Output } from 'mediabunny'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { useExportStore } from '@/store/useExportStore'
+import { useProjectStore } from '@/store/useProjectStore'
+import { buildRouteWithProjectId, resolveRouteProjectId } from '@/utils/projectRoute'
 
 const router = useRouter()
+const route = useRoute()
+const projectStore = useProjectStore()
 const exportStore = useExportStore()
 const { exportedVideo } = storeToRefs(exportStore)
 
@@ -73,7 +77,8 @@ function formatBytes(bytes: number): string {
 }
 
 function handleBack() {
-  router.push('/editor/media')
+  const routeProjectId = resolveRouteProjectId(route.params.projectId as string | string[] | undefined) ?? projectStore.activeProjectId
+  router.push(buildRouteWithProjectId('/editor/media', routeProjectId))
 }
 
 function handleDownload() {

@@ -24,6 +24,20 @@ interface PermissionCapableFileHandle extends FileSystemFileHandle {
   requestPermission: (descriptor?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>
 }
 
+export class FileHandlePermissionError extends Error {
+  readonly reason: 'requires-user-consent' | 'denied'
+
+  constructor(reason: 'requires-user-consent' | 'denied', message: string) {
+    super(message)
+    this.name = 'FileHandlePermissionError'
+    this.reason = reason
+  }
+}
+
+export function isFileHandlePermissionError(error: unknown): error is FileHandlePermissionError {
+  return error instanceof FileHandlePermissionError
+}
+
 function resolvePickerWindow(): PickerWindow | null {
   if (typeof window === 'undefined')
     return null
@@ -59,7 +73,11 @@ export async function pickMediaFileHandles(): Promise<FileSystemFileHandle[]> {
   return handles.filter(handle => handle.kind === 'file')
 }
 
-export async function ensureFileHandleReadable(handle: FileSystemFileHandle): Promise<boolean> {
+export async function ensureFileHandleReadable(
+  handle: FileSystemFileHandle,
+  options: { requestPermission?: boolean } = {},
+): Promise<boolean> {
+  const { requestPermission = true } = options
   const permissionHandle = handle as unknown as PermissionCapableFileHandle
   const descriptor = { mode: 'read' } as const
 
@@ -70,14 +88,36 @@ export async function ensureFileHandleReadable(handle: FileSystemFileHandle): Pr
   if (query === 'granted')
     return true
 
-  const request = await permissionHandle.requestPermission(descriptor)
-  return request === 'granted'
+  if (!requestPermission)
+    return false
+
+  try {
+    const request = await permissionHandle.requestPermission(descriptor)
+    return request === 'granted'
+  }
+  catch (error) {
+    if (error instanceof DOMException && error.name === 'SecurityError') {
+      throw new FileHandlePermissionError(
+        'requires-user-consent',
+        `Permission request requires user activation for file handle: ${handle.name}`,
+      )
+    }
+
+    throw error
+  }
 }
 
-export async function readFileFromHandle(handle: FileSystemFileHandle): Promise<File> {
-  const granted = await ensureFileHandleReadable(handle)
-  if (!granted)
-    throw new Error(`Permission denied for file handle: ${handle.name}`)
+export async function readFileFromHandle(
+  handle: FileSystemFileHandle,
+  options: { requestPermission?: boolean } = {},
+): Promise<File> {
+  const granted = await ensureFileHandleReadable(handle, options)
+  if (!granted) {
+    throw new FileHandlePermissionError(
+      options.requestPermission === false ? 'requires-user-consent' : 'denied',
+      `Permission denied for file handle: ${handle.name}`,
+    )
+  }
 
   return await handle.getFile()
 }

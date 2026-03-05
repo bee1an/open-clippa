@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { buildRouteWithProjectId, resolveRouteProjectId } from '@/utils/projectRoute'
+
 const emit = defineEmits<{
   navigate: [path: string]
 }>()
 
 const route = useRoute()
+const routeProjectId = computed(() => resolveRouteProjectId(route.params.projectId as string | string[] | undefined))
 
 const navItems = [
   {
@@ -45,7 +48,23 @@ const navItems = [
 ]
 
 function handleItemClick(path: string) {
-  emit('navigate', path)
+  emit('navigate', buildNavPath(path))
+}
+
+function buildNavTarget(path: string) {
+  return buildRouteWithProjectId(path, routeProjectId.value)
+}
+
+function buildNavPath(path: string): string {
+  const target = buildRouteWithProjectId(path, routeProjectId.value)
+  if (typeof target === 'string')
+    return target
+
+  return typeof target.path === 'string' ? target.path : path
+}
+
+function isItemActive(path: string): boolean {
+  return route.path === buildNavPath(path)
 }
 </script>
 
@@ -57,12 +76,12 @@ function handleItemClick(path: string) {
     <RouterLink
       v-for="item in navItems"
       :key="item.path"
-      :to="item.path"
+      :to="buildNavTarget(item.path)"
       class="w-full select-none"
       @click="handleItemClick(item.path)"
     >
       <NavItem
-        :active="route.path === item.path"
+        :active="isItemActive(item.path)"
         :icon="item.icon"
         :active-icon="item.activeIcon"
         :title="item.title"

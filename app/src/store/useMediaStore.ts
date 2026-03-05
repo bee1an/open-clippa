@@ -545,8 +545,11 @@ export const useMediaStore = defineStore('media', () => {
     return videoFile
   }
 
-  async function addVideoFromFileHandle(handle: FileSystemFileHandle, options: { id?: string } = {}): Promise<VideoFile> {
-    const file = await readFileFromHandle(handle)
+  async function addVideoFromFileHandle(
+    handle: FileSystemFileHandle,
+    options: { id?: string, requestPermission?: boolean } = {},
+  ): Promise<VideoFile> {
+    const file = await readFileFromHandle(handle, { requestPermission: options.requestPermission })
     if (!isVideoFileLike(file))
       throw new MediaStoreError('INVALID_ARGUMENT', `Unsupported video file type: ${file.name}`)
 
@@ -651,8 +654,11 @@ export const useMediaStore = defineStore('media', () => {
     return imageFile
   }
 
-  async function addImageFromFileHandle(handle: FileSystemFileHandle, options: { id?: string } = {}): Promise<ImageFile> {
-    const file = await readFileFromHandle(handle)
+  async function addImageFromFileHandle(
+    handle: FileSystemFileHandle,
+    options: { id?: string, requestPermission?: boolean } = {},
+  ): Promise<ImageFile> {
+    const file = await readFileFromHandle(handle, { requestPermission: options.requestPermission })
     if (!isImageFileLike(file))
       throw new MediaStoreError('INVALID_ARGUMENT', `Unsupported image file type: ${file.name}`)
 

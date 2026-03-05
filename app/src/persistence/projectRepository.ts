@@ -13,11 +13,11 @@ function buildDefaultProjectName(): string {
   const now = new Date()
   const pad = (value: number) => String(value).padStart(2, '0')
 
-  return `Project ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+  return `项目 ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
 }
 
 function createProjectId(): string {
-  return `project-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  return globalThis.crypto.randomUUID()
 }
 
 function ensureProjectStores(database: IDBDatabase): void {

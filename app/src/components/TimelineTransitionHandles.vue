@@ -3,13 +3,14 @@ import type { TimelineTransitionHandle } from 'clippc'
 import { TRANSITION_FEATURE_AVAILABLE } from '@clippc/transition'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useTransitionCandidates } from '@/composables/useTransitionCandidates'
 import { useEditorStore } from '@/store'
 import { useLayoutStore } from '@/store/useLayoutStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import { useTransitionStore } from '@/store/useTransitionStore'
+import { buildRouteWithProjectId, resolveRouteProjectId } from '@/utils/projectRoute'
 
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
@@ -17,6 +18,7 @@ const transitionStore = useTransitionStore()
 const editorCommandActions = useEditorCommandActions()
 const layoutStore = useLayoutStore()
 const router = useRouter()
+const route = useRoute()
 const { clippa } = editorStore
 const { activePairKey } = storeToRefs(transitionStore)
 const {
@@ -24,6 +26,7 @@ const {
 } = useTransitionCandidates()
 
 const transitionFeatureAvailable = TRANSITION_FEATURE_AVAILABLE
+const routeProjectId = computed(() => resolveRouteProjectId(route.params.projectId as string | string[] | undefined))
 
 const timelineHandles = computed<TimelineTransitionHandle[]>(() => {
   if (!transitionFeatureAvailable)
@@ -59,7 +62,7 @@ async function openTransitionPanel(handle: TimelineTransitionHandle): Promise<vo
   })
 
   layoutStore.setSiderCollapsed(false)
-  await router.push('/editor/transition')
+  await router.push(buildRouteWithProjectId('/editor/transition', routeProjectId.value))
 }
 
 function handleTimelineTransitionClick(handle: TimelineTransitionHandle): void {

@@ -1,5 +1,12 @@
 <script setup lang="ts">
-definePage({ redirect: '/editor/media' })
+import { buildRouteWithProjectId, resolveRouteProjectId } from '@/utils/projectRoute'
+
+definePage({
+  redirect: (to) => {
+    const projectId = resolveRouteProjectId(to.params.projectId as string | string[] | undefined)
+    return buildRouteWithProjectId('/editor/media', projectId, to.query)
+  },
+})
 </script>
 
 <template>

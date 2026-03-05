@@ -1,5 +1,6 @@
 import type { PersistedMediaAsset } from '@/persistence/types'
 import { applyEditorContentSnapshot, captureEditorContentSnapshot } from '@/history/editorContentSnapshot'
+import { isFileHandlePermissionError } from '@/persistence/fileSystemAccess'
 import { capturePersistedProjectState, restoreSnapshotFromPersistedSources } from '@/persistence/projectSessionSerializer'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useFilterStore } from '@/store/useFilterStore'
@@ -26,7 +27,11 @@ function mapMediaAssetUrlById(): Map<string, string> {
   return map
 }
 
-async function restoreMediaAssets(assets: PersistedMediaAsset[], kind: 'video' | 'image'): Promise<void> {
+async function restoreMediaAssets(
+  assets: PersistedMediaAsset[],
+  kind: 'video' | 'image',
+  options: { requestPermission: boolean, onPermissionRequired: () => void },
+): Promise<void> {
   const mediaStore = useMediaStore()
 
   for (let index = assets.length - 1; index >= 0; index -= 1) {
@@ -44,11 +49,16 @@ async function restoreMediaAssets(assets: PersistedMediaAsset[], kind: 'video' |
       }
 
       if (kind === 'video')
-        await mediaStore.addVideoFromFileHandle(asset.handle, { id: asset.id })
+        await mediaStore.addVideoFromFileHandle(asset.handle, { id: asset.id, requestPermission: options.requestPermission })
       else
-        await mediaStore.addImageFromFileHandle(asset.handle, { id: asset.id })
+        await mediaStore.addImageFromFileHandle(asset.handle, { id: asset.id, requestPermission: options.requestPermission })
     }
     catch (error) {
+      if (isFileHandlePermissionError(error)) {
+        options.onPermissionRequired()
+        continue
+      }
+
       console.warn(
         `[project-persistence] skip unreadable ${kind} asset "${asset.name}" (${asset.id})`,
         error,
@@ -67,6 +77,7 @@ export function useProjectPersistence() {
   const historyStore = useHistoryStore()
 
   const isHydrating = ref(false)
+  const requiresHandlePermission = ref(false)
   let initialized = false
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   const stopHandles: Array<() => void> = []
@@ -82,6 +93,11 @@ export function useProjectPersistence() {
   async function saveNow(): Promise<void> {
     const projectId = projectStore.activeProjectId
     if (!projectId || isHydrating.value)
+      return
+
+    // Avoid overwriting persisted local-media state with a partial snapshot
+    // before user grants permission to restore handle assets.
+    if (requiresHandlePermission.value)
       return
 
     const snapshot = captureEditorContentSnapshot({
@@ -117,22 +133,35 @@ export function useProjectPersistence() {
     await saveNow()
   }
 
-  async function restoreActiveProject(): Promise<void> {
+  async function restoreActiveProject(options: { requestPermission?: boolean } = {}): Promise<void> {
+    const { requestPermission = false } = options
     const projectId = projectStore.activeProjectId
     if (!projectId)
       return
 
     isHydrating.value = true
+    requiresHandlePermission.value = false
     try {
       const persisted = await projectStore.loadActiveProjectState()
       if (!persisted)
         return
 
+      let permissionRequired = false
+      const markPermissionRequired = () => {
+        permissionRequired = true
+      }
+
       await editorStore.clippa.ready
       mediaStore.clearAllMedia()
 
-      await restoreMediaAssets(persisted.videoAssets, 'video')
-      await restoreMediaAssets(persisted.imageAssets, 'image')
+      await restoreMediaAssets(persisted.videoAssets, 'video', {
+        requestPermission,
+        onPermissionRequired: markPermissionRequired,
+      })
+      await restoreMediaAssets(persisted.imageAssets, 'image', {
+        requestPermission,
+        onPermissionRequired: markPermissionRequired,
+      })
 
       const assetUrlMap = mapMediaAssetUrlById()
       const restoredSnapshot = restoreSnapshotFromPersistedSources(
@@ -147,10 +176,16 @@ export function useProjectPersistence() {
         filterStore,
         transitionStore,
       })
+
+      requiresHandlePermission.value = permissionRequired
     }
     finally {
       isHydrating.value = false
     }
+  }
+
+  async function restoreWithUserPermission(): Promise<void> {
+    await restoreActiveProject({ requestPermission: true })
   }
 
   function setupAutoSave(): void {
@@ -211,8 +246,10 @@ export function useProjectPersistence() {
 
   return {
     isHydrating,
+    requiresHandlePermission,
     initialize,
     flushSave,
     restoreActiveProject,
+    restoreWithUserPermission,
   }
 }

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 import logoSvg from '@/assets/logo.svg?raw'
 
 // Logo 组件，可以接收尺寸参数
@@ -12,8 +11,6 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   clickable: true,
 })
-
-const router = useRouter()
 
 const sizeClasses = {
   sm: 'text-sm',
@@ -28,9 +25,10 @@ const iconSizeClasses = {
 }
 
 function handleClick() {
-  if (props.clickable) {
-    router.push('/')
-  }
+  if (!props.clickable)
+    return
+
+  window.location.assign('/')
 }
 </script>
 
