@@ -122,12 +122,12 @@ export function useProjectPersistence() {
     if (!projectId)
       return
 
-    const persisted = await projectStore.loadActiveProjectState()
-    if (!persisted)
-      return
-
     isHydrating.value = true
     try {
+      const persisted = await projectStore.loadActiveProjectState()
+      if (!persisted)
+        return
+
       await editorStore.clippa.ready
       mediaStore.clearAllMedia()
 
@@ -199,8 +199,8 @@ export function useProjectPersistence() {
       return
 
     initialized = true
-    await restoreActiveProject()
     setupAutoSave()
+    await restoreActiveProject()
   }
 
   onUnmounted(() => {

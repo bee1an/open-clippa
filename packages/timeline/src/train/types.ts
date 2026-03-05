@@ -23,7 +23,7 @@ export type TrainEvents = {
    *
    * 这里使用对象的形式是为了让触发事件的时候可以修改这个参数
    */
-  beforeMove: [{ xValue: number }, target: Train]
+  beforeMove: [{ xValue: number, snapBypass?: boolean }, target: Train]
 
   /**
    * 每一次移动后
@@ -38,7 +38,7 @@ export type TrainEvents = {
   /**
    * 左侧调整器的值变化前
    */
-  beforeLeftResize: [{ xValue: number, wValue: number, disdrawable: boolean }, target: Train]
+  beforeLeftResize: [{ xValue: number, wValue: number, disdrawable: boolean, snapBypass?: boolean }, target: Train]
   /**
    * 左侧调整器pointerup
    */
@@ -52,7 +52,7 @@ export type TrainEvents = {
   /**
    * 右侧调整器的值变化前
    */
-  beforeRightResize: [{ wValue: number, disdrawable: boolean }, target: Train ]
+  beforeRightResize: [{ wValue: number, disdrawable: boolean, snapBypass?: boolean }, target: Train ]
 
   /**
    * 右侧调整器pointerup

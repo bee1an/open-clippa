@@ -1,6 +1,7 @@
 import type { PersistedHandleMediaAsset, PersistedMediaAsset, PersistedProjectState, PersistedUrlMediaAsset } from './types'
 import type { EditorContentSnapshot } from '@/history/editorContentSnapshot'
 import type { ImageFile, VideoFile } from '@/store/useMediaStore'
+import { toRaw } from 'vue'
 
 const ASSET_TOKEN_PREFIX = 'asset://'
 
@@ -27,7 +28,8 @@ function buildPersistedHandleAsset(
   kind: PersistedHandleMediaAsset['kind'],
   source: VideoFile | ImageFile,
 ): PersistedHandleMediaAsset | null {
-  if (!source.fileHandle)
+  const rawHandle = source.fileHandle ? toRaw(source.fileHandle) : null
+  if (!rawHandle)
     return null
 
   return {
@@ -35,7 +37,7 @@ function buildPersistedHandleAsset(
     kind,
     name: source.name,
     sourceType: 'handle',
-    handle: source.fileHandle,
+    handle: rawHandle,
     size: source.size,
     createdAt: source.createdAt?.getTime(),
   }

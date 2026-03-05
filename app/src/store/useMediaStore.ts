@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { reactive, ref } from 'vue'
+import { markRaw, reactive, ref } from 'vue'
 import { readFileFromHandle } from '@/persistence/fileSystemAccess'
 
 const REMOTE_ASSET_PROTOCOLS = new Set(['http:', 'https:'])
@@ -145,6 +145,13 @@ function resolveOptionalString(value: string | undefined): string | undefined {
   if (!normalized)
     return undefined
   return normalized
+}
+
+function normalizeFileHandle(handle: FileSystemFileHandle | undefined): FileSystemFileHandle | undefined {
+  if (!handle)
+    return undefined
+
+  return markRaw(handle)
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -487,7 +494,7 @@ export const useMediaStore = defineStore('media', () => {
       file,
       source: objectUrl,
       sourceType: options.sourceType ?? 'file',
-      fileHandle: options.fileHandle,
+      fileHandle: normalizeFileHandle(options.fileHandle),
       url: objectUrl,
       duration: 0,
       size: file.size,
@@ -607,7 +614,7 @@ export const useMediaStore = defineStore('media', () => {
       file,
       source: objectUrl,
       sourceType: options.sourceType ?? 'file',
-      fileHandle: options.fileHandle,
+      fileHandle: normalizeFileHandle(options.fileHandle),
       url: objectUrl,
       size: file.size,
       createdAt: new Date(),

@@ -1,3 +1,4 @@
+import type { AxisSnapState } from '@clippc/utils'
 import type { FederatedPointerEvent } from 'pixi.js'
 import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
@@ -12,11 +13,12 @@ import {
   TIMELINE_TRAIN_SEAM_EPSILON,
   TIMELINE_TRAIN_SEAM_WIDTH,
 } from '@clippc/constants'
-import { EventBus, getMsByPx, getPxByMs, isIntersection } from '@clippc/utils'
+import { EventBus, getMsByPx, getPxByMs, isIntersection, solveAxisSnap } from '@clippc/utils'
 import { Container, Graphics } from 'pixi.js'
 import { State } from './state'
 import { Train } from './train'
 import { collectAdjacentBoundaries, collectTrainJoinStates } from './utils/seam'
+import { buildTimelineEdgeSnapCandidates, buildTimelineLeftSnapCandidates } from './utils/snap'
 
 /**
  * rail height
@@ -46,6 +48,7 @@ export interface RailOption {
   zIndex: number
   railStyle?: TrainRailStyle
   trainsOption: TrainOption[]
+  resolveSnapPlayhead?: () => { x: number, time: number } | null
 }
 
 export interface RailTransitionHandle {
@@ -104,6 +107,7 @@ const TRANSITION_HANDLE_HIT_RADIUS = 14
 const TRANSITION_HANDLE_VISIBLE_RADIUS = 10
 const TRANSITION_HANDLE_STROKE_WIDTH = 1.5
 const RAIL_SEAM_LAYER_Z_INDEX = 20
+const RAIL_SNAP_GUIDE_LAYER_Z_INDEX = 25
 const RAIL_GAP_LAYER_Z_INDEX = 30
 const RAIL_TRANSITION_HANDLE_LAYER_Z_INDEX = 40
 const TRANSITION_HANDLE_IDLE_FILL = '#16181f'
@@ -113,6 +117,20 @@ const TRANSITION_HANDLE_ACTIVE_FILL = PRIMARYCOLOR
 const TRANSITION_HANDLE_ACTIVE_STROKE = PRIMARYCOLOR
 const TRANSITION_HANDLE_ACTIVE_ICON = '#171717'
 const TRANSITION_HANDLE_HOVER_RING = '#f2f2f2'
+const TRAIN_SNAP_ENTER_PX = 6
+const TRAIN_SNAP_EXIT_PX = 10
+const RAIL_SNAP_GUIDE_COLOR = '#60a5fa'
+const RAIL_SNAP_GUIDE_ALPHA = 0.95
+const RAIL_SNAP_GUIDE_WIDTH = 1.5
+
+type RailMoveSnapMeta = {
+  guideX: number
+  rawStartMs: number
+}
+
+type RailEdgeSnapMeta = {
+  guideX: number
+}
 
 export class Rail extends EventBus<RailEvents> {
   container: Container
@@ -129,6 +147,7 @@ export class Rail extends EventBus<RailEvents> {
   zIndex: number
   state: State = State.getInstance()
   private _seamLayer: Graphics
+  private _snapGuideLayer: Graphics
   private _gapInteractionLayer: Graphics
   private _transitionHandleLayer: Graphics
   private _hoveredGap: ClosableGap | null = null
@@ -136,7 +155,12 @@ export class Rail extends EventBus<RailEvents> {
   private _transitionHandles: RailTransitionHandle[] = []
   private _hoveredTransitionPairKey: string | null = null
   private _activeTransitionPairKey: string | null = null
-  private _dragDockState = new Map<Train, { target: Train, side: 'left' | 'right', escapeOffset: number }>()
+  private _resolveSnapPlayhead?: () => { x: number, time: number } | null
+  private _moveSnapState = new Map<Train, AxisSnapState | null>()
+  private _moveSnapRawStartMs = new Map<Train, number>()
+  private _leftResizeSnapState = new Map<Train, AxisSnapState | null>()
+  private _rightResizeSnapState = new Map<Train, AxisSnapState | null>()
+  private _activeSnapGuideX: number | null = null
   private _handlePxPerMsUpdated = (): void => {
     this._refreshVisualLayoutAndAdjacentVisuals()
   }
@@ -145,82 +169,10 @@ export class Rail extends EventBus<RailEvents> {
     return TIMELINE_TRAIN_CONNECTION_TIME_PX
   }
 
-  private _getDockSnapEnterPx(): number {
-    return Math.max(6, this._getConnectionGapPx() * 1.5)
-  }
-
-  private _getDockSnapExitPx(): number {
-    return this._getDockSnapEnterPx() + 4
-  }
-
-  private _getDockX(train: Train, target: Train, side: 'left' | 'right'): number {
-    const connectionGap = this._getConnectionGapPx()
-
-    if (side === 'left')
-      return Math.max(0, target.x - train.width - connectionGap)
-
-    return target.x + target.width + connectionGap
-  }
-
-  private _applyDock(
-    train: Train,
-    event: { xValue: number },
-    target: Train,
-    side: 'left' | 'right',
-  ): void {
-    const dockX = this._getDockX(train, target, side)
-    const currentDockState = this._dragDockState.get(train)
-    const keepEscapeOffset = currentDockState
-      && currentDockState.target === target
-      && currentDockState.side === side
-
-    this._dragDockState.set(train, {
-      target,
-      side,
-      escapeOffset: keepEscapeOffset ? currentDockState.escapeOffset : 0,
-    })
-    train.updateState('static')
-    event.xValue = dockX
-
-    if (train.container.x !== dockX)
-      train.container.x = dockX
-  }
-
-  private _pickNearestDockCandidate(
-    train: Train,
-    proposedX: number,
-    targets: readonly Train[],
-  ): { target: Train, side: 'left' | 'right', dockX: number, distance: number } | null {
-    let nearest: { target: Train, side: 'left' | 'right', dockX: number, distance: number } | null = null
-
-    for (const target of targets) {
-      if (target === train)
-        continue
-
-      const leftDockX = this._getDockX(train, target, 'left')
-      const rightDockX = this._getDockX(train, target, 'right')
-      const leftDistance = Math.abs(proposedX - leftDockX)
-      const rightDistance = Math.abs(proposedX - rightDockX)
-      const side: 'left' | 'right' = leftDistance <= rightDistance ? 'left' : 'right'
-      const dockX = side === 'left' ? leftDockX : rightDockX
-      const distance = Math.abs(proposedX - dockX)
-
-      if (!nearest || distance < nearest.distance) {
-        nearest = { target, side, dockX, distance }
-      }
-    }
-
-    return nearest
-  }
-
   getRawMsByVisualPx(_train: Train, visualPx: number): number {
-    const dockState = this._dragDockState.get(_train)
-    if (dockState) {
-      if (dockState.side === 'left')
-        return Math.max(0, dockState.target.start - _train.duration)
-
-      return dockState.target.start + dockState.target.duration
-    }
+    const snappedRawStartMs = this._moveSnapRawStartMs.get(_train)
+    if (Number.isFinite(snappedRawStartMs))
+      return Math.max(0, snappedRawStartMs!)
 
     const clampedVisualPx = Math.max(0, visualPx)
     const connectionGap = this._getConnectionGapPx()
@@ -303,6 +255,7 @@ export class Rail extends EventBus<RailEvents> {
     this.railStyle = railStyle
     this.height = getRailHeightByStyle(railStyle)
     this._drawBg()
+    this._renderSnapGuide()
     this._drawAdjacentSeams()
     this._renderTransitionHandles()
     return true
@@ -315,6 +268,7 @@ export class Rail extends EventBus<RailEvents> {
 
   private _refreshAdjacentVisuals(): void {
     this._syncTrainJoinState()
+    this._renderSnapGuide()
     this._drawAdjacentSeams()
     this._refreshGapInteractionAfterLayout()
     this._renderTransitionHandles()
@@ -332,12 +286,14 @@ export class Rail extends EventBus<RailEvents> {
     this.duration = option.duration
     this.zIndex = option.zIndex
     this.railStyle = option.railStyle ?? 'default'
+    this._resolveSnapPlayhead = option.resolveSnapPlayhead
     this.height = getRailHeightByStyle(this.railStyle)
 
     this.container = new Container({ y: this.y, label: 'rail', sortableChildren: true })
 
     this._drawBg()
     this._seamLayer = this._createSeamLayer()
+    this._snapGuideLayer = this._createSnapGuideLayer()
     this._gapInteractionLayer = this._createGapInteractionLayer()
     this._transitionHandleLayer = this._createTransitionHandleLayer()
 
@@ -355,43 +311,53 @@ export class Rail extends EventBus<RailEvents> {
    * 1. 吸附保持: 已吸附时在释放阈值内维持锁定, 防止抖动
    * 2. 吸附进入: 接近连接位时吸附
    */
-  private _trainBeforeMoveHandle = (event: { xValue: number }, train: Train): void => {
+  private _trainBeforeMoveHandle = (event: { xValue: number, snapBypass?: boolean }, train: Train): void => {
     const proposedX = Math.max(0, event.xValue)
-    const cachedDock = this._dragDockState.get(train)
+    const candidates = buildTimelineLeftSnapCandidates({
+      trainId: train.id,
+      width: train.width,
+      duration: train.duration,
+      targets: this.trains.map(item => ({
+        id: item.id,
+        x: item.x,
+        width: item.width,
+        start: item.start,
+        duration: item.duration,
+      })),
+      connectionGapPx: this._getConnectionGapPx(),
+      playhead: this._resolveSnapPlayhead?.() ?? null,
+    })
+    const result = solveAxisSnap<RailMoveSnapMeta>({
+      nextValue: proposedX,
+      candidates,
+      state: this._moveSnapState.get(train) ?? null,
+      enterThreshold: TRAIN_SNAP_ENTER_PX,
+      exitThreshold: TRAIN_SNAP_EXIT_PX,
+      bypass: event.snapBypass === true,
+      mode: 'incremental',
+    })
 
-    if (cachedDock) {
-      const dockX = this._getDockX(train, cachedDock.target, cachedDock.side)
-      cachedDock.escapeOffset += proposedX - dockX
-      const distance = Math.abs(cachedDock.escapeOffset)
-
-      if (distance < this._getDockSnapExitPx()) {
-        this._applyDock(train, event, cachedDock.target, cachedDock.side)
-        return
-      }
-
-      this._dragDockState.delete(train)
-      train.updateState('normal')
-      event.xValue = Math.max(0, dockX + cachedDock.escapeOffset)
+    this._moveSnapState.set(train, result.state)
+    if (result.snapped && result.candidate) {
+      this._moveSnapRawStartMs.set(train, result.candidate.meta?.rawStartMs ?? this.getRawMsByVisualPx(train, result.value))
+      this._setSnapGuideX(result.candidate.meta?.guideX ?? result.value)
+      train.updateState('static')
+      event.xValue = Math.max(0, result.value)
+      if (train.container.x !== event.xValue)
+        train.container.x = event.xValue
       return
     }
 
-    const nearestDock = this._pickNearestDockCandidate(
-      train,
-      proposedX,
-      this.trains,
-    )
-    if (nearestDock && nearestDock.distance <= this._getDockSnapEnterPx()) {
-      this._applyDock(train, event, nearestDock.target, nearestDock.side)
-      return
-    }
-
-    this._dragDockState.delete(train)
+    this._moveSnapRawStartMs.delete(train)
+    this._setSnapGuideX(null)
     train.updateState('normal')
-    event.xValue = proposedX
+    event.xValue = Math.max(0, result.value)
   }
 
   private _trainMoveEndHandle = (train: Train): void => {
-    this._dragDockState.delete(train)
+    this._moveSnapState.delete(train)
+    this._moveSnapRawStartMs.delete(train)
+    this._setSnapGuideX(null)
     this.insertTrain(train)
 
     this.updateTrainsPos()
@@ -413,7 +379,46 @@ export class Rail extends EventBus<RailEvents> {
     xValue: number
     wValue: number
     disdrawable: boolean
+    snapBypass?: boolean
   }, train: Train): void => {
+    const candidateWidth = Math.max(1, event.wValue)
+    const leftCandidates = buildTimelineEdgeSnapCandidates({
+      trainId: train.id,
+      width: candidateWidth,
+      duration: Math.max(1, getMsByPx(candidateWidth, this.state.pxPerMs)),
+      targets: this.trains.map(item => ({
+        id: item.id,
+        x: item.x,
+        width: item.width,
+        start: item.start,
+        duration: item.duration,
+      })),
+      connectionGapPx: this._getConnectionGapPx(),
+      playhead: this._resolveSnapPlayhead?.() ?? null,
+      edge: 'left',
+    })
+    const snapResult = solveAxisSnap<RailEdgeSnapMeta>({
+      nextValue: event.xValue,
+      candidates: leftCandidates,
+      state: this._leftResizeSnapState.get(train) ?? null,
+      enterThreshold: TRAIN_SNAP_ENTER_PX,
+      exitThreshold: TRAIN_SNAP_EXIT_PX,
+      bypass: event.snapBypass === true,
+      mode: 'incremental',
+    })
+    this._leftResizeSnapState.set(train, snapResult.state)
+    {
+      const oldRight = event.xValue + event.wValue
+      event.xValue = Math.max(0, snapResult.value)
+      event.wValue = oldRight - event.xValue
+    }
+    if (snapResult.snapped && snapResult.candidate) {
+      this._setSnapGuideX(snapResult.candidate.meta?.guideX ?? snapResult.value)
+    }
+    else if (!this._rightResizeSnapState.get(train)) {
+      this._setSnapGuideX(null)
+    }
+
     const connectionGap = this._getConnectionGapPx()
     const [intersectTrain] = this.trains.filter((item) => {
       if (item.x >= train.container.x)
@@ -443,6 +448,8 @@ export class Rail extends EventBus<RailEvents> {
    * 收集当前resize的train右边的train集合
    */
   private _trainRightResizeStartHandle = (train: Train): void => {
+    this._leftResizeSnapState.set(train, null)
+    this._rightResizeSnapState.set(train, null)
     this._rightTrains = this.trains.filter(item => item.x >= train.container.x)
   }
 
@@ -451,7 +458,42 @@ export class Rail extends EventBus<RailEvents> {
    * 仅仅是位置, 并不会改变train的开始时间
    * 改变开始时间将在拖拽结束时进行
    */
-  private _trainBeforeRightResizeHandle = (): void => {
+  private _trainBeforeRightResizeHandle = (event: { wValue: number, disdrawable: boolean, snapBypass?: boolean }, train: Train): void => {
+    const candidateWidth = Math.max(1, event.wValue)
+    const rightEdge = train.x + event.wValue
+    const rightCandidates = buildTimelineEdgeSnapCandidates({
+      trainId: train.id,
+      width: candidateWidth,
+      duration: Math.max(1, getMsByPx(candidateWidth, this.state.pxPerMs)),
+      targets: this.trains.map(item => ({
+        id: item.id,
+        x: item.x,
+        width: item.width,
+        start: item.start,
+        duration: item.duration,
+      })),
+      connectionGapPx: this._getConnectionGapPx(),
+      playhead: this._resolveSnapPlayhead?.() ?? null,
+      edge: 'right',
+    })
+    const snapResult = solveAxisSnap<RailEdgeSnapMeta>({
+      nextValue: rightEdge,
+      candidates: rightCandidates,
+      state: this._rightResizeSnapState.get(train) ?? null,
+      enterThreshold: TRAIN_SNAP_ENTER_PX,
+      exitThreshold: TRAIN_SNAP_EXIT_PX,
+      bypass: event.snapBypass === true,
+      mode: 'incremental',
+    })
+    this._rightResizeSnapState.set(train, snapResult.state)
+    event.wValue = Math.max(1, snapResult.value - train.x)
+    if (snapResult.snapped && snapResult.candidate) {
+      this._setSnapGuideX(snapResult.candidate.meta?.guideX ?? snapResult.value)
+    }
+    else if (!this._leftResizeSnapState.get(train)) {
+      this._setSnapGuideX(null)
+    }
+
     if (!this._rightTrains)
       return
 
@@ -461,7 +503,9 @@ export class Rail extends EventBus<RailEvents> {
       if (i === this._rightTrains.length - 1)
         break
 
-      const { container, width } = this._rightTrains[i]
+      const current = this._rightTrains[i]
+      const { container } = current
+      const width = current === train ? event.wValue : current.width
 
       const rightX = container.x + width + connectionGap
 
@@ -482,19 +526,25 @@ export class Rail extends EventBus<RailEvents> {
    * 修改右边train的位置和开始时间
    * 发送 `trainRightResizeEnd` 事件, 父类将检测总时长是否需要更新
    */
-  private _trainRightResizeEndHandle = (): void => {
+  private _trainRightResizeEndHandle = (train: Train): void => {
     this._rightTrains?.forEach((item) => {
       item.x = item.container.x
       item.start = this.getRawMsByVisualPx(item, item.x)
     })
 
     this._rightTrains = null
+    this._leftResizeSnapState.delete(train)
+    this._rightResizeSnapState.delete(train)
+    this._setSnapGuideX(null)
 
     this._refreshVisualLayoutAndAdjacentVisuals()
     this.emit('trainRightResizeEnd')
   }
 
-  private _trainLeftResizeEndHandle = (): void => {
+  private _trainLeftResizeEndHandle = (train: Train): void => {
+    this._leftResizeSnapState.delete(train)
+    this._rightResizeSnapState.delete(train)
+    this._setSnapGuideX(null)
     this._refreshVisualLayoutAndAdjacentVisuals()
   }
 
@@ -522,6 +572,36 @@ export class Rail extends EventBus<RailEvents> {
     seamLayer.visible = true
     this.container.addChild(seamLayer)
     return seamLayer
+  }
+
+  private _createSnapGuideLayer(): Graphics {
+    const snapGuideLayer = new Graphics({ label: 'rail-snap-guide' })
+    snapGuideLayer.eventMode = 'none'
+    snapGuideLayer.zIndex = RAIL_SNAP_GUIDE_LAYER_Z_INDEX
+    snapGuideLayer.visible = true
+    this.container.addChild(snapGuideLayer)
+    return snapGuideLayer
+  }
+
+  private _renderSnapGuide(): void {
+    this._snapGuideLayer.clear()
+
+    if (this._activeSnapGuideX === null)
+      return
+
+    this._snapGuideLayer
+      .moveTo(this._activeSnapGuideX, -TIMELINE_TRAIN_BORDER_SIZE)
+      .lineTo(this._activeSnapGuideX, this.height + TIMELINE_TRAIN_BORDER_SIZE)
+      .stroke({ color: RAIL_SNAP_GUIDE_COLOR, alpha: RAIL_SNAP_GUIDE_ALPHA, width: RAIL_SNAP_GUIDE_WIDTH })
+  }
+
+  private _setSnapGuideX(x: number | null): void {
+    const normalized = Number.isFinite(x) ? x : null
+    if (this._activeSnapGuideX === normalized)
+      return
+
+    this._activeSnapGuideX = normalized
+    this._renderSnapGuide()
   }
 
   private _createGapInteractionLayer(): Graphics {
@@ -973,6 +1053,7 @@ export class Rail extends EventBus<RailEvents> {
 
   private _moveVisualLayerToTop(): void {
     this.container.addChild(this._seamLayer)
+    this.container.addChild(this._snapGuideLayer)
     this.container.addChild(this._gapInteractionLayer)
     this.container.addChild(this._transitionHandleLayer)
   }
@@ -1141,7 +1222,11 @@ export class Rail extends EventBus<RailEvents> {
     this.trains.splice(index, 1)
     this.container.removeChild(train.container)
     train.parent = null
-    this._dragDockState.delete(train)
+    this._moveSnapState.delete(train)
+    this._moveSnapRawStartMs.delete(train)
+    this._leftResizeSnapState.delete(train)
+    this._rightResizeSnapState.delete(train)
+    this._setSnapGuideX(null)
 
     this._unbindTrainMoveEvents(train)
     this._unbindResizeEvents(train)

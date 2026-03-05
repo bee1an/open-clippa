@@ -485,8 +485,12 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
 
         this.emit('moveStart')
       },
-      move: (_, { dx, dy }) => {
-        const site = { xValue: this.x + dx, yValue: this.y + dy }
+      move: (event, { dx, dy }) => {
+        const site = {
+          xValue: this.x + dx,
+          yValue: this.y + dy,
+          snapBypass: event.altKey,
+        }
 
         this.emit('beforeMove', site, this)
 
@@ -559,11 +563,12 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         this._resizing = true
         this._updateResizerVisualVisibility()
       },
-      move: (_, { dx }) => {
+      move: (event, { dx }) => {
         const site = {
           wValue: this.width - dx,
           xValue: this.x + dx,
           disdrawable: false,
+          snapBypass: event.altKey,
         }
 
         this.emit('beforeLeftResize', site, this)
@@ -610,10 +615,11 @@ export class Train<T extends TrainEvents = TrainEvents> extends EventBus<T> {
         this._updateResizerVisualVisibility()
         this.emit('rightResizeStart', this)
       },
-      move: (_, { dx }) => {
+      move: (event, { dx }) => {
         const site = {
           wValue: this.width + dx,
           disdrawable: false,
+          snapBypass: event.altKey,
         }
         this.emit('beforeRightResize', site, this)
 

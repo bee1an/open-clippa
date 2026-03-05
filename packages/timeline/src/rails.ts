@@ -19,6 +19,7 @@ export interface RailsOption {
   screenHeight: number
   duration: number
   maxZIndex?: number
+  resolveSnapPlayhead?: () => { x: number, time: number } | null
 }
 
 export interface RailsTransitionHandle extends RailTransitionHandle {
@@ -89,6 +90,7 @@ export class Rails extends EventBus<RailsEvents> {
   private _transitionHandles: RailsTransitionHandle[] = []
   private _activeTransitionPairKey: string | null = null
   private _activeGapRail: Rail | null = null
+  private _resolveSnapPlayhead?: () => { x: number, time: number } | null
   get offsetX(): number {
     return this.scrollBox.offsetX
   }
@@ -119,6 +121,7 @@ export class Rails extends EventBus<RailsEvents> {
     this.screenWidth = option.screenWidth
     this.screenHeight = option.screenHeight
     this.duration = option.duration
+    this._resolveSnapPlayhead = option.resolveSnapPlayhead
     if (typeof option.maxZIndex === 'number') {
       this.maxZIndex = option.maxZIndex
     }
@@ -306,6 +309,7 @@ export class Rails extends EventBus<RailsEvents> {
         zIndex,
         railStyle,
         trainsOption: trainsOptions,
+        resolveSnapPlayhead: this._resolveSnapPlayhead,
       },
     )
 

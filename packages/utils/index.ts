@@ -1,6 +1,7 @@
 export * from './src/array'
 export * from './src/drag'
 export * from './src/eventBus'
+export * from './src/snap'
 export * from './src/time'
 export * from './src/tools'
 export * from './src/transform'

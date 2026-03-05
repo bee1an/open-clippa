@@ -224,6 +224,10 @@ export class Timeline extends EventBus<TimlineEvents> {
       screenWidth: this.app!.screen.width - TIMELINE_LEFT_PADDING,
       screenHeight: this.app!.screen.height,
       duration: this.duration,
+      resolveSnapPlayhead: () => ({
+        x: this.currentPx,
+        time: this.currentTime,
+      }),
     })
 
     this.container.addChild(this.rails.container)
