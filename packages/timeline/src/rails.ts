@@ -688,7 +688,8 @@ export class Rails extends EventBus<RailsEvents> {
     // maxZIndex must be updated BEFORE _createRail / _createRailGap,
     // because _insertRailByZIndex / _insertGapByZIndex depend on it
     // to compute correct splice positions.
-    this.maxZIndex++
+    // Keep maxZIndex aligned with requested zIndex for first insertion (zIndex can be 1).
+    this.maxZIndex = Math.max(this.maxZIndex + 1, zIndex)
 
     const rail = this._createRail(zIndex, railStyle)
     this._createRailGap(zIndex)
@@ -744,12 +745,13 @@ export class Rails extends EventBus<RailsEvents> {
       return existingRail
     }
 
-    if (zIndex >= this.rails.length) {
+    const nextSequentialZIndex = this.maxZIndex < 0 ? 1 : this.maxZIndex + 1
+    if (zIndex > nextSequentialZIndex) {
       /**
        * Rails只能应对rails数组连续的情况
-       * 这种情况属于越级创建, 例在zindex0未创建的情况下创建zindex1
+       * 这种情况属于越级创建, 例如在 zIndex2 未创建的情况下创建 zIndex3
        */
-      for (let index = this.rails.length; index < zIndex; index++) {
+      for (let index = nextSequentialZIndex; index < zIndex; index++) {
         this._createRailByZIndexRaw(index, 'default')
       }
     }
