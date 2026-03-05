@@ -54,17 +54,25 @@ vi.mock('@clippc/performer', () => {
     playState = 'paused'
     private listeners = new Map<string, Set<(...args: any[]) => void>>()
     private bounds: { x: number, y: number, width: number, height: number, rotation: number }
+    private deferLoad: boolean
+    private loadedWidth: number
+    private loadedHeight: number
+    private loadPromise: Promise<void> | null = null
+    private resolvePendingLoad: (() => void) | null = null
 
-    constructor(option: { id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number }) {
+    constructor(option: { id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number, deferLoad?: boolean, loadedWidth?: number, loadedHeight?: number }) {
       this.id = option.id
       this.start = option.start
       this.duration = option.duration
       this.zIndex = option.zIndex
+      this.deferLoad = option.deferLoad ?? false
+      this.loadedWidth = option.loadedWidth ?? option.width ?? 100
+      this.loadedHeight = option.loadedHeight ?? option.height ?? 100
       this.bounds = {
         x: option.x ?? 0,
         y: option.y ?? 0,
-        width: option.width ?? 100,
-        height: option.height ?? 100,
+        width: option.width ?? (this.deferLoad ? 0 : this.loadedWidth),
+        height: option.height ?? (this.deferLoad ? 0 : this.loadedHeight),
         rotation: 0,
       }
     }
@@ -79,7 +87,32 @@ vi.mock('@clippc/performer', () => {
       this.listeners.get(event)?.forEach(handler => handler(...args))
     }
 
-    async load(): Promise<void> {}
+    async load(): Promise<void> {
+      if (this.loadPromise)
+        return this.loadPromise
+
+      if (!this.deferLoad) {
+        this.bounds.width = this.loadedWidth
+        this.bounds.height = this.loadedHeight
+        this.loadPromise = Promise.resolve()
+        return this.loadPromise
+      }
+
+      this.loadPromise = new Promise<void>((resolve) => {
+        this.resolvePendingLoad = () => {
+          this.bounds.width = this.loadedWidth
+          this.bounds.height = this.loadedHeight
+          this.deferLoad = false
+          this.resolvePendingLoad = null
+          resolve()
+        }
+      })
+      return this.loadPromise
+    }
+
+    resolveLoad(): void {
+      this.resolvePendingLoad?.()
+    }
 
     containsPoint(): boolean {
       return false
@@ -133,7 +166,7 @@ vi.mock('@clippc/performer', () => {
     src: string
     sourceStart: number
 
-    constructor(option: { src: string, sourceStart?: number, id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number }) {
+    constructor(option: { src: string, sourceStart?: number, id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number, deferLoad?: boolean, loadedWidth?: number, loadedHeight?: number }) {
       super(option)
       this.src = option.src
       this.sourceStart = option.sourceStart ?? 0
@@ -143,7 +176,7 @@ vi.mock('@clippc/performer', () => {
   class Image extends MockPerformer {
     src: string
 
-    constructor(option: { src: string, id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number }) {
+    constructor(option: { src: string, id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number, deferLoad?: boolean, loadedWidth?: number, loadedHeight?: number }) {
       super(option)
       this.src = option.src
     }
@@ -153,7 +186,7 @@ vi.mock('@clippc/performer', () => {
     private content: string
     private style: { fill?: string | number }
 
-    constructor(option: { content: string, style?: { fill?: string | number }, id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number }) {
+    constructor(option: { content: string, style?: { fill?: string | number }, id: string, start: number, duration: number, zIndex: number, x?: number, y?: number, width?: number, height?: number, deferLoad?: boolean, loadedWidth?: number, loadedHeight?: number }) {
       super(option)
       this.content = option.content
       this.style = option.style ?? {}
@@ -198,6 +231,13 @@ describe('usePerformerStore cleanup integration', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
+
+  async function flushMicrotasks(): Promise<void> {
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  }
 
   it('calls clippa.fire when removing one performer', () => {
     const store = usePerformerStore()
@@ -290,5 +330,31 @@ describe('usePerformerStore cleanup integration', () => {
     store.updatePerformer(performer.id, { alpha: 0.5 } as any)
 
     expect(store.contentRevision).toBeGreaterThan(before)
+  })
+
+  it('refreshes selected bounds after deferred media load resolves', async () => {
+    const store = usePerformerStore()
+    const performer = store.addPerformer({
+      id: 'video-loading-selected',
+      type: 'video',
+      src: 'https://example.com/video.mp4',
+      start: 0,
+      duration: 2000,
+      x: 0,
+      y: 0,
+      deferLoad: true,
+      loadedWidth: 640,
+      loadedHeight: 360,
+    } as any)
+
+    store.selectPerformer(performer.id)
+    expect(store.selectedPerformers[0]?.bounds.width).toBe(0)
+    expect(store.selectedPerformers[0]?.bounds.height).toBe(0)
+
+    ;(performer as any).resolveLoad()
+    await flushMicrotasks()
+
+    expect(store.selectedPerformers[0]?.bounds.width).toBe(640)
+    expect(store.selectedPerformers[0]?.bounds.height).toBe(360)
   })
 })

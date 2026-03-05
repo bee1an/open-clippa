@@ -189,6 +189,18 @@ export const usePerformerStore = defineStore('performer', () => {
     markContentDirty()
   }
 
+  const syncSelectedPerformerBounds = (performer: CanvasPerformer) => {
+    const selectedIndex = selectedPerformers.value.findIndex(s => s.id === performer.id)
+    if (selectedIndex === -1)
+      return
+
+    selectedPerformers.value[selectedIndex] = {
+      ...selectedPerformers.value[selectedIndex],
+      bounds: performer.getBaseBounds(),
+      timestamp: Date.now(),
+    }
+  }
+
   const fitPerformerToStage = async (performer: CanvasPerformer) => {
     if (fittedPerformers.has(performer))
       return
@@ -304,6 +316,10 @@ export const usePerformerStore = defineStore('performer', () => {
         }
 
         return fitPerformerToStage(performer)
+          .finally(() => {
+            // 选中时媒体仍在加载会先缓存 0 尺寸，这里在加载完成后主动同步一次。
+            syncSelectedPerformerBounds(performer)
+          })
       })
       .catch(() => {})
 
