@@ -42,6 +42,7 @@ interface EditorStoreLike {
   duration: number
   clippa?: {
     stage?: {
+      contentRoot?: unknown
       app?: {
         canvas?: CanvasFrameLike
         stage?: unknown
@@ -154,7 +155,7 @@ function resolveExtractRenderer(editorStore: EditorStoreLike): RendererWithExtra
 }
 
 function resolveExtractTarget(editorStore: EditorStoreLike): unknown | null {
-  return editorStore.clippa?.stage?.app?.stage ?? null
+  return editorStore.clippa?.stage?.contentRoot ?? editorStore.clippa?.stage?.app?.stage ?? null
 }
 
 function resolveScreenshotSize(

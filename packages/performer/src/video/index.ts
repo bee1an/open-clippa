@@ -5,12 +5,16 @@ import type {
 import type { FederatedPointerEvent, Filter } from 'pixi.js'
 import type { AnimationLayout, PerformerAnimationSpec, TransformState } from '../animation'
 import type {
+  CropHandleDirection,
+  CropHandleResizeResult,
   CropInsets,
   CropMaskRect,
   Performer,
+  PerformerClipShape,
   PerformerOption,
   SideCropResizeInput,
   SideCropResizeResult,
+  SourceRenderBounds,
 } from '../performer'
 import { EventBus, transformSrc } from '@clippc/utils'
 import {
@@ -21,7 +25,8 @@ import {
 } from 'mediabunny'
 import { Graphics, Sprite, Texture } from 'pixi.js'
 import { AnimationController, DEFAULT_TRANSFORM_STATE } from '../animation'
-import { applySideCropResize, cloneCrop, EMPTY_CROP, normalizeCropInsets, resolveVisibleLocalSize } from '../mediaCrop'
+import { cloneClipShape, drawClipShapePath, hasClipShape as hasRenderableClipShape, isPointInsideClipShape } from '../clipShape'
+import { applyCropHandleResize, applySideCropResize, cloneCrop, EMPTY_CROP, normalizeCropInsets, panCropByWorldDelta, resolveVisibleLocalSize } from '../mediaCrop'
 import { PlayState, ShowState } from '../performer'
 
 export interface PerformerClickEvent {
@@ -64,6 +69,7 @@ export interface VideoOption extends PerformerOption {
 
   y?: number
   crop?: Partial<CropInsets> | null
+  clipShape?: PerformerClipShape | null
 }
 
 export class Video extends EventBus<PerformerEvents> implements Performer {
@@ -106,7 +112,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
   constructor(option: VideoOption) {
     super()
-    const { id, start, duration, src, zIndex, crop } = option
+    const { id, start, duration, src, zIndex, crop, clipShape } = option
 
     this.id = id
     this.start = start
@@ -118,6 +124,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.sourceDuration = option.sourceDuration ?? option.duration
     this.sourceStart = option.sourceStart ?? 0
     this._cropInsets = cloneCrop(crop)
+    this._clipShape = cloneClipShape(clipShape)
 
     this.load(option)
   }
@@ -130,6 +137,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   private _animationController?: AnimationController
   private _cropInsets: CropInsets = { ...EMPTY_CROP }
   private _cropMask?: Graphics
+  private _clipShape: PerformerClipShape | null = null
   private _trackLocalSize: { width: number, height: number } | null = null
 
   private _frameIntervalMs: number = Video._DEFAULT_FRAME_INTERVAL_MS
@@ -176,7 +184,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
         if (y !== undefined)
           this._sprite.y = y
 
-        this._syncCropState()
+        this._syncMaskState()
 
         if (width !== undefined || height !== undefined) {
           const bounds = this.getBounds()
@@ -188,7 +196,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
           }
         }
 
-        this._syncCropState()
+        this._syncMaskState()
         this.valid = true
         this._updateBaseTransform()
         this._applyAnimationForCurrentTime()
@@ -450,7 +458,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       if (visibleLocal.height > Video._SCALE_EPSILON) {
         sprite.scale.y = preservedScaleSignY * (Math.max(0, preservedBounds.height) / visibleLocal.height)
       }
-      this._syncCropState()
+      this._syncMaskState()
 
       this._lastRenderedTime = normalizedTime
     }
@@ -531,24 +539,31 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
   containsPoint(canvasX: number, canvasY: number): boolean {
     const bounds = this.getBounds()
+    let localX: number
+    let localY: number
+
     if (bounds.rotation === 0) {
-      return canvasX >= bounds.x && canvasX <= bounds.x + bounds.width
-        && canvasY >= bounds.y && canvasY <= bounds.y + bounds.height
+      localX = canvasX - bounds.x
+      localY = canvasY - bounds.y
+    }
+    else {
+      const angle = -bounds.rotation * Math.PI / 180
+      const cos = Math.cos(angle)
+      const sin = Math.sin(angle)
+      const dx = canvasX - bounds.x
+      const dy = canvasY - bounds.y
+
+      localX = dx * cos - dy * sin
+      localY = dx * sin + dy * cos
     }
 
-    const angle = -bounds.rotation * Math.PI / 180
+    if (localX < 0 || localX > bounds.width || localY < 0 || localY > bounds.height)
+      return false
 
-    const cos = Math.cos(angle)
-    const sin = Math.sin(angle)
+    if (!this._clipShape)
+      return true
 
-    const dx = canvasX - bounds.x
-    const dy = canvasY - bounds.y
-
-    const localX = dx * cos - dy * sin
-    const localY = dx * sin + dy * cos
-
-    return localX >= 0 && localX <= bounds.width
-      && localY >= 0 && localY <= bounds.height
+    return isPointInsideClipShape(localX, localY, this._clipShape, bounds.width, bounds.height)
   }
 
   getBounds(): Required<VideoBounds> {
@@ -664,7 +679,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     this._sprite.scale.x = scaleX
     this._sprite.scale.y = scaleY
-    this._syncCropState()
+    this._syncMaskState()
     this.notifyPositionUpdate()
 
     if (!this._animationController?.isApplying)
@@ -704,6 +719,25 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
       || this._cropInsets.bottom > Video._SCALE_EPSILON
   }
 
+  getClipShape(): PerformerClipShape | null {
+    return cloneClipShape(this._clipShape)
+  }
+
+  setClipShape(shape: PerformerClipShape | null): PerformerClipShape | null {
+    this._clipShape = cloneClipShape(shape)
+    this._syncMaskState()
+    this.notifyPositionUpdate()
+    return this.getClipShape()
+  }
+
+  clearClipShape(): PerformerClipShape | null {
+    return this.setClipShape(null)
+  }
+
+  hasClipShape(): boolean {
+    return hasRenderableClipShape(this._clipShape)
+  }
+
   setCropInsets(crop: Partial<CropInsets> | null): CropInsets {
     const nextCrop = crop ? { ...this._cropInsets, ...crop } : { ...EMPTY_CROP }
 
@@ -714,7 +748,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     const localSize = this._resolveRawLocalSize()
     this._cropInsets = normalizeCropInsets(nextCrop, localSize.width, localSize.height)
-    this._syncCropState()
+    this._syncMaskState()
     this.notifyPositionUpdate()
 
     return this.getCropInsets()
@@ -725,7 +759,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   }
 
   getMaskRect(): CropMaskRect | null {
-    if (!this._sprite || !this.hasCrop())
+    if (!this._sprite || (!this.hasCrop() && !this.hasClipShape()))
       return null
 
     const localSize = this._resolveRawLocalSize()
@@ -757,6 +791,70 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.setScale(result.scaleX, result.scaleY)
     this.setCropInsets(result.crop)
     return result
+  }
+
+  applyCropHandleResize(
+    direction: CropHandleDirection,
+    deltaLocalX: number,
+    deltaLocalY: number,
+    preserveAspectRatio: boolean = false,
+  ): CropHandleResizeResult | null {
+    if (!this._sprite)
+      return null
+
+    const localSize = this._resolveRawLocalSize()
+    const result = applyCropHandleResize({
+      direction,
+      localWidth: localSize.width,
+      localHeight: localSize.height,
+      scaleX: this._sprite.scale.x,
+      scaleY: this._sprite.scale.y,
+      crop: this._cropInsets,
+      deltaLocalX,
+      deltaLocalY,
+      preserveAspectRatio,
+    })
+
+    this.setCropInsets(result.crop)
+    return result
+  }
+
+  panCropByWorldDelta(deltaCanvasX: number, deltaCanvasY: number): CropInsets | null {
+    if (!this._sprite)
+      return null
+
+    const localSize = this._resolveRawLocalSize()
+    const nextCrop = panCropByWorldDelta({
+      localWidth: localSize.width,
+      localHeight: localSize.height,
+      scaleX: this._sprite.scale.x,
+      scaleY: this._sprite.scale.y,
+      crop: this._cropInsets,
+      deltaCanvasX,
+      deltaCanvasY,
+    })
+
+    return this.setCropInsets(nextCrop)
+  }
+
+  panCropByLocalDelta(deltaLocalX: number, deltaLocalY: number): CropInsets | null {
+    return this.panCropByWorldDelta(deltaLocalX, deltaLocalY)
+  }
+
+  getSourceRenderBounds(): SourceRenderBounds | null {
+    if (!this._sprite)
+      return null
+
+    const localSize = this._resolveRawLocalSize()
+    const currentTransform = this._getCurrentTransform()
+    return {
+      x: currentTransform.x - this._cropInsets.left * currentTransform.scaleX,
+      y: currentTransform.y - this._cropInsets.top * currentTransform.scaleY,
+      width: Math.max(0, localSize.width * Math.abs(currentTransform.scaleX)),
+      height: Math.max(0, localSize.height * Math.abs(currentTransform.scaleY)),
+      rotation: currentTransform.rotation,
+      alpha: currentTransform.alpha,
+    }
   }
 
   destroy(): void {
@@ -886,7 +984,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this._sprite.scale.y = transform.scaleY
     this._sprite.angle = transform.rotation
     this._sprite.alpha = transform.alpha
-    this._syncCropState()
+    this._syncMaskState()
   }
 
   private _updateBaseTransform(): void {
@@ -996,7 +1094,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     return resolveVisibleLocalSize(localSize.width, localSize.height, this._cropInsets)
   }
 
-  private _syncCropState(): void {
+  private _syncMaskState(): void {
     if (!this._sprite)
       return
 
@@ -1009,7 +1107,7 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     const localSize = this._resolveRawLocalSize()
     this._cropInsets = normalizeCropInsets(this._cropInsets, localSize.width, localSize.height)
 
-    if (!this.hasCrop()) {
+    if (!this.hasCrop() && !this.hasClipShape()) {
       if (this._cropMask) {
         this._cropMask.clear()
         if (sprite.mask === this._cropMask)
@@ -1027,12 +1125,30 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
 
     const visible = resolveVisibleLocalSize(localSize.width, localSize.height, this._cropInsets)
     this._cropMask.clear()
-      .rect(this._cropInsets.left, this._cropInsets.top, visible.width, visible.height)
-      .fill('#ffffff')
+    if (this._clipShape) {
+      drawClipShapePath(
+        this._cropMask,
+        this._clipShape,
+        this._cropInsets.left,
+        this._cropInsets.top,
+        visible.width,
+        visible.height,
+      )
+      this._cropMask.fill('#ffffff')
+    }
+    else {
+      this._cropMask
+        .rect(this._cropInsets.left, this._cropInsets.top, visible.width, visible.height)
+        .fill('#ffffff')
+    }
     if (this._cropMask.parent !== sprite && typeof sprite.addChild === 'function')
       sprite.addChild(this._cropMask)
     if (sprite.mask !== this._cropMask)
       sprite.mask = this._cropMask
     sprite.pivot?.set?.(this._cropInsets.left, this._cropInsets.top)
+  }
+
+  protected _syncCropState(): void {
+    this._syncMaskState()
   }
 }

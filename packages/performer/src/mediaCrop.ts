@@ -1,4 +1,4 @@
-import type { CropInsets, SideCropDirection, SideCropResizeResult } from './performer'
+import type { CropHandleDirection, CropHandleResizeResult, CropInsets, SideCropDirection, SideCropResizeResult } from './performer'
 
 const LOCAL_MIN_VISIBLE = 0.5
 const WORLD_EPSILON = 1e-6
@@ -248,4 +248,166 @@ export function applySideCropResize(input: {
     targetVisibleWidth,
     targetVisibleHeight,
   )
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+export function panCropByWorldDelta(input: {
+  localWidth: number
+  localHeight: number
+  scaleX: number
+  scaleY: number
+  crop: Partial<CropInsets> | null | undefined
+  deltaCanvasX: number
+  deltaCanvasY: number
+}): CropInsets {
+  const localWidth = Math.max(LOCAL_MIN_VISIBLE, input.localWidth)
+  const localHeight = Math.max(LOCAL_MIN_VISIBLE, input.localHeight)
+  const crop = normalizeCropInsets(input.crop, localWidth, localHeight)
+  const visible = resolveVisibleLocalSize(localWidth, localHeight, crop)
+  const maxLeft = Math.max(0, localWidth - visible.width)
+  const maxTop = Math.max(0, localHeight - visible.height)
+  const absScaleX = Math.max(WORLD_EPSILON, Math.abs(input.scaleX))
+  const absScaleY = Math.max(WORLD_EPSILON, Math.abs(input.scaleY))
+  const deltaLocalX = input.deltaCanvasX / absScaleX
+  const deltaLocalY = input.deltaCanvasY / absScaleY
+  const nextLeft = clamp(crop.left - deltaLocalX, 0, maxLeft)
+  const nextTop = clamp(crop.top - deltaLocalY, 0, maxTop)
+
+  return {
+    left: nextLeft,
+    top: nextTop,
+    right: Math.max(0, maxLeft - nextLeft),
+    bottom: Math.max(0, maxTop - nextTop),
+  }
+}
+
+export function applyCropHandleResize(input: {
+  direction: CropHandleDirection
+  localWidth: number
+  localHeight: number
+  scaleX: number
+  scaleY: number
+  crop: Partial<CropInsets> | null | undefined
+  deltaLocalX: number
+  deltaLocalY: number
+  preserveAspectRatio?: boolean
+}): CropHandleResizeResult {
+  const localWidth = Math.max(LOCAL_MIN_VISIBLE, input.localWidth)
+  const localHeight = Math.max(LOCAL_MIN_VISIBLE, input.localHeight)
+  const currentCrop = normalizeCropInsets(input.crop, localWidth, localHeight)
+  const absScaleX = Math.max(WORLD_EPSILON, Math.abs(input.scaleX))
+  const absScaleY = Math.max(WORLD_EPSILON, Math.abs(input.scaleY))
+  const currentVisible = resolveVisibleLocalSize(localWidth, localHeight, currentCrop)
+  const resizeLeft = input.direction === 'left' || input.direction === 'top-left' || input.direction === 'bottom-left'
+  const resizeRight = input.direction === 'right' || input.direction === 'top-right' || input.direction === 'bottom-right'
+  const resizeTop = input.direction === 'top' || input.direction === 'top-left' || input.direction === 'top-right'
+  const resizeBottom = input.direction === 'bottom' || input.direction === 'bottom-left' || input.direction === 'bottom-right'
+  const keepAspectRatio = input.preserveAspectRatio === true
+
+  let nextLeft = currentCrop.left
+  let nextRight = currentCrop.right
+  let nextTop = currentCrop.top
+  let nextBottom = currentCrop.bottom
+
+  if (keepAspectRatio) {
+    const widthDeltaLocal = resizeLeft
+      ? -(input.deltaLocalX / absScaleX)
+      : resizeRight
+        ? (input.deltaLocalX / absScaleX)
+        : 0
+    const heightDeltaLocal = resizeTop
+      ? -(input.deltaLocalY / absScaleY)
+      : resizeBottom
+        ? (input.deltaLocalY / absScaleY)
+        : 0
+    const widthScale = currentVisible.width > WORLD_EPSILON
+      ? (currentVisible.width + widthDeltaLocal) / currentVisible.width
+      : 1
+    const heightScale = currentVisible.height > WORLD_EPSILON
+      ? (currentVisible.height + heightDeltaLocal) / currentVisible.height
+      : 1
+
+    let requestedScale = 1
+    if (resizeLeft || resizeRight) {
+      requestedScale = widthScale
+    }
+    if (resizeTop || resizeBottom) {
+      if (!(resizeLeft || resizeRight)) {
+        requestedScale = heightScale
+      }
+      else {
+        requestedScale = Math.abs(widthScale - 1) >= Math.abs(heightScale - 1)
+          ? widthScale
+          : heightScale
+      }
+    }
+
+    const maxVisibleWidth = resizeLeft
+      ? (localWidth - currentCrop.right)
+      : resizeRight
+        ? (localWidth - currentCrop.left)
+        : localWidth
+    const maxVisibleHeight = resizeTop
+      ? (localHeight - currentCrop.bottom)
+      : resizeBottom
+        ? (localHeight - currentCrop.top)
+        : localHeight
+    const minScale = Math.max(
+      LOCAL_MIN_VISIBLE / currentVisible.width,
+      LOCAL_MIN_VISIBLE / currentVisible.height,
+    )
+    const maxScale = Math.min(
+      maxVisibleWidth / currentVisible.width,
+      maxVisibleHeight / currentVisible.height,
+    )
+    const clampedScale = clamp(requestedScale, minScale, maxScale)
+    const targetVisibleLocalWidth = currentVisible.width * clampedScale
+    const targetVisibleLocalHeight = currentVisible.height * clampedScale
+    const deltaVisibleHeight = targetVisibleLocalHeight - currentVisible.height
+    const deltaVisibleWidth = targetVisibleLocalWidth - currentVisible.width
+
+    if (resizeLeft)
+      nextLeft = localWidth - currentCrop.right - targetVisibleLocalWidth
+    if (resizeRight)
+      nextRight = localWidth - currentCrop.left - targetVisibleLocalWidth
+    if (!resizeLeft && !resizeRight) {
+      nextLeft = currentCrop.left - deltaVisibleWidth / 2
+      nextRight = currentCrop.right - deltaVisibleWidth / 2
+    }
+
+    if (resizeTop)
+      nextTop = localHeight - currentCrop.bottom - targetVisibleLocalHeight
+    if (resizeBottom)
+      nextBottom = localHeight - currentCrop.top - targetVisibleLocalHeight
+    if (!resizeTop && !resizeBottom) {
+      nextTop = currentCrop.top - deltaVisibleHeight / 2
+      nextBottom = currentCrop.bottom - deltaVisibleHeight / 2
+    }
+  }
+  else {
+    if (resizeLeft)
+      nextLeft = clamp(currentCrop.left + (input.deltaLocalX / absScaleX), 0, localWidth - LOCAL_MIN_VISIBLE - currentCrop.right)
+    if (resizeRight)
+      nextRight = clamp(currentCrop.right - (input.deltaLocalX / absScaleX), 0, localWidth - LOCAL_MIN_VISIBLE - nextLeft)
+    if (resizeTop)
+      nextTop = clamp(currentCrop.top + (input.deltaLocalY / absScaleY), 0, localHeight - LOCAL_MIN_VISIBLE - currentCrop.bottom)
+    if (resizeBottom)
+      nextBottom = clamp(currentCrop.bottom - (input.deltaLocalY / absScaleY), 0, localHeight - LOCAL_MIN_VISIBLE - nextTop)
+  }
+
+  const nextCrop = normalizeCropInsets({
+    left: nextLeft,
+    right: nextRight,
+    top: nextTop,
+    bottom: nextBottom,
+  }, localWidth, localHeight)
+
+  return {
+    crop: nextCrop,
+    originShiftX: resizeLeft ? (nextCrop.left - currentCrop.left) * absScaleX : 0,
+    originShiftY: resizeTop ? (nextCrop.top - currentCrop.top) * absScaleY : 0,
+  }
 }

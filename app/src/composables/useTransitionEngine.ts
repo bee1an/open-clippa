@@ -32,6 +32,7 @@ export function useTransitionEngine(options: TransitionEngineOptions = {}): void
     getPerformerById: performerId => performerStore.getPerformerById(performerId),
     getPerformers: () => clippa.theater.performers,
     getApp: () => clippa.stage.app,
+    getContentRoot: () => clippa.stage.contentRoot,
     onTimelineDurationChanged: (handler) => {
       clippa.timeline.on('durationChanged', handler)
       return () => clippa.timeline.off('durationChanged', handler)

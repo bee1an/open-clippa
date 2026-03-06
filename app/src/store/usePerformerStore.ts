@@ -1,5 +1,6 @@
 import type {
   CropInsets,
+  PerformerClipShape,
   PerformerAnimationPatch,
   PerformerAnimationSpec,
   PerformerBounds,
@@ -15,6 +16,7 @@ import {
 } from '@clippc/performer'
 import { defineStore } from 'pinia'
 import { useEditorStore } from '@/store/useEditorStore'
+import { resolveMediaClipShape } from '@/utils/mediaClipShape'
 
 /**
  * Performer 配置选项
@@ -39,12 +41,14 @@ export interface VideoPerformerConfig extends PerformerConfigBase {
   sourceDuration?: number
   sourceStart?: number
   crop?: Partial<CropInsets> | null
+  clipShapeId?: string | null
 }
 
 export interface ImagePerformerConfig extends PerformerConfigBase {
   type: 'image'
   src: string | File | Blob
   crop?: Partial<CropInsets> | null
+  clipShapeId?: string | null
 }
 
 export interface TextPerformerConfig extends PerformerConfigBase {
@@ -257,6 +261,8 @@ export const usePerformerStore = defineStore('performer', () => {
   // 创建新的 performer
   const createPerformer = (config: PerformerConfig): CanvasPerformer => {
     const zIndex = config.zIndex ?? performerMap.size + 1
+    const clipShape: PerformerClipShape | null
+      = 'clipShapeId' in config ? resolveMediaClipShape(config.clipShapeId) : null
 
     let performer: CanvasPerformer
 
@@ -264,6 +270,7 @@ export const usePerformerStore = defineStore('performer', () => {
       const { type: _type, rotation: _rotation, ...imageConfig } = config
       performer = new Image({
         ...imageConfig,
+        clipShape,
         zIndex,
       })
     }
@@ -285,6 +292,7 @@ export const usePerformerStore = defineStore('performer', () => {
       const { type: _type, rotation: _rotation, ...videoConfig } = config
       performer = new Video({
         ...videoConfig,
+        clipShape,
         zIndex,
       })
     }

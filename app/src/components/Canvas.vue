@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import type { CanvasSize, Train } from 'clippc'
-import { Audio } from '@clippc/performer'
+import type { ResizeDirection } from '@clippc/selection'
+import { Audio, Image, Video } from '@clippc/performer'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Select } from '@/components/ui/select'
+import MediaCropBoxOverlay from '@/components/MediaCropBoxOverlay.vue'
+import { rotateCropDelta } from '@/components/cropGesture'
+import { resolveCropOverlayState } from '@/components/cropOverlayState'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
+import { useMediaCropPreviewController } from '@/composables/useMediaCropPreviewController'
+import { useMediaCropSession } from '@/composables/useMediaCropSession'
 import { useEditorStore } from '@/store'
+import { useMediaCropStore } from '@/store/useMediaCropStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 import SelectionGroup from './SelectionGroup.vue'
 
@@ -14,8 +21,16 @@ const MAX_TIMELINE_SYNC_RETRIES = 24
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const editorCommandActions = useEditorCommandActions()
+const mediaCropStore = useMediaCropStore()
+const { enterCropMode, exitCropMode } = useMediaCropSession()
+const {
+  activePerformer: activeCropPerformer,
+  revision: cropPreviewRevision,
+  clearPreview: clearCropPreview,
+} = useMediaCropPreviewController()
 const { currentTime, duration, canvasPresetId, canvasSize } = storeToRefs(editorStore)
 const { selectedPerformers, selectionRevision } = storeToRefs(performerStore)
+const { activePerformerId: activeMediaCropPerformerId } = storeToRefs(mediaCropStore)
 const { clippa } = editorStore
 clippa.stage.init({ width: canvasSize.value.width, height: canvasSize.value.height, antialias: true })
 const canvasPresetOptions = computed(() => {
@@ -35,6 +50,9 @@ let stopSelectionWatch: (() => void) | null = null
 let isTimelineListenerActive = false
 let canvasContainerResizeObserver: ResizeObserver | null = null
 const PRESERVE_SELECTION_ATTR = 'data-preserve-canvas-selection'
+const cropDragPointerId = ref<number | null>(null)
+const cropDragLastCanvasPoint = ref<{ x: number, y: number } | null>(null)
+const cropResizeDirection = ref<ResizeDirection | null>(null)
 
 // Canvas 缩放率
 const canvasScaleRatio = ref(1)
@@ -46,6 +64,17 @@ const canvasWrapperStyle = computed(() => ({
   width: `${canvasDisplaySize.value.width}px`,
   height: `${canvasDisplaySize.value.height}px`,
 }))
+const isCropModeActive = computed(() => Boolean(activeMediaCropPerformerId.value))
+const cropOverlayState = computed(() => {
+  return resolveCropOverlayState({
+    isCropModeActive: isCropModeActive.value,
+    performer: activeCropPerformer.value,
+    revision: cropPreviewRevision.value,
+  })
+})
+const shouldShowRectCropHandles = computed(() => cropOverlayState.value.showOverlay)
+const shouldShowCropSideHandles = computed(() => cropOverlayState.value.showSideHandles)
+const shouldShowCropFrame = computed(() => cropOverlayState.value.showFrame)
 
 function calculateCanvasDisplaySize() {
   const containerElement = canvasContainerRef.value
@@ -94,10 +123,10 @@ function calculateCanvasScaleRatio() {
   canvasScaleRatio.value = ratio
 }
 
-function handleCanvasPointerDown(event: PointerEvent) {
+function resolveCanvasPoint(event: MouseEvent | PointerEvent): { x: number, y: number } | null {
   const app = clippa.stage.app
   if (!app)
-    return
+    return null
 
   const canvasElement = app.canvas as HTMLCanvasElement
   const rect = canvasElement.getBoundingClientRect()
@@ -105,28 +134,75 @@ function handleCanvasPointerDown(event: PointerEvent) {
   const clientY = event.clientY
 
   if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom)
-    return
+    return null
 
   const ratio = canvasScaleRatio.value || 1
-  const canvasX = (clientX - rect.left) / ratio
-  const canvasY = (clientY - rect.top) / ratio
+  return {
+    x: (clientX - rect.left) / ratio,
+    y: (clientY - rect.top) / ratio,
+  }
+}
+
+function resolveTopmostHitPerformer(event: PointerEvent) {
+  const canvasPoint = resolveCanvasPoint(event)
+  if (!canvasPoint)
+    return null
+
+  const { x: canvasX, y: canvasY } = canvasPoint
 
   const hitPerformers = Array.from(clippa.stage.performers)
     .filter(performer => performer.containsPoint(canvasX, canvasY))
 
-  if (hitPerformers.length === 0) {
+  if (hitPerformers.length === 0)
+    return null
+
+  return hitPerformers.sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))[0] ?? null
+}
+
+async function handleCanvasPointerDown(event: PointerEvent) {
+  if (mediaCropStore.activePerformerId) {
+    const target = resolveTopmostHitPerformer(event)
+    if (target && activeCropPerformer.value && target.id === activeCropPerformer.value.id) {
+      const canvasPoint = resolveCanvasPoint(event)
+      if (!canvasPoint)
+        return
+
+      cropDragPointerId.value = event.pointerId
+      cropDragLastCanvasPoint.value = canvasPoint
+      performerStore.clearPendingSelectionDrag()
+      return
+    }
+
+    performerStore.clearPendingSelectionDrag()
+    await exitCropMode()
+
+    if (!target) {
+      void editorCommandActions.performerClearSelection()
+      syncSelectionToTimeline(null)
+      return
+    }
+
+    void editorCommandActions.performerSelect({ performerId: target.id })
+    syncSelectionToTimeline(target.id)
+    return
+  }
+
+  const target = resolveTopmostHitPerformer(event)
+  if (!target) {
     void editorCommandActions.performerClearSelection()
     performerStore.clearPendingSelectionDrag()
     syncSelectionToTimeline(null)
     return
   }
 
-  const target = hitPerformers.sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))[0]
-  if (!target)
-    return
-
+  const isAlreadySelected = selectedPerformers.value[0]?.id === target.id
   void editorCommandActions.performerSelect({ performerId: target.id })
   syncSelectionToTimeline(target.id)
+  if (!isAlreadySelected || event.detail > 1) {
+    performerStore.clearPendingSelectionDrag()
+    return
+  }
+
   performerStore.requestSelectionDrag({
     id: target.id,
     clientX: event.clientX,
@@ -137,7 +213,86 @@ function handleCanvasPointerDown(event: PointerEvent) {
 
 function handleCanvasPointerCapture(event: PointerEvent) {
   event.stopPropagation()
-  handleCanvasPointerDown(event)
+  void handleCanvasPointerDown(event)
+}
+
+async function handleCanvasDoubleClick(event: MouseEvent): Promise<void> {
+  const target = resolveTopmostHitPerformer(event as PointerEvent)
+  if (!(target instanceof Image || target instanceof Video))
+    return
+
+  performerStore.clearPendingSelectionDrag()
+  void editorCommandActions.performerSelect({ performerId: target.id })
+  syncSelectionToTimeline(target.id)
+  await enterCropMode(target)
+}
+
+function handleCropPointerMove(event: PointerEvent): void {
+  if (cropDragPointerId.value !== event.pointerId || !cropDragLastCanvasPoint.value || !activeCropPerformer.value)
+    return
+
+  const nextPoint = resolveCanvasPoint(event)
+  if (!nextPoint)
+    return
+
+  const deltaX = nextPoint.x - cropDragLastCanvasPoint.value.x
+  const deltaY = nextPoint.y - cropDragLastCanvasPoint.value.y
+  cropDragLastCanvasPoint.value = nextPoint
+
+  const beforeBounds = activeCropPerformer.value.getBounds()
+  const rotation = beforeBounds.rotation ?? 0
+  const localDelta = rotateCropDelta(deltaX, deltaY, -rotation)
+
+  if (cropResizeDirection.value) {
+    const preserveAspectRatio
+      = cropResizeDirection.value.includes('-')
+        || Boolean(activeCropPerformer.value.getClipShape?.())
+    const result = activeCropPerformer.value.applyCropHandleResize?.(
+      cropResizeDirection.value,
+      localDelta.x,
+      localDelta.y,
+      preserveAspectRatio,
+    )
+
+    if (result) {
+      const originShift = rotateCropDelta(result.originShiftX, result.originShiftY, rotation)
+      activeCropPerformer.value.setPosition(
+        beforeBounds.x + originShift.x,
+        beforeBounds.y + originShift.y,
+      )
+    }
+    return
+  }
+
+  if (activeCropPerformer.value instanceof Image || activeCropPerformer.value instanceof Video)
+    activeCropPerformer.value.panCropByLocalDelta?.(localDelta.x, localDelta.y)
+}
+
+function endCropDrag(pointerId?: number): void {
+  if (pointerId !== undefined && cropDragPointerId.value !== pointerId)
+    return
+
+  cropDragPointerId.value = null
+  cropDragLastCanvasPoint.value = null
+  cropResizeDirection.value = null
+}
+
+function handleCropResizeStart(direction: ResizeDirection, event: PointerEvent): void {
+  const canvasPoint = resolveCanvasPoint(event)
+  if (!canvasPoint)
+    return
+
+  cropDragPointerId.value = event.pointerId
+  cropDragLastCanvasPoint.value = canvasPoint
+  cropResizeDirection.value = direction
+}
+
+function handleCropPointerUp(event: PointerEvent): void {
+  endCropDrag(event.pointerId)
+}
+
+function handleCropPointerCancel(event: PointerEvent): void {
+  endCropDrag(event.pointerId)
 }
 
 function shouldKeepSelection(event: PointerEvent): boolean {
@@ -176,6 +331,9 @@ function handleDocumentPointerDown(event: PointerEvent) {
   const timelineElement = document.getElementById('timeline')
   if (timelineElement && timelineElement.contains(target))
     return
+
+  if (mediaCropStore.activePerformerId)
+    void exitCropMode()
 
   void editorCommandActions.performerClearSelection()
   performerStore.clearPendingSelectionDrag()
@@ -336,6 +494,9 @@ onMounted(async () => {
   }
 
   document.addEventListener('pointerdown', handleDocumentPointerDown, { capture: true })
+  document.addEventListener('pointermove', handleCropPointerMove, { capture: true })
+  document.addEventListener('pointerup', handleCropPointerUp, { capture: true })
+  document.addEventListener('pointercancel', handleCropPointerCancel, { capture: true })
 
   // 计算初始缩放率
   nextTick(() => {
@@ -356,6 +517,18 @@ onMounted(async () => {
   syncTimelineToSelection(clippa.timeline.state.activeTrain)
 })
 
+watch(
+  () => [activeMediaCropPerformerId.value, selectedPerformers.value[0]?.id ?? null] as const,
+  ([activeId, selectedId]) => {
+    if (activeId && selectedId !== activeId)
+      void exitCropMode()
+    if (!activeId) {
+      endCropDrag()
+      clearCropPreview()
+    }
+  },
+)
+
 onUnmounted(() => {
   if (canvasPointerTarget.value) {
     canvasPointerTarget.value.removeEventListener('pointerdown', handleCanvasPointerCapture, { capture: true })
@@ -363,6 +536,9 @@ onUnmounted(() => {
   }
 
   document.removeEventListener('pointerdown', handleDocumentPointerDown, { capture: true })
+  document.removeEventListener('pointermove', handleCropPointerMove, { capture: true })
+  document.removeEventListener('pointerup', handleCropPointerUp, { capture: true })
+  document.removeEventListener('pointercancel', handleCropPointerCancel, { capture: true })
   canvasContainerResizeObserver?.disconnect()
   canvasContainerResizeObserver = null
 
@@ -406,9 +582,17 @@ onUnmounted(() => {
           ref="canvasWrapperRef"
           rounded-sm overflow-visible border="white/5" relative bg-black
           :style="canvasWrapperStyle"
-          @pointerdown="handleCanvasPointerDown"
+          @dblclick.capture="handleCanvasDoubleClick"
         >
-          <SelectionGroup :scale-ratio="canvasScaleRatio" />
+          <SelectionGroup v-if="!isCropModeActive" :scale-ratio="canvasScaleRatio" />
+          <MediaCropBoxOverlay
+            v-if="shouldShowRectCropHandles && activeCropPerformer"
+            :performer="activeCropPerformer"
+            :scale-ratio="canvasScaleRatio"
+            :show-side-handles="shouldShowCropSideHandles"
+            :show-frame="shouldShowCropFrame"
+            @resize-start="handleCropResizeStart"
+          />
         </div>
       </div>
     </div>

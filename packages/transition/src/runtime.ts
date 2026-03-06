@@ -40,6 +40,7 @@ export interface TransitionRuntimeAdapter {
   getPerformerById: (performerId: string) => unknown
   getPerformers: () => unknown[]
   getApp: () => Application
+  getContentRoot?: () => Container
   onTimelineDurationChanged: (handler: () => void) => () => void
   onPerformerHire: (handler: (performer: unknown) => void) => () => void
 }
@@ -241,6 +242,10 @@ export class TransitionRuntime {
   private snapshotCaptureSprite: Sprite | null = null
   private snapshotCaptureMask: Graphics | null = null
 
+  private getContentRoot(): Container {
+    return this.adapter.getContentRoot?.() ?? this.adapter.getApp().stage
+  }
+
   private readonly transitionFilterCache = new Map<string, Filter>()
   private readonly railDisposers = new Map<Rail, () => void>()
   private readonly performerDisposers = new Map<TransitionRenderablePerformer, () => void>()
@@ -323,9 +328,8 @@ export class TransitionRuntime {
     this.restoreHiddenPair()
     this.hideTransitionLayer()
 
-    const app = this.adapter.getApp()
     if (this.transitionContainer) {
-      app.stage.removeChild(this.transitionContainer)
+      this.getContentRoot().removeChild(this.transitionContainer)
       ;(this.transitionContainer as any).destroy?.({ children: true })
       this.transitionContainer = null
     }
@@ -558,8 +562,6 @@ export class TransitionRuntime {
     if (!this.ready || this.transitionContainer)
       return Boolean(this.transitionContainer)
 
-    const app = this.adapter.getApp()
-
     this.transitionContainer = new Container({ label: 'transition-container', visible: false })
     this.transitionSprite = new Sprite(PixiTexture.WHITE)
     this.fallbackFromSprite = new Sprite(PixiTexture.WHITE)
@@ -571,7 +573,7 @@ export class TransitionRuntime {
     this.transitionContainer.addChild(this.fallbackFromSprite)
     this.transitionContainer.addChild(this.fallbackToSprite)
 
-    app.stage.addChild(this.transitionContainer)
+    this.getContentRoot().addChild(this.transitionContainer)
     this.syncLayerSize()
     return true
   }
@@ -888,7 +890,8 @@ export class TransitionRuntime {
       return
 
     const app = this.adapter.getApp()
-    app.stage.setChildIndex(this.transitionContainer, app.stage.children.length - 1)
+    const contentRoot = this.getContentRoot()
+    contentRoot.setChildIndex(this.transitionContainer, contentRoot.children.length - 1)
 
     const progress = Math.max(0, Math.min(1, context.progress))
     this.transitionFilter = this.resolveTransitionFilter(context.transition)

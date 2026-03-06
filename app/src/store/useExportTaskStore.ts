@@ -164,6 +164,7 @@ export const useExportTaskStore = defineStore('export-task', () => {
       currentFrame.value = 0
       totalFrames.value = Math.max(1, Math.ceil((duration / 1000) * frameRate))
       previewCanvasSize.value = resolvePreviewCanvasSize(canvas, editorStore.canvasSize)
+      app.renderer.render(editorStore.clippa.stage.contentRoot)
       previewUrl.value = captureCanvasPreview(canvas)
       errorMessage.value = ''
       result.value = null
@@ -194,7 +195,7 @@ export const useExportTaskStore = defineStore('export-task', () => {
           await editorStore.clippa.director.seek(timestampMs)
           await nextTick()
           await editorStore.syncTransitionFrame()
-          app.renderer.render(app.stage)
+          app.renderer.render(editorStore.clippa.stage.contentRoot)
         },
         onProgress: ({ currentFrame: nextFrame, totalFrames: nextTotalFrames }) => {
           if (jobId.value !== nextJobId)
@@ -222,6 +223,7 @@ export const useExportTaskStore = defineStore('export-task', () => {
             return
 
           const filename = createFilename(options.filename)
+          app.renderer.render(editorStore.clippa.stage.contentRoot)
           const coverUrl = previewUrl.value || captureCanvasPreview(canvas)
 
           exportStore.setExportResult({

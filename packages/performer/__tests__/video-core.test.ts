@@ -138,6 +138,29 @@ describe('video core behavior', () => {
     expect(video.containsPoint(90, 200)).toBe(false)
   })
 
+  it('checks containsPoint against clip shapes', () => {
+    const video = createVideoHarness()
+    video._clipShape = {
+      id: 'diamond',
+      points: [
+        { x: 0.5, y: 0 },
+        { x: 1, y: 0.5 },
+        { x: 0.5, y: 1 },
+        { x: 0, y: 0.5 },
+      ],
+    }
+    video.getBounds = () => ({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+    })
+
+    expect(video.containsPoint(50, 50)).toBe(true)
+    expect(video.containsPoint(10, 10)).toBe(false)
+  })
+
   it('stores pending filters before sprite is ready and applies directly afterwards', () => {
     const video = createVideoHarness()
     const filters = [{ name: 'f1' }] as any

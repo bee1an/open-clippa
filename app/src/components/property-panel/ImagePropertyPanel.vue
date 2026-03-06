@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CanvasPerformer } from '@/store/usePerformerStore'
 import { Image } from '@clippc/performer'
+import MediaClipPanel from './MediaClipPanel.vue'
 
 interface Props {
   performer: CanvasPerformer
@@ -39,5 +40,9 @@ const sourceFileName = computed(() => {
         <span class="max-w-40 truncate text-[10px] text-foreground">{{ sourceFileName }}</span>
       </div>
     </div>
+
+    <div class="h-px bg-border/30" />
+
+    <MediaClipPanel :performer="performer" />
   </div>
 </template>
