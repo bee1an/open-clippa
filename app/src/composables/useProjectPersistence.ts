@@ -1,7 +1,9 @@
 import type { PersistedMediaAsset } from '@/persistence/types'
+import { onUnmounted, ref, watch } from 'vue'
 import { applyEditorContentSnapshot, captureEditorContentSnapshot } from '@/history/editorContentSnapshot'
 import { isFileHandlePermissionError } from '@/persistence/fileSystemAccess'
 import { capturePersistedProjectState, restoreSnapshotFromPersistedSources } from '@/persistence/projectSessionSerializer'
+import { comparePersistedProjectStateSync } from '@/persistence/projectStateSync'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useFilterStore } from '@/store/useFilterStore'
 import { useHistoryStore } from '@/store/useHistoryStore'
@@ -34,7 +36,11 @@ function mapMediaAssetUrlById(): Map<string, string> {
 async function restoreMediaAssets(
   assets: PersistedMediaAsset[],
   kind: 'video' | 'audio' | 'image',
-  options: { requestPermission: boolean, onPermissionRequired: () => void },
+  options: {
+    requestPermission: boolean
+    onPermissionRequired: () => void
+    onUnreadableAsset: () => void
+  },
 ): Promise<void> {
   const mediaStore = useMediaStore()
 
@@ -71,6 +77,7 @@ async function restoreMediaAssets(
         `[project-persistence] skip unreadable ${kind} asset "${asset.name}" (${asset.id})`,
         error,
       )
+      options.onUnreadableAsset()
     }
   }
 }
@@ -142,6 +149,24 @@ export function useProjectPersistence() {
     await saveNow()
   }
 
+  function buildCurrentPersistedState(projectId: string) {
+    const snapshot = captureEditorContentSnapshot({
+      editorStore,
+      performerStore,
+      filterStore,
+      transitionStore,
+    })
+
+    return capturePersistedProjectState({
+      projectId,
+      canvasPresetId: editorStore.canvasPresetId,
+      snapshot,
+      videoAssets: mediaStore.videoFiles,
+      audioAssets: mediaStore.audioFiles,
+      imageAssets: mediaStore.imageFiles,
+    })
+  }
+
   async function restoreActiveProject(options: { requestPermission?: boolean } = {}): Promise<void> {
     const { requestPermission = false } = options
     const projectId = projectStore.activeProjectId
@@ -156,8 +181,12 @@ export function useProjectPersistence() {
         return
 
       let permissionRequired = false
+      let degradedRestore = false
       const markPermissionRequired = () => {
         permissionRequired = true
+      }
+      const markUnreadableAsset = () => {
+        degradedRestore = true
       }
 
       await editorStore.clippa.ready
@@ -166,14 +195,17 @@ export function useProjectPersistence() {
       await restoreMediaAssets(persisted.videoAssets, 'video', {
         requestPermission,
         onPermissionRequired: markPermissionRequired,
+        onUnreadableAsset: markUnreadableAsset,
       })
       await restoreMediaAssets(persisted.audioAssets ?? [], 'audio', {
         requestPermission,
         onPermissionRequired: markPermissionRequired,
+        onUnreadableAsset: markUnreadableAsset,
       })
       await restoreMediaAssets(persisted.imageAssets, 'image', {
         requestPermission,
         onPermissionRequired: markPermissionRequired,
+        onUnreadableAsset: markUnreadableAsset,
       })
 
       const assetUrlMap = mapMediaAssetUrlById()
@@ -191,6 +223,13 @@ export function useProjectPersistence() {
       })
 
       requiresHandlePermission.value = permissionRequired
+
+      if (!permissionRequired && !degradedRestore) {
+        const normalizedPersisted = buildCurrentPersistedState(projectId)
+        const syncResult = comparePersistedProjectStateSync(normalizedPersisted, persisted)
+        if (!syncResult.synced)
+          await projectStore.saveActiveProjectState(normalizedPersisted)
+      }
     }
     finally {
       isHydrating.value = false
