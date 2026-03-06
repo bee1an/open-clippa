@@ -1,4 +1,5 @@
 export * from './src/animation'
+export * from './src/clipShapePresets'
 export * from './src/image'
 export * from './src/performer'
 export * from './src/text'

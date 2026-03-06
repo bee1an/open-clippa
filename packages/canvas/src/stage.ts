@@ -2,7 +2,7 @@ import type { Performer } from '@clippc/performer'
 import type { MaybeArray } from 'type-aide'
 import type { CanvasSize } from './layout'
 import { EventBus } from '@clippc/utils'
-import { Application } from 'pixi.js'
+import { Application, Container } from 'pixi.js'
 import { normalizeCanvasSize } from './layout'
 
 export interface InitialOption {
@@ -26,6 +26,8 @@ export class Stage extends EventBus<StageEvents> {
   private _app!: Application
   private _pendingLoads: Set<Performer> = new Set()
   private _size: CanvasSize = { width: 0, height: 0 }
+  private _contentRoot!: Container
+  private _overlayRoot!: Container
 
   /**
    * 获取PIXI应用实例
@@ -36,6 +38,14 @@ export class Stage extends EventBus<StageEvents> {
 
   get size(): CanvasSize {
     return { ...this._size }
+  }
+
+  get contentRoot(): Container {
+    return this._contentRoot
+  }
+
+  get overlayRoot(): Container {
+    return this._overlayRoot
   }
 
   /**
@@ -66,6 +76,10 @@ export class Stage extends EventBus<StageEvents> {
 
     await app.init(option)
     app.stage.sortableChildren = true
+    this._contentRoot = new Container({ label: 'stage-content-root', sortableChildren: true, zIndex: 0 })
+    this._overlayRoot = new Container({ label: 'stage-overlay-root', sortableChildren: true, zIndex: 10_000 })
+    app.stage.addChild(this._contentRoot)
+    app.stage.addChild(this._overlayRoot)
     this._size = normalizeCanvasSize({
       width: app.renderer.width,
       height: app.renderer.height,
@@ -133,9 +147,9 @@ export class Stage extends EventBus<StageEvents> {
       this._performers.delete(p)
       this._pendingLoads.delete(p)
 
-      if (p.sprite && p.sprite.parent === this._app.stage) {
-        this._app.stage.removeChild(p.sprite)
-        this._app.stage.sortChildren()
+      if (p.sprite && p.sprite.parent === this._contentRoot) {
+        this._contentRoot.removeChild(p.sprite)
+        this._contentRoot.sortChildren()
       }
     })
   }
@@ -171,10 +185,10 @@ export class Stage extends EventBus<StageEvents> {
 
     p.sprite.zIndex = p.zIndex
 
-    if (p.sprite.parent !== this._app.stage) {
-      this._app.stage.addChild(p.sprite)
+    if (p.sprite.parent !== this._contentRoot) {
+      this._contentRoot.addChild(p.sprite)
     }
 
-    this._app.stage.sortChildren()
+    this._contentRoot.sortChildren()
   }
 }

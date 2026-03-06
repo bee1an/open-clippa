@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CanvasPerformer } from '@/store/usePerformerStore'
 import { Video } from '@clippc/performer'
+import MediaClipPanel from './MediaClipPanel.vue'
 
 interface Props {
   performer: CanvasPerformer
@@ -66,5 +67,9 @@ const timelineDuration = computed(() => {
         <span class="font-mono text-[10px] tabular-nums text-foreground">{{ timelineDuration }}</span>
       </div>
     </div>
+
+    <div class="h-px bg-border/30" />
+
+    <MediaClipPanel :performer="performer" />
   </div>
 </template>

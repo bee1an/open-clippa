@@ -198,10 +198,33 @@ const {
 })
 
 vi.mock('@clippc/performer', () => {
+  const CLIP_SHAPE_PRESETS = [
+    {
+      id: 'circle',
+      shape: {
+        id: 'circle',
+        points: [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+          { x: 1, y: 1 },
+          { x: 0, y: 1 },
+        ],
+      },
+    },
+  ]
+
   return {
     Video: MockVideo,
     Image: MockImage,
     Text: MockText,
+    CLIP_SHAPE_PRESETS,
+    resolveClipShape: (shapeId: string | null | undefined) => {
+      return CLIP_SHAPE_PRESETS.find(preset => preset.id === shapeId)?.shape ?? null
+    },
+    resolveClipShapePreset: (shapeId: string | null | undefined) => {
+      return CLIP_SHAPE_PRESETS.find(preset => preset.id === shapeId) ?? null
+    },
+    buildClipShapeSvgPath: () => 'M0 0 L100 0 L100 100 L0 100 Z',
   }
 })
 

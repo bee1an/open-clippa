@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { reactive } from 'vue'
 import { capturePersistedProjectState, restoreSnapshotFromPersistedSources } from './projectSessionSerializer'
 
-function createSnapshot(src: string): EditorContentSnapshot {
+function createSnapshot(src: string, clipShapeId?: string): EditorContentSnapshot {
   return {
     performers: [
       {
@@ -19,6 +19,7 @@ function createSnapshot(src: string): EditorContentSnapshot {
         rotation: 0,
         alpha: 1,
         src,
+        clipShapeId,
       },
     ],
     selectedPerformerIds: [],
@@ -141,5 +142,24 @@ describe('projectSessionSerializer', () => {
     )
 
     expect(restored.performers[0]?.src).toBe('blob:restored-video-1')
+  })
+
+  it('preserves clip shape ids through persistence round trips', () => {
+    const persisted = capturePersistedProjectState({
+      projectId: 'project-1',
+      canvasPresetId: 'landscape',
+      snapshot: createSnapshot('https://cdn.example.com/clip.mp4', 'hexagon'),
+      videoAssets: [],
+      imageAssets: [],
+    })
+
+    expect(persisted.editorContentSnapshot.performers[0]?.clipShapeId).toBe('hexagon')
+
+    const restored = restoreSnapshotFromPersistedSources(
+      persisted.editorContentSnapshot,
+      () => null,
+    )
+
+    expect(restored.performers[0]?.clipShapeId).toBe('hexagon')
   })
 })

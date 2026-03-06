@@ -23,7 +23,35 @@ export interface CropMaskRect {
   height: number
 }
 
+export interface ClipShapePoint {
+  x: number
+  y: number
+}
+
+export interface PerformerClipShape {
+  id: string
+  points: ClipShapePoint[]
+}
+
+export interface SourceRenderBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  alpha: number
+}
+
 export type SideCropDirection = 'left' | 'right' | 'top' | 'bottom'
+export type CropHandleDirection
+  = | 'top-left'
+    | 'top-right'
+    | 'bottom-left'
+    | 'bottom-right'
+    | 'top'
+    | 'right'
+    | 'bottom'
+    | 'left'
 
 export interface SideCropResizeInput {
   direction: SideCropDirection
@@ -35,6 +63,12 @@ export interface SideCropResizeResult {
   scaleX: number
   scaleY: number
   crop: CropInsets
+}
+
+export interface CropHandleResizeResult {
+  crop: CropInsets
+  originShiftX: number
+  originShiftY: number
 }
 
 export interface Performer {
@@ -75,8 +109,21 @@ export interface Performer {
   setCropInsets?: (crop: Partial<CropInsets> | null) => CropInsets
   clearCrop?: () => CropInsets
   hasCrop?: () => boolean
+  getClipShape?: () => PerformerClipShape | null
+  setClipShape?: (shape: PerformerClipShape | null) => PerformerClipShape | null
+  clearClipShape?: () => PerformerClipShape | null
+  hasClipShape?: () => boolean
   getMaskRect?: () => CropMaskRect | null
   applySideCropResize?: (input: SideCropResizeInput) => SideCropResizeResult | null
+  applyCropHandleResize?: (
+    direction: CropHandleDirection,
+    deltaLocalX: number,
+    deltaLocalY: number,
+    preserveAspectRatio?: boolean,
+  ) => CropHandleResizeResult | null
+  panCropByLocalDelta?: (deltaLocalX: number, deltaLocalY: number) => CropInsets | null
+  panCropByWorldDelta?: (deltaCanvasX: number, deltaCanvasY: number) => CropInsets | null
+  getSourceRenderBounds?: () => SourceRenderBounds | null
 }
 
 export interface PerformerOption {

@@ -23,6 +23,7 @@ export interface PerformerContentSnapshot {
   sourceStartMs?: number
   sourceDurationMs?: number
   crop?: CropInsets | null
+  clipShapeId?: string | null
   text?: string
   style?: TextStyleOption
   animation?: PerformerAnimationSpec | null
@@ -95,6 +96,13 @@ function resolvePerformerCrop(performer: CanvasPerformer): CropInsets | null {
   }
 }
 
+function resolvePerformerClipShapeId(performer: CanvasPerformer): string | null {
+  if (!('getClipShape' in performer) || typeof performer.getClipShape !== 'function')
+    return null
+
+  return performer.getClipShape()?.id ?? null
+}
+
 function mapPerformerSnapshot(performer: CanvasPerformer, animation: PerformerAnimationSpec | null): PerformerContentSnapshot {
   const bounds = performer.getBaseBounds()
   const kind = resolvePerformerSnapshotKind(performer)
@@ -120,11 +128,13 @@ function mapPerformerSnapshot(performer: CanvasPerformer, animation: PerformerAn
     snapshot.sourceStartMs = video.sourceStart
     snapshot.sourceDurationMs = video.sourceDuration
     snapshot.crop = resolvePerformerCrop(performer)
+    snapshot.clipShapeId = resolvePerformerClipShapeId(performer)
   }
   else if (kind === 'image') {
     const image = performer as Image
     snapshot.src = image.src
     snapshot.crop = resolvePerformerCrop(performer)
+    snapshot.clipShapeId = resolvePerformerClipShapeId(performer)
   }
   else {
     const text = performer as Text
@@ -170,6 +180,7 @@ function buildPerformerConfig(snapshot: PerformerContentSnapshot): PerformerConf
       sourceStart: snapshot.sourceStartMs,
       sourceDuration: snapshot.sourceDurationMs,
       crop: snapshot.crop ?? undefined,
+      clipShapeId: snapshot.clipShapeId ?? undefined,
     }
   }
 
@@ -182,6 +193,7 @@ function buildPerformerConfig(snapshot: PerformerContentSnapshot): PerformerConf
       type: 'image',
       src: snapshot.src,
       crop: snapshot.crop ?? undefined,
+      clipShapeId: snapshot.clipShapeId ?? undefined,
     }
   }
 
