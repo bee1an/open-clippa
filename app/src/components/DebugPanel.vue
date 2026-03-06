@@ -1,14 +1,31 @@
 <script setup lang="ts">
-import { useDraggable, useStorage } from '@vueuse/core'
+import { useClipboard, useDraggable, useStorage, useWindowSize } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
+import { clampDebugPanelPosition } from '@/components/debugPanelPosition'
+import { captureEditorContentSnapshot } from '@/history/editorContentSnapshot'
+import { capturePersistedProjectState } from '@/persistence/projectSessionSerializer'
+import { comparePersistedProjectStateSync, stringifyPersistedProjectStateForDebug } from '@/components/debugProjectState'
 import { useEditorStore } from '@/store/useEditorStore'
+import { useFilterStore } from '@/store/useFilterStore'
+import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
+import { useProjectStore } from '@/store/useProjectStore'
+import { useTransitionStore } from '@/store/useTransitionStore'
 
 const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
+const projectStore = useProjectStore()
+const filterStore = useFilterStore()
+const transitionStore = useTransitionStore()
+const mediaStore = useMediaStore()
 
 const panelEl = ref<HTMLElement | null>(null)
 const handleEl = ref<HTMLElement | null>(null)
+const viewportEl = computed(() => {
+  return typeof document === 'undefined' ? null : document.documentElement
+})
+const { width: viewportWidth, height: viewportHeight } = useWindowSize()
+const { copy: copyToClipboard } = useClipboard({ legacy: true })
 
 const savedPosition = useStorage('debugPanelPosition', {
   x: window.innerWidth - 340,
@@ -27,8 +44,9 @@ function onHandlePointerUp() {
   dragged = false
 }
 
-const { style } = useDraggable(panelEl, {
+const { style, position } = useDraggable(panelEl, {
   initialValue: savedPosition.value,
+  containerElement: viewportEl,
   handle: handleEl,
   onMove: () => {
     dragged = true
@@ -39,17 +57,33 @@ const { style } = useDraggable(panelEl, {
 })
 const { selectedPerformers, selectionRevision } = storeToRefs(performerStore)
 const { currentTime, duration: totalDuration } = storeToRefs(editorStore)
+const { activeProjectId } = storeToRefs(projectStore)
 
 const tick = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   timer = setInterval(() => tick.value++, 200)
+  void nextTick(() => {
+    clampPanelPosition()
+  })
 })
 
 onUnmounted(() => {
   if (timer)
     clearInterval(timer)
+})
+
+watch([viewportWidth, viewportHeight], () => {
+  void nextTick(() => {
+    clampPanelPosition()
+  })
+})
+
+watch(collapsed, () => {
+  void nextTick(() => {
+    clampPanelPosition()
+  })
 })
 
 interface TrainSnapshot {
@@ -119,6 +153,235 @@ function fmtMs(ms: number | null): string {
     return 'N/A'
   return `${Math.round(ms)}ms`
 }
+
+function formatTimestamp(timestamp: number | null): string {
+  if (timestamp === null)
+    return 'N/A'
+
+  return new Date(timestamp).toLocaleString()
+}
+
+function clampPanelPosition(): void {
+  const panel = panelEl.value
+  if (!panel)
+    return
+
+  const nextPosition = clampDebugPanelPosition(
+    position.value,
+    {
+      width: viewportWidth.value,
+      height: viewportHeight.value,
+    },
+    {
+      width: panel.offsetWidth,
+      height: panel.offsetHeight,
+    },
+  )
+
+  position.value = nextPosition
+  savedPosition.value = nextPosition
+}
+
+interface IndexedDbSyncState {
+  status: 'idle' | 'checking' | 'synced' | 'out-of-sync' | 'missing' | 'error'
+  message: string
+  mismatchSections: string[]
+  persistedSavedAt: number | null
+  comparedAt: number | null
+  currentPayload: string
+  persistedPayload: string
+}
+
+function createIndexedDbSyncState(overrides: Partial<IndexedDbSyncState> = {}): IndexedDbSyncState {
+  return {
+    status: 'idle',
+    message: 'Not checked',
+    mismatchSections: [],
+    persistedSavedAt: null,
+    comparedAt: null,
+    currentPayload: '',
+    persistedPayload: '',
+    ...overrides,
+  }
+}
+
+function buildCurrentPersistedState() {
+  const snapshot = captureEditorContentSnapshot({
+    editorStore,
+    performerStore,
+    filterStore,
+    transitionStore,
+  })
+
+  return capturePersistedProjectState({
+    projectId: activeProjectId.value ?? 'debug-export',
+    canvasPresetId: editorStore.canvasPresetId,
+    snapshot,
+    videoAssets: mediaStore.videoFiles,
+    audioAssets: mediaStore.audioFiles,
+    imageAssets: mediaStore.imageFiles,
+  })
+}
+
+function parseDebugPayload(payload: string): unknown {
+  if (!payload)
+    return null
+
+  try {
+    return JSON.parse(payload)
+  }
+  catch {
+    return payload
+  }
+}
+
+function buildDebugExportPayload(syncState: IndexedDbSyncState): string {
+  const currentPersistedState = buildCurrentPersistedState()
+
+  return JSON.stringify({
+    generatedAt: new Date().toISOString(),
+    activeProjectId: activeProjectId.value,
+    canvasPresetId: editorStore.canvasPresetId,
+    timeline: {
+      currentTimeMs: currentTime.value,
+      totalDurationMs: totalDuration.value,
+    },
+    idMaps: {
+      performerIds: allPerformerIds.value,
+      trainIds: allTrainIds.value,
+    },
+    selectedDetails: selectedDetails.value,
+    indexedDbSync: {
+      ...syncState,
+      currentPayload: parseDebugPayload(syncState.currentPayload),
+      persistedPayload: parseDebugPayload(syncState.persistedPayload),
+    },
+    currentComparableState: parseDebugPayload(
+      stringifyPersistedProjectStateForDebug(currentPersistedState),
+    ),
+  }, null, 2)
+}
+
+const indexedDbSyncState = ref<IndexedDbSyncState>(createIndexedDbSyncState())
+
+const copyState = ref({
+  status: 'idle' as 'idle' | 'copying' | 'copied' | 'error',
+  message: '',
+})
+
+const copyStateClass = computed(() => {
+  switch (copyState.value.status) {
+    case 'copied':
+      return 'text-success'
+    case 'copying':
+      return 'text-warning'
+    case 'error':
+      return 'text-destructive'
+    default:
+      return 'text-muted'
+  }
+})
+const indexedDbSyncStatusClass = computed(() => {
+  switch (indexedDbSyncState.value.status) {
+    case 'synced':
+      return 'text-success'
+    case 'checking':
+      return 'text-warning'
+    case 'missing':
+      return 'text-warning'
+    case 'out-of-sync':
+    case 'error':
+      return 'text-destructive'
+    default:
+      return 'text-muted'
+  }
+})
+
+async function resolveIndexedDbSyncState(): Promise<IndexedDbSyncState> {
+  const projectId = activeProjectId.value
+  if (!projectId) {
+    const nextState = createIndexedDbSyncState({
+      status: 'missing',
+      message: 'No active project',
+      comparedAt: Date.now(),
+    })
+    indexedDbSyncState.value = nextState
+    return nextState
+  }
+
+  indexedDbSyncState.value = createIndexedDbSyncState({
+    ...indexedDbSyncState.value,
+    status: 'checking',
+    message: 'Comparing current state with IndexedDB...',
+  })
+
+  try {
+    const persistedState = await projectStore.loadActiveProjectState()
+    if (!persistedState) {
+      const nextState = createIndexedDbSyncState({
+        status: 'missing',
+        message: 'IndexedDB has no saved state for the active project',
+        comparedAt: Date.now(),
+      })
+      indexedDbSyncState.value = nextState
+      return nextState
+    }
+
+    const currentState = buildCurrentPersistedState()
+    const result = comparePersistedProjectStateSync(currentState, persistedState)
+    const mismatchSections = result.sections
+      .filter(section => !section.synced)
+      .map(section => section.key)
+
+    const nextState = createIndexedDbSyncState({
+      status: result.synced ? 'synced' : 'out-of-sync',
+      message: result.synced ? 'Current state matches IndexedDB' : 'Current state differs from IndexedDB',
+      mismatchSections,
+      persistedSavedAt: result.persistedSavedAt,
+      comparedAt: Date.now(),
+      currentPayload: result.currentPayload,
+      persistedPayload: result.persistedPayload,
+    })
+    indexedDbSyncState.value = nextState
+    return nextState
+  }
+  catch (error) {
+    const nextState = createIndexedDbSyncState({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to compare project state',
+      comparedAt: Date.now(),
+    })
+    indexedDbSyncState.value = nextState
+    return nextState
+  }
+}
+
+async function checkIndexedDbSync(): Promise<void> {
+  await resolveIndexedDbSyncState()
+}
+
+async function copyDebugData(): Promise<void> {
+  copyState.value = {
+    status: 'copying',
+    message: 'Preparing debug bundle...',
+  }
+
+  try {
+    const syncState = await resolveIndexedDbSyncState()
+    const payload = buildDebugExportPayload(syncState)
+    await copyToClipboard(payload)
+    copyState.value = {
+      status: 'copied',
+      message: 'Debug bundle copied',
+    }
+  }
+  catch (error) {
+    copyState.value = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to copy debug bundle',
+    }
+  }
+}
 </script>
 
 <template>
@@ -164,6 +427,80 @@ function fmtMs(ms: number | null): string {
           <span op-50>totalDuration</span>
           <span>{{ fmtMs(totalDuration) }}</span>
         </div>
+        <div flex items-center justify-between gap-2 pt-1>
+          <span op-50>analysis bundle</span>
+          <button
+            class="btn-base focus-ring rounded-sm bg-primary px-2 py-1 text-10px text-primary-foreground hover:bg-primary-hover"
+            @click="copyDebugData"
+          >
+            Copy debug data
+          </button>
+        </div>
+        <div v-if="copyState.message" text-10px :class="copyStateClass">
+          {{ copyState.message }}
+        </div>
+      </div>
+
+      <div px-3 py-2 space-y-2 border-b border="white/10">
+        <div flex items-center justify-between gap-2>
+          <span op-50>IndexedDB sync</span>
+          <button
+            class="btn-base focus-ring rounded-sm bg-secondary px-2 py-1 text-10px text-secondary-foreground hover:bg-secondary-hover disabled:cursor-not-allowed disabled:op-40"
+            :disabled="indexedDbSyncState.status === 'checking'"
+            @click="checkIndexedDbSync"
+          >
+            {{ indexedDbSyncState.status === 'checking' ? 'Checking...' : 'Check sync' }}
+          </button>
+        </div>
+        <div flex justify-between gap-2>
+          <span op-50>activeProjectId</span>
+          <span text-right break-all>{{ activeProjectId ?? 'N/A' }}</span>
+        </div>
+        <div flex justify-between gap-2>
+          <span op-50>status</span>
+          <span :class="indexedDbSyncStatusClass">{{ indexedDbSyncState.message }}</span>
+        </div>
+        <div flex justify-between gap-2>
+          <span op-50>savedAt</span>
+          <span text-right>{{ formatTimestamp(indexedDbSyncState.persistedSavedAt) }}</span>
+        </div>
+        <div flex justify-between gap-2>
+          <span op-50>comparedAt</span>
+          <span text-right>{{ formatTimestamp(indexedDbSyncState.comparedAt) }}</span>
+        </div>
+        <div v-if="indexedDbSyncState.mismatchSections.length > 0" space-y-1>
+          <div op-50 text-10px>
+            mismatch sections
+          </div>
+          <div flex flex-wrap gap-1>
+            <span
+              v-for="section in indexedDbSyncState.mismatchSections"
+              :key="section"
+              rounded bg="destructive/12" px-1.5 py-0.5 text-10px text-destructive
+            >
+              {{ section }}
+            </span>
+          </div>
+        </div>
+        <details v-if="indexedDbSyncState.currentPayload && indexedDbSyncState.persistedPayload">
+          <summary cursor-pointer op-60 text-10px>
+            comparable payload
+          </summary>
+          <div mt-2 space-y-2>
+            <div>
+              <div mb-1 op-50 text-10px>
+                current
+              </div>
+              <pre max-h-40 overflow-auto whitespace-pre-wrap break-all rounded border border-border-subtle bg="background-overlay/60" p-2 text-foreground-muted>{{ indexedDbSyncState.currentPayload }}</pre>
+            </div>
+            <div>
+              <div mb-1 op-50 text-10px>
+                indexedDB
+              </div>
+              <pre max-h-40 overflow-auto whitespace-pre-wrap break-all rounded border border-border-subtle bg="background-overlay/60" p-2 text-foreground-muted>{{ indexedDbSyncState.persistedPayload }}</pre>
+            </div>
+          </div>
+        </details>
       </div>
 
       <!-- ID mapping overview -->
