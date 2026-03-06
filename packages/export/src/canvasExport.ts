@@ -1,7 +1,13 @@
 import {
+  ALL_FORMATS,
+  AudioBufferSink,
+  AudioBufferSource,
   BufferTarget,
+  BlobSource,
+  Input,
   Mp4OutputFormat,
   Output,
+  UrlSource,
   VideoSample,
   VideoSampleSource,
 } from 'mediabunny'
@@ -36,8 +42,22 @@ export interface CanvasExportOptions {
   bitrate?: number
   /** 视频质量预设，会影响默认比特率：'low'(低质量)、'medium'(中等质量)、'high'(高质量) */
   quality?: 'low' | 'medium' | 'high'
+  /** 需要混入导出结果的音频片段 */
+  audioTracks?: ExportAudioTrack[]
   /** Export progress callback */
   onProgress?: (progress: ExportProgress) => void
+}
+
+export interface ExportAudioTrack {
+  id?: string
+  source: string | File | Blob
+  startMs: number
+  durationMs: number
+  sourceStartMs?: number
+  sourceDurationMs?: number
+  waveformPeaks?: number[]
+  volume?: number
+  muted?: boolean
 }
 
 export interface ExportProgress {
@@ -72,6 +92,7 @@ export class CanvasExport {
   private _frameRate: number
   private _codec: 'avc' | 'vp9' | 'av1' | 'hevc'
   private _bitrate: number
+  private _audioTracks: ExportAudioTrack[]
   private _onProgress?: (progress: ExportProgress) => void
   private _canceled: boolean = false
   private _output?: Output
@@ -92,6 +113,7 @@ export class CanvasExport {
     // 设置编解码器和比特率
     this._codec = options.codec || 'avc'
     this._bitrate = options.bitrate || QualityPresets.getBitrate(options.quality || 'medium')
+    this._audioTracks = options.audioTracks ?? []
     this._onProgress = options.onProgress
   }
 
@@ -126,6 +148,17 @@ export class CanvasExport {
       bitrate: this._bitrate,
     })
     output.addVideoTrack(videoSampleSource)
+
+    const mixedAudioBuffer = await this._renderMixedAudioBuffer()
+    let audioBufferSource: AudioBufferSource | null = null
+    if (mixedAudioBuffer && mixedAudioBuffer.length > 0) {
+      audioBufferSource = new AudioBufferSource({
+        codec: 'aac',
+        bitrate: 192_000,
+      })
+      output.addAudioTrack(audioBufferSource)
+    }
+
     await output.start()
 
     const frameDurationUs = Math.round(1000000 / this._frameRate)
@@ -187,6 +220,10 @@ export class CanvasExport {
       throw new ExportCanceledError()
     }
 
+    if (audioBufferSource && mixedAudioBuffer) {
+      await audioBufferSource.add(mixedAudioBuffer)
+    }
+
     await output.finalize()
 
     const arrayBuffer = output.target.buffer
@@ -232,6 +269,132 @@ export class CanvasExport {
       && typeof VideoEncoder !== 'undefined'
       && typeof MediaRecorder !== 'undefined'
     )
+  }
+
+  private async _renderMixedAudioBuffer(): Promise<AudioBuffer | null> {
+    const activeTracks = this._audioTracks.filter((track) => {
+      if (track.muted)
+        return false
+
+      const volume = track.volume ?? 1
+      if (!Number.isFinite(volume) || volume <= 0)
+        return false
+
+      return Number.isFinite(track.durationMs) && track.durationMs > 0
+    })
+
+    if (activeTracks.length === 0)
+      return null
+
+    if (
+      typeof OfflineAudioContext === 'undefined'
+      || typeof AudioBuffer === 'undefined'
+    ) {
+      throw new Error('当前浏览器不支持离线音频混音')
+    }
+
+    const sampleRate = 48_000
+    const channelCount = 2
+    const length = Math.max(1, Math.ceil((this._totalFrames / this._frameRate) * sampleRate))
+    const offlineContext = new OfflineAudioContext({
+      numberOfChannels: channelCount,
+      length,
+      sampleRate,
+    })
+    const decodedCache = new Map<string | File | Blob, Promise<AudioBuffer | null>>()
+
+    const resolveAudioBuffer = async (source: string | File | Blob): Promise<AudioBuffer | null> => {
+      const cached = decodedCache.get(source)
+      if (cached)
+        return await cached
+
+      const promise = this._decodeAudioBuffer(source)
+      decodedCache.set(source, promise)
+      return await promise
+    }
+
+    for (const track of activeTracks) {
+      const decodedBuffer = await resolveAudioBuffer(track.source)
+      if (!decodedBuffer || decodedBuffer.length === 0)
+        continue
+
+      const startAt = Math.max(0, track.startMs / 1000)
+      const sourceOffset = Math.max(0, (track.sourceStartMs ?? 0) / 1000)
+      const requestedDuration = Math.max(0, track.durationMs / 1000)
+      const sourceWindowDuration = track.sourceDurationMs !== undefined
+        ? Math.max(0, track.sourceDurationMs / 1000)
+        : requestedDuration
+      const sourceAvailableDuration = Math.max(0, decodedBuffer.duration - sourceOffset)
+      const clipDuration = Math.min(
+        requestedDuration,
+        sourceWindowDuration,
+        sourceAvailableDuration,
+        Math.max(0, (this._totalFrames / this._frameRate) - startAt),
+      )
+
+      if (clipDuration <= 0)
+        continue
+
+      const sourceNode = offlineContext.createBufferSource()
+      sourceNode.buffer = decodedBuffer
+
+      const gainNode = offlineContext.createGain()
+      gainNode.gain.value = Math.max(0, Math.min(1, track.volume ?? 1))
+
+      sourceNode.connect(gainNode)
+      gainNode.connect(offlineContext.destination)
+      sourceNode.start(startAt, sourceOffset, clipDuration)
+    }
+
+    return await offlineContext.startRendering()
+  }
+
+  private async _decodeAudioBuffer(source: string | File | Blob): Promise<AudioBuffer | null> {
+    const input = new Input({
+      formats: ALL_FORMATS,
+      source: typeof source === 'string' ? new UrlSource(source) : new BlobSource(source),
+    })
+    const audioTrack = await input.getPrimaryAudioTrack()
+    if (!audioTrack)
+      return null
+
+    const duration = await audioTrack.computeDuration()
+    if (!Number.isFinite(duration) || duration <= 0)
+      return null
+
+    const sink = new AudioBufferSink(audioTrack)
+    const sampleRate = Math.max(1, Math.round(audioTrack.sampleRate || 48_000))
+    const numberOfChannels = Math.max(1, Math.round(audioTrack.numberOfChannels || 2))
+    const chunks: Array<{ buffer: AudioBuffer, frameOffset: number }> = []
+    let totalFrames = 0
+
+    for await (const wrapped of sink.buffers(0, duration)) {
+      const frameOffset = Math.max(0, Math.round(wrapped.timestamp * sampleRate))
+      totalFrames = Math.max(totalFrames, frameOffset + wrapped.buffer.length)
+      chunks.push({
+        buffer: wrapped.buffer,
+        frameOffset,
+      })
+    }
+
+    if (totalFrames <= 0)
+      return null
+
+    const mergedBuffer = new AudioBuffer({
+      length: totalFrames,
+      sampleRate,
+      numberOfChannels,
+    })
+
+    chunks.forEach(({ buffer, frameOffset }) => {
+      for (let channelIndex = 0; channelIndex < numberOfChannels; channelIndex += 1) {
+        const sourceChannel = buffer.getChannelData(Math.min(channelIndex, buffer.numberOfChannels - 1))
+        const targetChannel = mergedBuffer.getChannelData(channelIndex)
+        targetChannel.set(sourceChannel, frameOffset)
+      }
+    })
+
+    return mergedBuffer
   }
 
   /**

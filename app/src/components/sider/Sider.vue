@@ -1,20 +1,42 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { Audio } from '@clippc/performer'
 import AnimationPanel from '@/components/property-panel/AnimationPanel.vue'
 import PropertyPanel from '@/components/property-panel/PropertyPanel.vue'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
+import { useEditorStore } from '@/store/useEditorStore'
 import { useLayoutStore } from '@/store/useLayoutStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 const route = useRoute()
 
+const editorStore = useEditorStore()
 const performerStore = usePerformerStore()
 const editorCommandActions = useEditorCommandActions()
 const layoutStore = useLayoutStore()
 const { selectedPerformers } = storeToRefs(performerStore)
 const { siderCollapsed } = storeToRefs(layoutStore)
+const activeTrainId = ref<string | null>(editorStore.clippa.timeline.state.activeTrain?.id ?? null)
 
-const hasSelection = computed(() => selectedPerformers.value.length > 0)
+function handleActiveTrainChanged(train: { id: string } | null): void {
+  activeTrainId.value = train?.id ?? null
+}
+
+onMounted(() => {
+  editorStore.clippa.timeline.state.on('activeTrainChanged', handleActiveTrainChanged)
+})
+
+onUnmounted(() => {
+  editorStore.clippa.timeline.state.off('activeTrainChanged', handleActiveTrainChanged)
+})
+
+const hasSelection = computed(() => {
+  if (selectedPerformers.value.length > 0)
+    return true
+
+  const activePerformer = activeTrainId.value ? performerStore.getPerformerById(activeTrainId.value) : null
+  return activePerformer instanceof Audio
+})
 
 type SiderPanel = 'properties' | 'animation'
 const siderPanel = ref<SiderPanel>('properties')
@@ -33,6 +55,12 @@ watch(hasSelection, (selected) => {
 function handleNavigate(path: string) {
   // if properties panel is showing, first click just dismisses it
   if (hasSelection.value) {
+    const activePerformer = activeTrainId.value ? performerStore.getPerformerById(activeTrainId.value) : null
+    if (activePerformer instanceof Audio) {
+      editorStore.clippa.timeline.state.activeTrain?.updateActive(false)
+      return
+    }
+
     void editorCommandActions.performerClearSelection()
     return
   }

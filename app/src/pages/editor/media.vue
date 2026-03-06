@@ -12,6 +12,16 @@ const isImportingByUrl = ref(false)
 const isImportingLocal = ref(false)
 const showUrlInput = ref(false)
 
+function isAudioUrl(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase()
+    return ['.mp3', '.wav', '.aac', '.m4a', '.ogg', '.opus', '.flac', '.weba'].some(ext => pathname.endsWith(ext))
+  }
+  catch {
+    return false
+  }
+}
+
 async function handleImportLocalMedia(): Promise<void> {
   if (isImportingLocal.value)
     return
@@ -37,17 +47,20 @@ async function handleImportLocalMedia(): Promise<void> {
   }
 }
 
-function importVideoFromUrl() {
+function importMediaFromUrl() {
   mediaUrlError.value = ''
   const url = mediaUrl.value.trim()
   if (!url) {
-    mediaUrlError.value = '请输入视频 URL'
+    mediaUrlError.value = '请输入媒体 URL'
     return
   }
 
   isImportingByUrl.value = true
   try {
-    mediaStore.addVideoFromUrl(url)
+    if (isAudioUrl(url))
+      mediaStore.addAudioFromUrl(url)
+    else
+      mediaStore.addVideoFromUrl(url)
     mediaUrl.value = ''
   }
   catch (error) {
@@ -96,9 +109,9 @@ function importVideoFromUrl() {
             <input
               v-model="mediaUrl"
               type="text"
-              placeholder="粘贴视频链接..."
+              placeholder="粘贴音频或视频链接..."
               class="flex-1 bg-transparent border-none text-sm text-foreground outline-none placeholder:text-muted min-w-0"
-              @keydown.enter.prevent="importVideoFromUrl"
+              @keydown.enter.prevent="importMediaFromUrl"
             >
             <Button
               v-if="mediaUrl"
@@ -116,7 +129,7 @@ function importVideoFromUrl() {
             size="icon"
             class="shrink-0"
             :disabled="!mediaUrl || isImportingByUrl"
-            @click="importVideoFromUrl"
+            @click="importMediaFromUrl"
           >
             <div v-if="isImportingByUrl" i-carbon-circle-dash animate-spin />
             <div v-else i-carbon-arrow-right />

@@ -32,6 +32,7 @@ export async function generateThumbnailWithCodec(videoFile: VideoFile): Promise<
             bitrate: 0,
           }]
         : [],
+      waveform: videoFile.metadata.waveform,
     }
 
     // 更新时长（从微秒转换为毫秒）

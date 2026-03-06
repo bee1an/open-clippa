@@ -1,8 +1,23 @@
 <script setup lang="ts">
 import { useMediaStore } from '@/store/useMediaStore'
 
+interface Props {
+  kinds?: Array<'video' | 'audio' | 'image'>
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  kinds: () => ['video', 'audio', 'image'],
+})
+
 const mediaStore = useMediaStore()
-const hasMediaFiles = computed(() => mediaStore.videoFiles.length > 0 || mediaStore.imageFiles.length > 0)
+const showVideos = computed(() => props.kinds.includes('video'))
+const showAudios = computed(() => props.kinds.includes('audio'))
+const showImages = computed(() => props.kinds.includes('image'))
+const hasMediaFiles = computed(() => {
+  return (showVideos.value && mediaStore.videoFiles.length > 0)
+    || (showAudios.value && mediaStore.audioFiles.length > 0)
+    || (showImages.value && mediaStore.imageFiles.length > 0)
+})
 </script>
 
 <template>
@@ -22,14 +37,24 @@ const hasMediaFiles = computed(() => mediaStore.videoFiles.length > 0 || mediaSt
         grid gap="3 sm:4" p="3 sm:0"
         grid-cols="[repeat(auto-fill,minmax(150px,1fr))] sm:[repeat(auto-fill,minmax(180px,1fr))]"
       >
-        <VideoPreviewCard
-          v-for="videoFile in mediaStore.videoFiles" :key="videoFile.id"
-          :video-file="videoFile"
-        />
-        <ImagePreviewCard
-          v-for="imageFile in mediaStore.imageFiles" :key="imageFile.id"
-          :image-file="imageFile"
-        />
+        <template v-if="showVideos">
+          <VideoPreviewCard
+            v-for="videoFile in mediaStore.videoFiles" :key="videoFile.id"
+            :video-file="videoFile"
+          />
+        </template>
+        <template v-if="showAudios">
+          <AudioPreviewCard
+            v-for="audioFile in mediaStore.audioFiles" :key="audioFile.id"
+            :audio-file="audioFile"
+          />
+        </template>
+        <template v-if="showImages">
+          <ImagePreviewCard
+            v-for="imageFile in mediaStore.imageFiles" :key="imageFile.id"
+            :image-file="imageFile"
+          />
+        </template>
       </div>
 
       <!-- 加载状态 -->

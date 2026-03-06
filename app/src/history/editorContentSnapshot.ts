@@ -3,16 +3,17 @@ import type { useEditorStore } from '@/store/useEditorStore'
 import type { FilterConfig, useFilterStore } from '@/store/useFilterStore'
 import type { CanvasPerformer, PerformerConfig, usePerformerStore } from '@/store/usePerformerStore'
 import type { useTransitionStore } from '@/store/useTransitionStore'
-import { Text, Video } from '@clippc/performer'
+import { Audio, Text, Video } from '@clippc/performer'
 import { buildTransitionPairKey } from '@clippc/transition'
 import { cloneFilterConfig } from '@/store/useFilterStore'
 
 export interface PerformerContentSnapshot {
   id: string
-  kind: 'video' | 'image' | 'text'
+  kind: 'video' | 'image' | 'text' | 'audio'
   startMs: number
   durationMs: number
   zIndex: number
+  timelineLane: number
   x: number
   y: number
   width: number
@@ -22,6 +23,10 @@ export interface PerformerContentSnapshot {
   src?: string
   sourceStartMs?: number
   sourceDurationMs?: number
+  waveformPeaks?: number[]
+  volume?: number
+  muted?: boolean
+  linkGroupId?: string | null
   crop?: CropInsets | null
   text?: string
   style?: TextStyleOption
@@ -72,6 +77,8 @@ function cloneRecord<T extends Record<string, unknown>>(value: T): T {
 }
 
 function resolvePerformerSnapshotKind(performer: CanvasPerformer): PerformerContentSnapshot['kind'] {
+  if (performer instanceof Audio)
+    return 'audio'
   if (performer instanceof Video)
     return 'video'
   if (performer instanceof Text)
@@ -105,6 +112,7 @@ function mapPerformerSnapshot(performer: CanvasPerformer, animation: PerformerAn
     startMs: performer.start,
     durationMs: performer.duration,
     zIndex: performer.zIndex,
+    timelineLane: (performer as CanvasPerformer & { timelineLane?: number }).timelineLane ?? performer.zIndex,
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
@@ -114,11 +122,22 @@ function mapPerformerSnapshot(performer: CanvasPerformer, animation: PerformerAn
     animation,
   }
 
-  if (kind === 'video') {
+  if (kind === 'audio') {
+    const audio = performer as Audio
+    snapshot.src = audio.src
+    snapshot.sourceStartMs = audio.sourceStart
+    snapshot.sourceDurationMs = audio.sourceDuration
+    snapshot.waveformPeaks = [...audio.waveformPeaks]
+    snapshot.volume = audio.volume
+    snapshot.muted = audio.muted
+    snapshot.linkGroupId = audio.linkGroupId
+  }
+  else if (kind === 'video') {
     const video = performer as Video
     snapshot.src = video.src
     snapshot.sourceStartMs = video.sourceStart
     snapshot.sourceDurationMs = video.sourceDuration
+    snapshot.linkGroupId = (video as Video & { linkGroupId?: string | null }).linkGroupId ?? null
     snapshot.crop = resolvePerformerCrop(performer)
   }
   else if (kind === 'image') {
@@ -155,8 +174,10 @@ function buildPerformerConfig(snapshot: PerformerContentSnapshot): PerformerConf
     y: snapshot.y,
     width: snapshot.width,
     height: snapshot.height,
-    zIndex: snapshot.zIndex,
-    rotation: snapshot.rotation,
+      zIndex: snapshot.zIndex,
+      rotation: snapshot.rotation,
+      timelineLane: snapshot.timelineLane,
+      linkGroupId: snapshot.linkGroupId,
   }
 
   if (snapshot.kind === 'video') {
@@ -170,6 +191,22 @@ function buildPerformerConfig(snapshot: PerformerContentSnapshot): PerformerConf
       sourceStart: snapshot.sourceStartMs,
       sourceDuration: snapshot.sourceDurationMs,
       crop: snapshot.crop ?? undefined,
+    }
+  }
+
+  if (snapshot.kind === 'audio') {
+    if (!snapshot.src)
+      return null
+
+    return {
+      ...shared,
+      type: 'audio',
+      src: snapshot.src,
+      sourceStart: snapshot.sourceStartMs,
+      sourceDuration: snapshot.sourceDurationMs,
+      waveformPeaks: snapshot.waveformPeaks,
+      volume: snapshot.volume,
+      muted: snapshot.muted,
     }
   }
 

@@ -1,9 +1,10 @@
 import type { Rail, Train } from 'clippc'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
-import { getMsByPx, getPxByMs, VideoTrain } from 'clippc'
+import { Audio, AudioTrain, getMsByPx, getPxByMs, VideoTrain } from 'clippc'
 import { onMounted, onUnmounted } from 'vue'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
+import { useMediaStore } from '@/store/useMediaStore'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
 type SourceTimingPerformer = CanvasPerformer & {
@@ -22,6 +23,7 @@ function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
 
 export function useTimelineBinding(): void {
   const editorStore = useEditorStore()
+  const mediaStore = useMediaStore()
   const performerStore = usePerformerStore()
   const editorCommandActions = useEditorCommandActions()
   const { clippa } = editorStore
@@ -93,6 +95,140 @@ export function useTimelineBinding(): void {
     return getPxByMs(MIN_TRAIN_DURATION_MS, pxPerMs)
   }
 
+  function findTrainById(targetId: string): Train | null {
+    const rails = clippa.timeline.rails?.rails ?? []
+    for (const rail of rails) {
+      const train = rail.trains.find(item => item.id === targetId)
+      if (train)
+        return train
+    }
+
+    return null
+  }
+
+  function resolveLinkedContext(train: Train): { train: Train | null, performer: CanvasPerformer } | null {
+    const performer = performerStore.getPerformerById(train.id)
+    const linkGroupId = (performer as { linkGroupId?: string | null } | undefined)?.linkGroupId
+    if (!performer || !linkGroupId)
+      return null
+
+    const linkedPerformer = performerStore.getAllPerformers().find((item) => {
+      return item.id !== performer.id
+        && (item as { linkGroupId?: string | null }).linkGroupId === linkGroupId
+    })
+    if (!linkedPerformer)
+      return null
+
+    const linkedTrain = findTrainById(linkedPerformer.id)
+    return {
+      train: linkedTrain,
+      performer: linkedPerformer,
+    }
+  }
+
+  function updateTrainVisualStart(train: Train, startMs: number): void {
+    const nextX = getPxByMs(startMs, clippa.timeline.state.pxPerMs)
+    train.updatePos(nextX)
+    train.x = nextX
+    train.start = startMs
+  }
+
+  function updateTrainVisualDuration(train: Train, durationMs: number): void {
+    const normalizedDuration = Math.max(MIN_TRAIN_DURATION_MS, durationMs)
+    const nextWidth = getPxByMs(normalizedDuration, clippa.timeline.state.pxPerMs)
+    train.updateWidth(nextWidth)
+    train.width = nextWidth
+    train.duration = normalizedDuration
+  }
+
+  function syncMediaTrainState(train: Train, performer: CanvasPerformer): void {
+    if (!hasSourceTiming(performer))
+      return
+
+    if (train instanceof VideoTrain)
+      train.updateSourceStart(performer.sourceStart)
+
+    if (train instanceof AudioTrain) {
+      train.updateAudioWindow(
+        performer.sourceStart,
+        performer.duration,
+        performer.sourceDuration,
+      )
+      const audioPerformer = performer as Audio
+      train.updateWaveform([...audioPerformer.waveformPeaks])
+      train.updateAudioState({
+        muted: audioPerformer.muted,
+        volume: audioPerformer.volume,
+      })
+    }
+  }
+
+  function refreshVideoTrainThumbnails(train: Train): void {
+    if (!(train instanceof VideoTrain))
+      return
+
+    train.refreshThumbnails().catch((error) => {
+      console.warn('[timeline-binding] refresh video train thumbnails failed', error)
+    })
+  }
+
+  function syncLinkedMove(train: Train, nextStart: number): void {
+    const linked = resolveLinkedContext(train)
+    if (!linked)
+      return
+
+    linked.performer.start = nextStart
+    if (linked.train)
+      updateTrainVisualStart(linked.train, nextStart)
+  }
+
+  function syncLinkedLeftResize(train: Train, deltaStart: number): void {
+    const linked = resolveLinkedContext(train)
+    if (!linked)
+      return
+
+    const nextStart = linked.performer.start + deltaStart
+    linked.performer.start = nextStart
+    linked.performer.duration = Math.max(MIN_TRAIN_DURATION_MS, linked.performer.duration - deltaStart)
+
+    if (hasSourceTiming(linked.performer)) {
+      linked.performer.sourceStart = Math.max(
+        0,
+        Math.min(
+          linked.performer.sourceDuration,
+          linked.performer.sourceStart + deltaStart,
+        ),
+      )
+    }
+
+    if (linked.train) {
+      updateTrainVisualStart(linked.train, nextStart)
+      updateTrainVisualDuration(linked.train, linked.performer.duration)
+      syncMediaTrainState(linked.train, linked.performer)
+    }
+  }
+
+  function syncLinkedRightResize(train: Train, nextDuration: number): void {
+    const linked = resolveLinkedContext(train)
+    if (!linked)
+      return
+
+    linked.performer.duration = Math.max(MIN_TRAIN_DURATION_MS, nextDuration)
+    if (linked.train) {
+      updateTrainVisualDuration(linked.train, linked.performer.duration)
+      syncMediaTrainState(linked.train, linked.performer)
+    }
+  }
+
+  function markTimelineMutationComplete(rails: Array<Rail | null | undefined>): void {
+    rails.forEach((rail) => {
+      if (rail)
+        syncRailTiming(rail)
+    })
+    performerStore.markContentDirty()
+    queueCanvasTimingSync()
+  }
+
   function beginTrainGestureTransaction(train: Train, label: string): void {
     if (trainGestureTransactions.has(train) || trainGestureTransactionStarting.has(train))
       return
@@ -157,33 +293,33 @@ export function useTimelineBinding(): void {
     if (trainDisposers.has(train))
       return
 
-    const syncVideoTrainSource = (): void => {
-      const performer = performerStore.getPerformerById(train.id)
-      if (!performer || !hasSourceTiming(performer) || !(train instanceof VideoTrain))
+    const performer = performerStore.getPerformerById(train.id)
+    if (!performer)
+      return
+
+    const syncCurrentTrainMediaState = (): void => {
+      const nextPerformer = performerStore.getPerformerById(train.id)
+      if (!nextPerformer)
         return
 
-      train.updateSourceStart(performer.sourceStart)
+      syncMediaTrainState(train, nextPerformer)
     }
 
-    const refreshVideoTrainThumbnails = (): void => {
-      if (!(train instanceof VideoTrain))
-        return
-
-      train.refreshThumbnails().catch((error) => {
-        console.warn('[timeline-binding] refresh video train thumbnails failed', error)
-      })
-    }
-
-    syncVideoTrainSource()
+    syncCurrentTrainMediaState()
 
     const handleMoveStart = (): void => {
       beginTrainGestureTransaction(train, 'Move Timeline Item')
     }
 
+    const handleBeforeMove = (site: { xValue: number }): void => {
+      const nextStart = resolveStartByVisualX(train, site.xValue)
+      syncLinkedMove(train, nextStart)
+    }
+
     const handleMoveEnd = (target: Train): void => {
-      syncRailTiming(target.parent)
       syncTrainTiming(target)
-      queueCanvasTimingSync()
+      const linked = resolveLinkedContext(target)
+      markTimelineMutationComplete([target.parent, linked?.train?.parent])
       void endTrainGestureTransaction(train, 'Move Timeline Item')
     }
 
@@ -200,22 +336,25 @@ export function useTimelineBinding(): void {
 
       let nextStart = resolveStartByVisualX(train, site.xValue)
       let nextDuration = getMsByPx(site.wValue, pxPerMs)
+      let sourceDelta = nextStart - oldStart
 
-      if (hasSourceTiming(performer)) {
-        const sourceDelta = nextStart - oldStart
-        const nextSourceStart = performer.sourceStart + sourceDelta
+      const linked = resolveLinkedContext(train)
+      const sourceTimingPerformers = [performer, linked?.performer].filter((item): item is SourceTimingPerformer => {
+        return !!item && hasSourceTiming(item)
+      })
+      const minDelta = sourceTimingPerformers.reduce((result, item) => {
+        return Math.max(result, -item.sourceStart)
+      }, Number.NEGATIVE_INFINITY)
+      if (Number.isFinite(minDelta) && sourceDelta < minDelta) {
+        const blockedDelta = minDelta - sourceDelta
+        const blockedPx = getPxByMs(blockedDelta, pxPerMs)
 
-        if (nextSourceStart < 0) {
-          const clampedDelta = -performer.sourceStart
-          const blockedDelta = clampedDelta - sourceDelta
-          const blockedPx = getPxByMs(blockedDelta, pxPerMs)
+        site.xValue += blockedPx
+        site.wValue -= blockedPx
 
-          site.xValue += blockedPx
-          site.wValue -= blockedPx
-
-          nextStart = oldStart + clampedDelta
-          nextDuration = oldDuration - clampedDelta
-        }
+        nextStart = oldStart + minDelta
+        nextDuration = oldDuration - minDelta
+        sourceDelta = minDelta
       }
 
       // 按最小时长约束最小宽度
@@ -228,28 +367,33 @@ export function useTimelineBinding(): void {
         site.disdrawable = false
         nextStart = resolveStartByVisualX(train, site.xValue)
         nextDuration = getMsByPx(site.wValue, pxPerMs)
+        sourceDelta = nextStart - oldStart
       }
 
       if (hasSourceTiming(performer)) {
         const maxSourceStart = Math.max(0, performer.sourceDuration)
-        const clampedSourceStart = performer.sourceStart + (nextStart - oldStart)
+        const clampedSourceStart = performer.sourceStart + sourceDelta
         performer.sourceStart = Math.min(
           maxSourceStart,
           Math.max(0, clampedSourceStart),
         )
-
-        if (train instanceof VideoTrain)
-          train.updateSourceStart(performer.sourceStart)
       }
 
       performer.start = nextStart
       performer.duration = Math.max(MIN_TRAIN_DURATION_MS, nextDuration)
+      syncMediaTrainState(train, performer)
+      syncLinkedLeftResize(train, sourceDelta)
     }
 
     const handleBeforeRightResize = (site: { wValue: number, disdrawable: boolean }): void => {
       // 按最小时长约束最小宽度
       const minW = resolveMinTrainWidth(clippa.timeline.state.pxPerMs)
       site.wValue = Math.max(minW, site.wValue)
+
+      const nextDuration = getMsByPx(site.wValue, clippa.timeline.state.pxPerMs)
+      performer.duration = Math.max(MIN_TRAIN_DURATION_MS, nextDuration)
+      syncMediaTrainState(train, performer)
+      syncLinkedRightResize(train, performer.duration)
     }
 
     const handleRightResizeStart = (): void => {
@@ -257,40 +401,91 @@ export function useTimelineBinding(): void {
     }
 
     const handleLeftResizeEnd = (target: Train): void => {
-      syncRailTiming(target.parent)
       syncTrainTiming(target)
-      syncVideoTrainSource()
-      refreshVideoTrainThumbnails()
-      queueCanvasTimingSync()
+      syncCurrentTrainMediaState()
+      refreshVideoTrainThumbnails(target)
+      const linked = resolveLinkedContext(target)
+      if (linked?.train)
+        refreshVideoTrainThumbnails(linked.train)
+      markTimelineMutationComplete([target.parent, linked?.train?.parent])
       void endTrainGestureTransaction(train, 'Resize Timeline Item')
     }
 
     const handleRightResizeEnd = (target: Train): void => {
-      syncRailTiming(target.parent)
       syncTrainTiming(target)
-      syncVideoTrainSource()
-      refreshVideoTrainThumbnails()
-      queueCanvasTimingSync()
+      syncCurrentTrainMediaState()
+      refreshVideoTrainThumbnails(target)
+      const linked = resolveLinkedContext(target)
+      if (linked?.train)
+        refreshVideoTrainThumbnails(linked.train)
+      markTimelineMutationComplete([target.parent, linked?.train?.parent])
       void endTrainGestureTransaction(train, 'Resize Timeline Item')
     }
 
+    const handleAudioStateChange = (state: { muted: boolean, volume: number }): void => {
+      if (!(train instanceof AudioTrain))
+        return
+
+      train.updateAudioState(state)
+    }
+
+    const handleWaveformChange = (peaks: number[]): void => {
+      if (!(train instanceof AudioTrain))
+        return
+
+      train.updateWaveform(peaks)
+    }
+
     train.on('moveStart', handleMoveStart)
+    train.on('beforeMove', handleBeforeMove)
     train.on('moveEnd', handleMoveEnd)
     train.on('beforeLeftResize', handleBeforeLeftResize)
     train.on('leftResizeEnd', handleLeftResizeEnd)
     train.on('rightResizeStart', handleRightResizeStart)
     train.on('beforeRightResize', handleBeforeRightResize)
     train.on('rightResizeEnd', handleRightResizeEnd)
+    if (performer instanceof Audio) {
+      performer.on('audioStateChange', handleAudioStateChange)
+      performer.on('waveformChange', handleWaveformChange)
+    }
 
     trainDisposers.set(train, () => {
       train.off('moveStart', handleMoveStart)
+      train.off('beforeMove', handleBeforeMove)
       train.off('moveEnd', handleMoveEnd)
       train.off('beforeLeftResize', handleBeforeLeftResize)
       train.off('leftResizeEnd', handleLeftResizeEnd)
       train.off('rightResizeStart', handleRightResizeStart)
       train.off('beforeRightResize', handleBeforeRightResize)
       train.off('rightResizeEnd', handleRightResizeEnd)
+      if (performer instanceof Audio) {
+        performer.off('audioStateChange', handleAudioStateChange)
+        performer.off('waveformChange', handleWaveformChange)
+      }
       void cancelTrainGestureTransaction(train)
+    })
+  }
+
+  function syncAudioWaveformsFromLibrary(): void {
+    const audioWaveforms = new Map<string, number[]>()
+    mediaStore.audioFiles.forEach((audioFile) => {
+      audioWaveforms.set(audioFile.url, [...audioFile.metadata.waveform.peaks])
+    })
+
+    performerStore.getAllPerformers().forEach((performer) => {
+      if (!(performer instanceof Audio) || performer.linkGroupId)
+        return
+
+      const nextPeaks = audioWaveforms.get(performer.src)
+      if (!nextPeaks || nextPeaks.length === 0)
+        return
+
+      const sameLength = performer.waveformPeaks.length === nextPeaks.length
+      const samePeaks = sameLength && performer.waveformPeaks.every((value, index) => value === nextPeaks[index])
+      if (samePeaks)
+        return
+
+      performer.setWaveformPeaks(nextPeaks)
     })
   }
 
@@ -359,10 +554,19 @@ export function useTimelineBinding(): void {
   onMounted(async () => {
     await clippa.ready
     bindTimelineRails()
+    syncAudioWaveformsFromLibrary()
     clippa.timeline.on('durationChanged', handleDurationChanged)
     clippa.timeline.on('currentTimeUpdated', handleCurrentTimeUpdated)
     clippa.timeline.state.on('activeTrainChanged', handleActiveTrainChanged)
     clippa.theater.on('hire', handleHire)
+
+    watch(
+      () => mediaStore.audioFiles.map(file => `${file.id}:${file.metadata.waveform.peaks.join(',')}`),
+      () => {
+        syncAudioWaveformsFromLibrary()
+      },
+      { deep: false },
+    )
   })
 
   onUnmounted(() => {

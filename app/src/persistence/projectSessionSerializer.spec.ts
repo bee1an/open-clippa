@@ -12,6 +12,7 @@ function createSnapshot(src: string): EditorContentSnapshot {
         startMs: 0,
         durationMs: 1000,
         zIndex: 1,
+        timelineLane: 1,
         x: 0,
         y: 0,
         width: 320,
@@ -64,6 +65,7 @@ describe('projectSessionSerializer', () => {
             bitrate: 0,
             aspectRatio: '16:9',
             audioTracks: [],
+            waveform: { sampleCount: 0, peaks: [] },
           },
           thumbnails: {
             primary: '',
@@ -76,6 +78,7 @@ describe('projectSessionSerializer', () => {
           },
         },
       ],
+      audioAssets: [],
       imageAssets: [],
     })
 
@@ -118,6 +121,7 @@ describe('projectSessionSerializer', () => {
             bitrate: 0,
             aspectRatio: '16:9',
             audioTracks: [],
+            waveform: { sampleCount: 0, peaks: [] },
           },
           thumbnails: {
             primary: '',
@@ -130,6 +134,7 @@ describe('projectSessionSerializer', () => {
           },
         },
       ],
+      audioAssets: [],
       imageAssets: [],
     })
 

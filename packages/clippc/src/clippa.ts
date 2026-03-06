@@ -2,9 +2,9 @@ import type { CanvasBounds, CanvasSize } from '@clippc/canvas'
 import type { MaybeArray } from 'type-aide'
 import type { Performer } from './performer'
 import { projectBoundsToCanvasBase, remapBoundsForCanvasResize } from '@clippc/canvas'
-import { TextTrain, VideoTrain } from '@clippc/timeline'
+import { AudioTrain, TextTrain, VideoTrain } from '@clippc/timeline'
 import { Director, Stage, Theater } from './canvas'
-import { Text } from './performer'
+import { Audio, Text } from './performer'
 import { Timeline } from './timeline'
 import { EventBus } from './utils'
 
@@ -59,6 +59,7 @@ export class Clippa extends EventBus<ClippaEvents> {
     this.theater.hire(p)
     this.attachLayoutListener(p)
     this.syncPerformerLayoutBaseFromCurrent(p)
+    const timelineLane = (p as Performer & { timelineLane?: number }).timelineLane ?? p.zIndex
 
     if (p instanceof Text) {
       const train = new TextTrain({
@@ -69,7 +70,27 @@ export class Clippa extends EventBus<ClippaEvents> {
         variant: 'text',
         textColor: p.getStyle().fill,
       })
-      this.timeline.addTrainByZIndex(train, p.zIndex)
+      this.timeline.addTrainByZIndex(train, timelineLane)
+      return
+    }
+
+    if (p instanceof Audio) {
+      if (p.linkGroupId) {
+        return
+      }
+
+      const train = new AudioTrain({
+        id: p.id,
+        start: p.start,
+        duration: p.duration,
+        waveformPeaks: [...p.waveformPeaks],
+        assetDuration: p.sourceDuration,
+        sourceStart: p.sourceStart,
+        sourceDuration: p.duration,
+        muted: p.muted,
+        volume: p.volume,
+      })
+      this.timeline.addTrainByZIndex(train, timelineLane)
       return
     }
 
@@ -85,7 +106,7 @@ export class Clippa extends EventBus<ClippaEvents> {
       src: performerWithSrc.src,
       sourceStart: performerWithSrc.sourceStart,
     })
-    this.timeline.addTrainByZIndex(videoTrain, p.zIndex)
+    this.timeline.addTrainByZIndex(videoTrain, timelineLane)
     await videoTrain.init()
   }
 

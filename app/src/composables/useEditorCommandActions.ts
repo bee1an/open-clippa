@@ -52,6 +52,7 @@ export function useEditorCommandActions() {
     timelineClearSelection: () => callRuntime(() => runtime.timelineClearSelection()),
 
     mediaAddAssetToTimeline: (input: MediaAddAssetToTimelineInput) => callRuntime(() => runtime.mediaAddAssetToTimeline(input)),
+    mediaImportAudioFromUrl: (input: { url: string, name?: string }) => callRuntime(() => runtime.mediaImportAudioFromUrl(input)),
     mediaRemoveAsset: (input: MediaRemoveAssetInput) => callRuntime(() => runtime.mediaRemoveAsset(input)),
 
     createTextElement: (input: CreateTextElementInput) => callRuntime(() => runtime.createTextElement(input)),

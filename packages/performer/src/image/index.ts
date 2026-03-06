@@ -41,6 +41,8 @@ export interface ImageOption extends PerformerOption {
   id: string
   src: string | File | Blob
   zIndex: number
+  timelineLane?: number
+  linkGroupId?: string | null
   width?: number
   height?: number
   x?: number
@@ -56,6 +58,8 @@ export class Image extends EventBus<ImageEvents> implements Performer {
   duration: number
   src: string
   zIndex: number
+  timelineLane: number
+  linkGroupId: string | null
 
   protected _sprite?: Sprite
   get sprite(): Sprite | undefined {
@@ -86,6 +90,8 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     this.start = start
     this.duration = duration
     this.zIndex = zIndex
+    this.timelineLane = option.timelineLane ?? zIndex
+    this.linkGroupId = option.linkGroupId ?? null
     this.src = transformSrc(src)
     this._cropInsets = cloneCrop(crop)
 

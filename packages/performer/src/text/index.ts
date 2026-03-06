@@ -31,6 +31,8 @@ export interface TextOption extends PerformerOption {
   id: string
   content: string
   zIndex: number
+  timelineLane?: number
+  linkGroupId?: string | null
   x?: number
   y?: number
   width?: number
@@ -65,6 +67,8 @@ export class Text extends EventBus<TextEvents> implements Performer {
   start: number
   duration: number
   zIndex: number
+  timelineLane: number
+  linkGroupId: string | null
 
   protected _sprite?: PixiText
   get sprite(): PixiText | undefined {
@@ -91,6 +95,8 @@ export class Text extends EventBus<TextEvents> implements Performer {
     this.start = start
     this.duration = duration
     this.zIndex = zIndex
+    this.timelineLane = option.timelineLane ?? zIndex
+    this.linkGroupId = option.linkGroupId ?? null
     this._content = content
     this._styleOption = style || {}
 

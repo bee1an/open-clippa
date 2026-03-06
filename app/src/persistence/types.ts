@@ -1,6 +1,6 @@
 import type { EditorContentSnapshot } from '@/history/editorContentSnapshot'
 
-export type PersistedMediaAssetKind = 'video' | 'image'
+export type PersistedMediaAssetKind = 'video' | 'image' | 'audio'
 export type PersistedMediaSourceType = 'url' | 'handle'
 
 export interface PersistedProjectMeta {
@@ -40,5 +40,6 @@ export interface PersistedProjectState {
   canvasPresetId: string
   editorContentSnapshot: EditorContentSnapshot
   videoAssets: PersistedMediaAsset[]
+  audioAssets: PersistedMediaAsset[]
   imageAssets: PersistedMediaAsset[]
 }

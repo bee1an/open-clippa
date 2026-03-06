@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CanvasSize, Train } from 'clippc'
+import { Audio } from '@clippc/performer'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Select } from '@/components/ui/select'
@@ -230,7 +231,11 @@ function syncTimelineToSelection(train: Train | null) {
 
   isSyncingFromTimeline.value = true
   if (train) {
-    void editorCommandActions.performerSelect({ performerId: train.id })
+    const performer = performerStore.getPerformerById(train.id)
+    if (performer instanceof Audio)
+      performerStore.clearSelection()
+    else
+      void editorCommandActions.performerSelect({ performerId: train.id })
   }
   else {
     void editorCommandActions.performerClearSelection()

@@ -6,6 +6,7 @@ import type {
   TextStyleOption,
 } from '@clippc/performer'
 import {
+  Audio,
   Image,
   mergeAnimationSpec,
   normalizeAnimationSpec,
@@ -28,6 +29,8 @@ interface PerformerConfigBase {
   height?: number
   zIndex?: number
   rotation?: number
+  timelineLane?: number
+  linkGroupId?: string | null
 }
 
 export interface VideoPerformerConfig extends PerformerConfigBase {
@@ -50,9 +53,19 @@ export interface TextPerformerConfig extends PerformerConfigBase {
   style?: TextStyleOption
 }
 
-export type PerformerConfig = VideoPerformerConfig | ImagePerformerConfig | TextPerformerConfig
+export interface AudioPerformerConfig extends PerformerConfigBase {
+  type: 'audio'
+  src: string | File | Blob
+  sourceDuration?: number
+  sourceStart?: number
+  waveformPeaks?: number[]
+  volume?: number
+  muted?: boolean
+}
 
-export type CanvasPerformer = Video | Image | Text
+export type PerformerConfig = VideoPerformerConfig | ImagePerformerConfig | TextPerformerConfig | AudioPerformerConfig
+
+export type CanvasPerformer = Video | Image | Text | Audio
 
 interface PerformerPointerEvent {
   performer: CanvasPerformer
@@ -261,6 +274,13 @@ export const usePerformerStore = defineStore('performer', () => {
         zIndex,
       })
     }
+    else if (config.type === 'audio') {
+      const { type: _type, rotation: _rotation, x: _x, y: _y, width: _width, height: _height, ...audioConfig } = config
+      performer = new Audio({
+        ...audioConfig,
+        zIndex,
+      })
+    }
     else {
       const { type: _type, rotation: _rotation, ...videoConfig } = config
       performer = new Video({
@@ -270,16 +290,16 @@ export const usePerformerStore = defineStore('performer', () => {
     }
 
     const eventTarget = performer as {
-      on:
+      on?:
       & ((event: 'pointerdown', handler: (event: PerformerPointerEvent) => void) => void)
       & ((event: 'positionUpdate', handler: (bounds: PerformerBounds) => void) => void)
     }
 
-    eventTarget.on('pointerdown', (event) => {
+    eventTarget.on?.('pointerdown', (event) => {
       handlePerformerPointerDown(performer, event)
     })
 
-    eventTarget.on('positionUpdate', (bounds) => {
+    eventTarget.on?.('positionUpdate', (bounds) => {
       handlePerformerPositionUpdate(performer, bounds)
     })
 

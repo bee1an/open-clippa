@@ -1,3 +1,4 @@
+export * from './audioTrain'
 export * from './textTrain'
 export * from './train'
 export * from './types'

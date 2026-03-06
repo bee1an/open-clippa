@@ -1,6 +1,6 @@
 import type { PersistedHandleMediaAsset, PersistedMediaAsset, PersistedProjectState, PersistedUrlMediaAsset } from './types'
 import type { EditorContentSnapshot } from '@/history/editorContentSnapshot'
-import type { ImageFile, VideoFile } from '@/store/useMediaStore'
+import type { AudioFile, ImageFile, VideoFile } from '@/store/useMediaStore'
 import { toRaw } from 'vue'
 
 const ASSET_TOKEN_PREFIX = 'asset://'
@@ -11,7 +11,7 @@ function cloneSnapshot(snapshot: EditorContentSnapshot): EditorContentSnapshot {
 
 function buildPersistedUrlAsset(
   kind: PersistedUrlMediaAsset['kind'],
-  source: VideoFile | ImageFile,
+  source: VideoFile | AudioFile | ImageFile,
 ): PersistedUrlMediaAsset {
   return {
     id: source.id,
@@ -26,7 +26,7 @@ function buildPersistedUrlAsset(
 
 function buildPersistedHandleAsset(
   kind: PersistedHandleMediaAsset['kind'],
-  source: VideoFile | ImageFile,
+  source: VideoFile | AudioFile | ImageFile,
 ): PersistedHandleMediaAsset | null {
   const rawHandle = source.fileHandle ? toRaw(source.fileHandle) : null
   if (!rawHandle)
@@ -63,6 +63,16 @@ function mapImageAsset(source: ImageFile): PersistedMediaAsset | null {
   return null
 }
 
+function mapAudioAsset(source: AudioFile): PersistedMediaAsset | null {
+  if (source.sourceType === 'url')
+    return buildPersistedUrlAsset('audio', source)
+
+  if (source.sourceType === 'handle')
+    return buildPersistedHandleAsset('audio', source)
+
+  return null
+}
+
 function toAssetToken(assetId: string): string {
   return `${ASSET_TOKEN_PREFIX}${assetId}`
 }
@@ -82,6 +92,7 @@ export function capturePersistedProjectState(input: {
   canvasPresetId: string
   snapshot: EditorContentSnapshot
   videoAssets: VideoFile[]
+  audioAssets: AudioFile[]
   imageAssets: ImageFile[]
 }): PersistedProjectState {
   const persistedVideos = input.videoAssets
@@ -90,6 +101,10 @@ export function capturePersistedProjectState(input: {
 
   const persistedImages = input.imageAssets
     .map(mapImageAsset)
+    .filter((asset): asset is PersistedMediaAsset => asset !== null)
+
+  const persistedAudios = input.audioAssets
+    .map(mapAudioAsset)
     .filter((asset): asset is PersistedMediaAsset => asset !== null)
 
   const localAssetUrlToId = new Map<string, string>()
@@ -106,6 +121,14 @@ export function capturePersistedProjectState(input: {
       return
 
     const matched = input.imageAssets.find(item => item.id === asset.id)
+    if (matched?.url)
+      localAssetUrlToId.set(matched.url, asset.id)
+  })
+  persistedAudios.forEach((asset) => {
+    if (asset.sourceType !== 'handle')
+      return
+
+    const matched = input.audioAssets.find(item => item.id === asset.id)
     if (matched?.url)
       localAssetUrlToId.set(matched.url, asset.id)
   })
@@ -127,7 +150,8 @@ export function capturePersistedProjectState(input: {
 
   return {
     projectId: input.projectId,
-    schemaVersion: 1,
+    schemaVersion: 2,
+    audioAssets: persistedAudios,
     savedAt: Date.now(),
     canvasPresetId: input.canvasPresetId,
     editorContentSnapshot: tokenizedSnapshot,

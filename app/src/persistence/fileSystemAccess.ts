@@ -3,6 +3,7 @@ const MEDIA_PICKER_TYPES = [
     description: 'Media Files',
     accept: {
       'video/*': ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v'],
+      'audio/*': ['.mp3', '.wav', '.aac', '.m4a', '.ogg', '.opus', '.flac', '.weba'],
       'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg', '.heic'],
     },
   },

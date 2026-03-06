@@ -113,6 +113,30 @@ export const createMediaTools: EditorControlToolFactory = adapter => [
     },
   },
   {
+    name: 'media_import_audio_from_url',
+    description: 'Import an audio asset from remote URL into media library.',
+    jsonSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        name: { type: 'string' },
+      },
+      required: ['url'],
+      additionalProperties: false,
+    },
+    handler: async (rawInput) => {
+      const input = toRecord(rawInput)
+      const url = asOptionalString(input.url)
+      if (!url)
+        return invalidArgument('url is required')
+
+      return await adapter.mediaImportAudioFromUrl({
+        url,
+        name: asOptionalString(input.name),
+      })
+    },
+  },
+  {
     name: 'media_import_random_image',
     description: 'Import a random image from Pexels into media library.',
     jsonSchema: {
@@ -202,7 +226,7 @@ export const createMediaTools: EditorControlToolFactory = adapter => [
       properties: {
         type: {
           type: 'string',
-          enum: ['all', 'video', 'image'],
+          enum: ['all', 'video', 'image', 'audio'],
         },
       },
       required: [],
@@ -215,11 +239,12 @@ export const createMediaTools: EditorControlToolFactory = adapter => [
         && input.type !== 'all'
         && input.type !== 'video'
         && input.type !== 'image'
+        && input.type !== 'audio'
       ) {
-        return invalidArgument('type must be one of: all, video, image')
+        return invalidArgument('type must be one of: all, video, image, audio')
       }
 
-      const type = input.type === 'video' || input.type === 'image' || input.type === 'all'
+      const type = input.type === 'video' || input.type === 'image' || input.type === 'audio' || input.type === 'all'
         ? input.type
         : 'all'
 
@@ -253,7 +278,7 @@ export const createMediaTools: EditorControlToolFactory = adapter => [
       properties: {
         type: {
           type: 'string',
-          enum: ['all', 'video', 'image'],
+          enum: ['all', 'video', 'image', 'audio'],
         },
       },
       required: [],
@@ -261,7 +286,7 @@ export const createMediaTools: EditorControlToolFactory = adapter => [
     },
     handler: async (rawInput) => {
       const input = toRecord(rawInput)
-      const type = input.type === 'video' || input.type === 'image' || input.type === 'all'
+      const type = input.type === 'video' || input.type === 'image' || input.type === 'audio' || input.type === 'all'
         ? input.type
         : 'all'
       return await adapter.mediaClearLibrary({ type })

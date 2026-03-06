@@ -26,7 +26,7 @@ export interface TransitionPatchInput {
 }
 
 export interface QueryMediaAssetsInput {
-  type?: 'all' | 'video' | 'image'
+  type?: 'all' | 'video' | 'image' | 'audio'
   limit?: number
 }
 
@@ -66,6 +66,11 @@ export interface MediaImportVideoFromUrlInput {
   name?: string
 }
 
+export interface MediaImportAudioFromUrlInput {
+  url: string
+  name?: string
+}
+
 export type MediaRandomOrientation = 'landscape' | 'portrait' | 'square'
 
 export interface MediaImportRandomImageInput {
@@ -83,7 +88,7 @@ export interface MediaImportRandomVideoInput {
 }
 
 export interface MediaPickRandomAssetInput {
-  type?: 'all' | 'video' | 'image'
+  type?: 'all' | 'video' | 'image' | 'audio'
 }
 
 export interface MediaRemoveAssetInput {
@@ -91,7 +96,7 @@ export interface MediaRemoveAssetInput {
 }
 
 export interface MediaClearLibraryInput {
-  type?: 'all' | 'video' | 'image'
+  type?: 'all' | 'video' | 'image' | 'audio'
 }
 
 export interface PerformerSelectInput {
@@ -267,6 +272,7 @@ export interface EditorControlAdapter {
 
   mediaAddAssetToTimeline: (input: MediaAddAssetToTimelineInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   mediaImportVideoFromUrl: (input: MediaImportVideoFromUrlInput) => EditorControlActionResult | Promise<EditorControlActionResult>
+  mediaImportAudioFromUrl: (input: MediaImportAudioFromUrlInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   mediaImportRandomImage: (input: MediaImportRandomImageInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   mediaImportRandomVideo: (input: MediaImportRandomVideoInput) => EditorControlActionResult | Promise<EditorControlActionResult>
   mediaPickRandomAsset: (input: MediaPickRandomAssetInput) => EditorControlActionResult | Promise<EditorControlActionResult>

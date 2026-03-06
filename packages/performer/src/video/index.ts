@@ -49,6 +49,8 @@ export interface VideoOption extends PerformerOption {
   src: string | File | Blob
 
   zIndex: number
+  timelineLane?: number
+  linkGroupId?: string | null
 
   sourceDuration?: number
 
@@ -81,6 +83,8 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
   valid: boolean = false
   error: boolean = false
   zIndex: number
+  timelineLane: number
+  linkGroupId: string | null
   /**
    * 当前播放时间
    */
@@ -108,6 +112,8 @@ export class Video extends EventBus<PerformerEvents> implements Performer {
     this.start = start
     this.duration = duration
     this.zIndex = zIndex
+    this.timelineLane = option.timelineLane ?? zIndex
+    this.linkGroupId = option.linkGroupId ?? null
     this.src = transformSrc(src)
     this.sourceDuration = option.sourceDuration ?? option.duration
     this.sourceStart = option.sourceStart ?? 0

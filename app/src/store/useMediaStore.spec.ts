@@ -16,9 +16,42 @@ const { generateThumbnailWithCodecMock } = vi.hoisted(() => {
   }
 })
 
+const { inspectMediaSourceMock } = vi.hoisted(() => {
+  return {
+    inspectMediaSourceMock: vi.fn(async () => ({
+      durationMs: 12_000,
+      mimeType: 'video/mp4',
+      video: {
+        codec: 'h264',
+        width: 1920,
+        height: 1080,
+        frameRate: 30,
+        bitrate: 1_000_000,
+      },
+      audioTracks: [{
+        index: 0,
+        codec: 'aac',
+        channels: 2,
+        sampleRate: 48_000,
+        bitrate: 128_000,
+      }],
+      waveform: {
+        sampleCount: 4,
+        peaks: [0.1, 0.5, 0.25, 0.75],
+      },
+    })),
+  }
+})
+
 vi.mock('@/utils/thumbnailGenerator', () => {
   return {
     generateThumbnailWithCodec: generateThumbnailWithCodecMock,
+  }
+})
+
+vi.mock('@/utils/media', () => {
+  return {
+    inspectMediaSource: inspectMediaSourceMock,
   }
 })
 
@@ -56,6 +89,10 @@ describe('useMediaStore helpers', () => {
       aspectRatio: '16:9',
       colorSpace: undefined,
       audioTracks: [],
+      waveform: {
+        sampleCount: 96,
+        peaks: Array.from({ length: 96 }, () => 0),
+      },
     })
 
     expect(createDefaultThumbnailSet()).toEqual({
@@ -84,6 +121,10 @@ describe('useMediaStore helpers', () => {
       aspectRatio: '16:9',
       colorSpace: undefined,
       audioTracks: [{ index: 0, codec: 'aac', channels: 2, sampleRate: 48000 }],
+      waveform: {
+        sampleCount: 96,
+        peaks: Array.from({ length: 96 }, () => 0),
+      },
     })
 
     expect(validateThumbnailSet({
@@ -106,6 +147,7 @@ describe('useMediaStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     generateThumbnailWithCodecMock.mockReset()
+    inspectMediaSourceMock.mockClear()
 
     objectUrlIndex = 0
     createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:mock-${objectUrlIndex++}`)
@@ -359,7 +401,7 @@ describe('useMediaStore', () => {
     expect((globalThis.fetch as any).mock.calls[0][0]).toContain('/api/pexels/random?')
   })
 
-  it('imports random video from pexels and applies returned duration', async () => {
+  it('imports random video from pexels and initializes metadata', async () => {
     generateThumbnailWithCodecMock.mockResolvedValue('blob:remote-thumb')
     vi.stubGlobal('fetch', vi.fn(async () => {
       return createJsonResponse({
@@ -389,10 +431,10 @@ describe('useMediaStore', () => {
 
     expect(video.sourceType).toBe('url')
     expect(video.url).toBe('https://player.vimeo.com/external/123.hd.mp4')
-    expect(video.duration).toBe(9000)
+    expect(video.duration).toBe(12000)
     expect(video.metadata.resolution).toEqual({
-      width: 1280,
-      height: 720,
+      width: 1920,
+      height: 1080,
     })
     expect(store.videoFiles).toHaveLength(1)
   })
@@ -426,5 +468,67 @@ describe('useMediaStore', () => {
 
     expect(store.formatFileSize(0)).toBe('0 B')
     expect((globalThis.fetch as any).mock.calls).toHaveLength(1)
+  })
+
+  it('searches jamendo tracks through proxy endpoint', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (requestUrl: string) => {
+      expect(requestUrl).toContain('/api/jamendo/search?')
+      return createJsonResponse({
+        ok: true,
+        data: {
+          provider: 'jamendo',
+          page: 1,
+          limit: 12,
+          total: 2,
+          tracks: [
+            {
+              id: 'jam-1',
+              name: 'Northern Lights',
+              durationMs: 187000,
+              audioUrl: 'https://cdn.jamendo.com/jam-1.mp3',
+              artistName: 'Atlas',
+              albumName: 'Skies',
+              audioDownloadAllowed: true,
+            },
+          ],
+        },
+      })
+    }))
+
+    const store = useMediaStore()
+    const result = await store.searchJamendoTracks({
+      query: 'northern',
+    })
+
+    expect(result.total).toBe(2)
+    expect(result.tracks).toEqual([
+      {
+        id: 'jam-1',
+        name: 'Northern Lights',
+        duration: 187000,
+        audioUrl: 'https://cdn.jamendo.com/jam-1.mp3',
+        artistName: 'Atlas',
+        albumName: 'Skies',
+        audioDownloadAllowed: true,
+      },
+    ])
+  })
+
+  it('imports jamendo track into audio library', () => {
+    const store = useMediaStore()
+
+    const imported = store.importJamendoTrack({
+      id: 'jam-2',
+      name: 'Soft Rain',
+      duration: 156000,
+      audioUrl: 'https://cdn.jamendo.com/jam-2.mp3',
+      artistName: 'Mila',
+      audioDownloadAllowed: false,
+    })
+
+    expect(imported.id).toBe('jamendo-jam-2')
+    expect(imported.name).toBe('Mila - Soft Rain')
+    expect(store.audioFiles).toHaveLength(1)
+    expect(store.audioFiles[0]?.url).toBe('https://cdn.jamendo.com/jam-2.mp3')
   })
 })

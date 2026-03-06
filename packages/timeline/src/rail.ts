@@ -4,6 +4,7 @@ import type { TrainOption } from './train'
 import type { TrainRailStyle } from './train/types'
 import type { TimelineSnapTarget } from './utils/snap'
 import {
+  TIMELINE_AUDIO_TRAIN_HEIGHT,
   PRIMARYCOLOR,
   TIMELINE_FILTER_TRAIN_HEIGHT,
   TIMELINE_RAIL_FILL,
@@ -26,10 +27,14 @@ import { buildTimelineEdgeSnapCandidates, buildTimelineLeftSnapCandidates } from
  */
 export const RAIL_HEIGHT = TIMELINE_TRAIN_HEIGHT
 const COMPACT_RAIL_PADDING = 4
+const AUDIO_RAIL_PADDING = 2
 
 export function getRailHeightByStyle(railStyle: TrainRailStyle): number {
   if (railStyle === 'text')
     return TIMELINE_TEXT_TRAIN_HEIGHT + COMPACT_RAIL_PADDING
+
+  if (railStyle === 'audio')
+    return TIMELINE_AUDIO_TRAIN_HEIGHT + AUDIO_RAIL_PADDING
 
   if (railStyle === 'filter')
     return TIMELINE_FILTER_TRAIN_HEIGHT + COMPACT_RAIL_PADDING

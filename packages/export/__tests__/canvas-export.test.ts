@@ -4,7 +4,8 @@ import { CanvasExport, ExportCanceledError } from '../src/canvasExport'
 const mockState = vi.hoisted(() => {
   return {
     outputs: [] as any[],
-    sources: [] as any[],
+    videoSources: [] as any[],
+    audioSources: [] as any[],
   }
 })
 
@@ -25,7 +26,14 @@ vi.mock('mediabunny', () => {
   class VideoSampleSource {
     add = vi.fn(async (_sample: VideoSample) => {})
     constructor(_options: unknown) {
-      mockState.sources.push(this)
+      mockState.videoSources.push(this)
+    }
+  }
+
+  class AudioBufferSource {
+    add = vi.fn(async (_buffer: unknown) => {})
+    constructor(_options: unknown) {
+      mockState.audioSources.push(this)
     }
   }
 
@@ -33,6 +41,7 @@ vi.mock('mediabunny', () => {
     target: BufferTarget
     start = vi.fn(async () => {})
     addVideoTrack = vi.fn((_track: VideoSampleSource) => {})
+    addAudioTrack = vi.fn((_track: AudioBufferSource) => {})
     finalize = vi.fn(async () => {
       if (!this.target.buffer)
         this.target.buffer = new Uint8Array([1, 2, 3]).buffer
@@ -50,6 +59,7 @@ vi.mock('mediabunny', () => {
     BufferTarget,
     Mp4OutputFormat,
     Output,
+    AudioBufferSource,
     VideoSample,
     VideoSampleSource,
   }
@@ -75,7 +85,8 @@ function setupBrowserCodecSupport(): void {
 describe('canvasExport', () => {
   beforeEach(() => {
     mockState.outputs.length = 0
-    mockState.sources.length = 0
+    mockState.videoSources.length = 0
+    mockState.audioSources.length = 0
     setupBrowserCodecSupport()
   })
 
@@ -128,11 +139,34 @@ describe('canvasExport', () => {
     })
 
     expect(mockState.outputs).toHaveLength(1)
-    expect(mockState.sources).toHaveLength(1)
+    expect(mockState.videoSources).toHaveLength(1)
+    expect(mockState.audioSources).toHaveLength(0)
     expect(mockState.outputs[0].start).toHaveBeenCalledTimes(1)
     expect(mockState.outputs[0].addVideoTrack).toHaveBeenCalledTimes(1)
     expect(mockState.outputs[0].finalize).toHaveBeenCalledTimes(1)
-    expect(mockState.sources[0].add).toHaveBeenCalledTimes(5)
+    expect(mockState.videoSources[0].add).toHaveBeenCalledTimes(5)
+  })
+
+  it('adds an audio track when mixed audio is available', async () => {
+    const exporter = new CanvasExport({
+      canvas: {} as HTMLCanvasElement,
+      nextFrame: () => {},
+      duration: 1000,
+      frameRate: 5,
+      audioTracks: [{
+        source: 'https://example.com/audio.mp3',
+        startMs: 0,
+        durationMs: 1000,
+      }],
+    })
+
+    vi.spyOn(exporter as any, '_renderMixedAudioBuffer').mockResolvedValue({ length: 1024 })
+
+    await exporter.export()
+
+    expect(mockState.outputs[0].addAudioTrack).toHaveBeenCalledTimes(1)
+    expect(mockState.audioSources).toHaveLength(1)
+    expect(mockState.audioSources[0].add).toHaveBeenCalledTimes(1)
   })
 
   it('supports cancellation during export loop', async () => {

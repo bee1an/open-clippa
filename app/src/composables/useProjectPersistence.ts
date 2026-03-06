@@ -20,6 +20,10 @@ function mapMediaAssetUrlById(): Map<string, string> {
     map.set(asset.id, asset.url)
   })
 
+  mediaStore.audioFiles.forEach((asset) => {
+    map.set(asset.id, asset.url)
+  })
+
   mediaStore.imageFiles.forEach((asset) => {
     map.set(asset.id, asset.url)
   })
@@ -29,7 +33,7 @@ function mapMediaAssetUrlById(): Map<string, string> {
 
 async function restoreMediaAssets(
   assets: PersistedMediaAsset[],
-  kind: 'video' | 'image',
+  kind: 'video' | 'audio' | 'image',
   options: { requestPermission: boolean, onPermissionRequired: () => void },
 ): Promise<void> {
   const mediaStore = useMediaStore()
@@ -43,6 +47,8 @@ async function restoreMediaAssets(
       if (asset.sourceType === 'url') {
         if (kind === 'video')
           mediaStore.addVideoFromUrl(asset.url, asset.name, asset.id)
+        else if (kind === 'audio')
+          mediaStore.addAudioFromUrl(asset.url, asset.name, asset.id)
         else
           mediaStore.addImageFromUrl(asset.url, asset.name, asset.id)
         continue
@@ -50,6 +56,8 @@ async function restoreMediaAssets(
 
       if (kind === 'video')
         await mediaStore.addVideoFromFileHandle(asset.handle, { id: asset.id, requestPermission: options.requestPermission })
+      else if (kind === 'audio')
+        await mediaStore.addAudioFromFileHandle(asset.handle, { id: asset.id, requestPermission: options.requestPermission })
       else
         await mediaStore.addImageFromFileHandle(asset.handle, { id: asset.id, requestPermission: options.requestPermission })
     }
@@ -112,6 +120,7 @@ export function useProjectPersistence() {
       canvasPresetId: editorStore.canvasPresetId,
       snapshot,
       videoAssets: mediaStore.videoFiles,
+      audioAssets: mediaStore.audioFiles,
       imageAssets: mediaStore.imageFiles,
     })
 
@@ -155,6 +164,10 @@ export function useProjectPersistence() {
       mediaStore.clearAllMedia()
 
       await restoreMediaAssets(persisted.videoAssets, 'video', {
+        requestPermission,
+        onPermissionRequired: markPermissionRequired,
+      })
+      await restoreMediaAssets(persisted.audioAssets ?? [], 'audio', {
         requestPermission,
         onPermissionRequired: markPermissionRequired,
       })

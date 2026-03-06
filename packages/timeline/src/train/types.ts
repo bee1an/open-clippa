@@ -1,6 +1,6 @@
 import type { Train } from './train'
 
-export type TrainRailStyle = 'default' | 'text' | 'filter'
+export type TrainRailStyle = 'default' | 'text' | 'filter' | 'audio'
 
 export interface TrainOption {
   id: string

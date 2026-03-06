@@ -23,6 +23,9 @@ import {
   UPSTREAM_BASE_HEADER,
 } from './functions/api/kimi/proxyShared'
 import {
+  handleJamendoSearchRequest,
+} from './functions/api/jamendo/shared'
+import {
   handlePexelsListRequest,
   handlePexelsRandomRequest,
 } from './functions/api/pexels/shared'
@@ -224,6 +227,37 @@ export default defineConfig(({ mode }) => {
                 Readable.fromWeb(upstreamResponse.body as any),
                 res,
               )
+            }
+            catch {
+              if (!res.headersSent)
+                sendJsonError(res, 502, '上游服务请求失败')
+              else
+                res.end()
+            }
+          })
+        },
+      },
+      {
+        name: 'clippc-jamendo-proxy-dev-middleware',
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const rawUrl = req.url
+            if (!rawUrl || !rawUrl.startsWith('/api/jamendo/search'))
+              return next()
+
+            try {
+              const inboundUrl = new URL(rawUrl, 'http://localhost')
+              const proxyEnv = {
+                JAMENDO_CLIENT_ID: env.JAMENDO_CLIENT_ID,
+                JAMENDO_API_BASE: env.JAMENDO_API_BASE,
+              }
+              const request = new Request(inboundUrl.toString(), {
+                method: req.method ?? 'GET',
+                headers: toFetchHeaders(req.headers),
+              })
+              const response = await handleJamendoSearchRequest(request, proxyEnv)
+
+              await sendFetchResponse(res, response)
             }
             catch {
               if (!res.headersSent)

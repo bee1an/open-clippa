@@ -9,9 +9,11 @@ import { resetEditorCommandBusForTesting } from '@/command/commandBus'
 import { createEditorControlRuntime } from './runtime'
 
 const {
+  MockAudio,
   MockImage,
   MockText,
   MockVideo,
+  inspectMediaSourceMock,
   loadVideoMetadataMock,
 } = vi.hoisted(() => {
   class MockBasePerformer {
@@ -185,7 +187,39 @@ const {
     }
   }
 
+  class LocalMockAudio extends MockBasePerformer {
+    src: string
+    sourceStart: number
+    sourceDuration: number
+    waveformPeaks: number[]
+    volume: number
+    muted: boolean
+    timelineLane: number
+    linkGroupId: string | null
+
+    constructor(option: any) {
+      super(option)
+      this.src = typeof option.src === 'string' ? option.src : `blob:${option.id}`
+      this.sourceStart = option.sourceStart ?? 0
+      this.sourceDuration = option.sourceDuration ?? option.duration
+      this.waveformPeaks = [...(option.waveformPeaks ?? [])]
+      this.volume = option.volume ?? 1
+      this.muted = option.muted ?? false
+      this.timelineLane = option.timelineLane ?? option.zIndex ?? 1
+      this.linkGroupId = option.linkGroupId ?? null
+    }
+
+    setVolume(volume: number) {
+      this.volume = volume
+    }
+
+    setMuted(muted: boolean) {
+      this.muted = muted
+    }
+  }
+
   return {
+    MockAudio: LocalMockAudio,
     MockVideo: LocalMockVideo,
     MockImage: LocalMockImage,
     MockText: LocalMockText,
@@ -194,11 +228,34 @@ const {
       width: 1920,
       height: 1080,
     })),
+    inspectMediaSourceMock: vi.fn(async () => ({
+      durationMs: 12000,
+      mimeType: 'video/mp4',
+      video: {
+        codec: 'h264',
+        width: 1920,
+        height: 1080,
+        frameRate: 30,
+        bitrate: 1_000_000,
+      },
+      audioTracks: [{
+        index: 0,
+        codec: 'aac',
+        channels: 2,
+        sampleRate: 48000,
+        bitrate: 128000,
+      }],
+      waveform: {
+        sampleCount: 4,
+        peaks: [0.1, 0.3, 0.5, 0.2],
+      },
+    })),
   }
 })
 
 vi.mock('@clippc/performer', () => {
   return {
+    Audio: MockAudio,
     Video: MockVideo,
     Image: MockImage,
     Text: MockText,
@@ -284,6 +341,7 @@ vi.mock('clippc', () => {
 vi.mock('@/utils/media', () => {
   return {
     loadVideoMetadata: loadVideoMetadataMock,
+    inspectMediaSource: inspectMediaSourceMock,
   }
 })
 
@@ -328,6 +386,7 @@ function createHarness(options: {
   duration?: number
   mediaAssets?: {
     videos?: Array<{ id: string, name: string, duration: number, size: number, url?: string }>
+    audios?: Array<{ id: string, name: string, duration: number, size: number, url?: string }>
     images?: Array<{ id: string, name: string, size: number, url?: string }>
   }
   performers?: any[]
@@ -557,6 +616,54 @@ function createHarness(options: {
       duration: file.duration,
       size: file.size,
       createdAt: new Date(),
+      metadata: {
+        resolution: { width: 1920, height: 1080 },
+        frameRate: 30,
+        codec: 'h264',
+        bitrate: 1_000_000,
+        aspectRatio: '16:9',
+        colorSpace: undefined,
+        audioTracks: [{
+          index: 0,
+          codec: 'aac',
+          channels: 2,
+          sampleRate: 48000,
+          bitrate: 128000,
+        }],
+        waveform: {
+          sampleCount: 4,
+          peaks: [0.1, 0.3, 0.5, 0.2],
+        },
+      },
+      processingStatus: {
+        metadataExtracted: true,
+        thumbnailsGenerated: true,
+      },
+    })),
+    audioFiles: (options.mediaAssets?.audios ?? []).map(file => ({
+      id: file.id,
+      name: file.name,
+      file: new Blob([file.name], { type: 'audio/mp3' }),
+      source: new Blob([file.name], { type: 'audio/mp3' }),
+      sourceType: 'file',
+      url: file.url ?? `blob:audio-${file.id}`,
+      duration: file.duration,
+      size: file.size,
+      createdAt: new Date(),
+      metadata: {
+        codec: 'unknown',
+        bitrate: 0,
+        channels: 2,
+        sampleRate: 48000,
+        waveform: {
+          sampleCount: 4,
+          peaks: [0.2, 0.4, 0.6, 0.3],
+        },
+      },
+      processingStatus: {
+        metadataExtracted: true,
+        thumbnailsGenerated: true,
+      },
     })),
     imageFiles: (options.mediaAssets?.images ?? []).map(file => ({
       id: file.id,
@@ -571,11 +678,17 @@ function createHarness(options: {
     removeVideoFile(id: string) {
       this.videoFiles = this.videoFiles.filter((item: any) => item.id !== id)
     },
+    removeAudioFile(id: string) {
+      this.audioFiles = this.audioFiles.filter((item: any) => item.id !== id)
+    },
     removeImageFile(id: string) {
       this.imageFiles = this.imageFiles.filter((item: any) => item.id !== id)
     },
     clearVideoFiles() {
       this.videoFiles = []
+    },
+    clearAudioFiles() {
+      this.audioFiles = []
     },
     clearImageFiles() {
       this.imageFiles = []
@@ -599,6 +712,10 @@ function createHarness(options: {
           bitrate: 0,
           aspectRatio: '16:9',
           audioTracks: [],
+          waveform: {
+            sampleCount: 4,
+            peaks: [0, 0, 0, 0],
+          },
         },
         thumbnails: {
           primary: '',
@@ -611,6 +728,36 @@ function createHarness(options: {
         },
       }
       this.videoFiles.push(asset)
+      return asset
+    },
+    addAudioFromUrl(url: string, name?: string) {
+      const parsedUrl = new URL(url)
+      const inferredName = parsedUrl.pathname.split('/').pop() || 'remote-audio.mp3'
+      const asset = {
+        id: `audio-url-${this.audioFiles.length + 1}`,
+        name: name?.trim().length ? name.trim() : inferredName,
+        source: parsedUrl.toString(),
+        sourceType: 'url',
+        url: parsedUrl.toString(),
+        duration: 0,
+        size: 0,
+        createdAt: new Date(),
+        metadata: {
+          codec: 'unknown',
+          bitrate: 0,
+          channels: 2,
+          sampleRate: 48000,
+          waveform: {
+            sampleCount: 4,
+            peaks: [0.25, 0.5, 0.75, 0.35],
+          },
+        },
+        processingStatus: {
+          metadataExtracted: true,
+          thumbnailsGenerated: true,
+        },
+      }
+      this.audioFiles.push(asset)
       return asset
     },
     addImageFromUrl(url: string, name?: string) {
@@ -902,10 +1049,33 @@ describe('aI control acceptance e2e', () => {
   beforeEach(() => {
     resetEditorCommandBusForTesting()
     loadVideoMetadataMock.mockClear()
+    inspectMediaSourceMock.mockClear()
     loadVideoMetadataMock.mockResolvedValue({
       duration: 12000,
       width: 1920,
       height: 1080,
+    })
+    inspectMediaSourceMock.mockResolvedValue({
+      durationMs: 12000,
+      mimeType: 'video/mp4',
+      video: {
+        codec: 'h264',
+        width: 1920,
+        height: 1080,
+        frameRate: 30,
+        bitrate: 1_000_000,
+      },
+      audioTracks: [{
+        index: 0,
+        codec: 'aac',
+        channels: 2,
+        sampleRate: 48000,
+        bitrate: 128000,
+      }],
+      waveform: {
+        sampleCount: 4,
+        peaks: [0.1, 0.3, 0.5, 0.2],
+      },
     })
   })
 

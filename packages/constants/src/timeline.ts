@@ -67,6 +67,10 @@ export const TIMELINE_TEXT_TRAIN_ACCENT_FILL = '#7a9bff'
  */
 export const TIMELINE_TEXT_TRAIN_HEIGHT = 30
 /**
+ * audio train compact height
+ */
+export const TIMELINE_AUDIO_TRAIN_HEIGHT = 28
+/**
  * filter train background fill
  */
 export const TIMELINE_FILTER_TRAIN_FILL = '#1f3a32'

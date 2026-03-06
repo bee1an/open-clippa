@@ -266,7 +266,7 @@ describe('createEditorControlTools', () => {
       ok: false,
       error: {
         code: 'INVALID_ARGUMENT',
-        message: 'type must be one of: all, video, image',
+        message: 'type must be one of: all, video, image, audio',
       },
     })
 

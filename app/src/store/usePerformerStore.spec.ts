@@ -201,6 +201,29 @@ vi.mock('@clippc/performer', () => {
     }
   }
 
+  class Audio extends MockPerformer {
+    src: string
+    sourceStart: number
+    sourceDuration: number
+    waveformPeaks: number[]
+    volume: number
+    muted: boolean
+    timelineLane: number
+    linkGroupId: string | null
+
+    constructor(option: { src: string, id: string, start: number, duration: number, zIndex: number, timelineLane?: number, linkGroupId?: string | null, waveformPeaks?: number[] }) {
+      super(option)
+      this.src = option.src
+      this.sourceStart = 0
+      this.sourceDuration = option.duration
+      this.waveformPeaks = [...(option.waveformPeaks ?? [])]
+      this.volume = 1
+      this.muted = false
+      this.timelineLane = option.timelineLane ?? option.zIndex
+      this.linkGroupId = option.linkGroupId ?? null
+    }
+  }
+
   function normalizeAnimationSpec<T>(spec: T): T {
     return spec
   }
@@ -213,6 +236,7 @@ vi.mock('@clippc/performer', () => {
   }
 
   return {
+    Audio,
     Video,
     Image,
     Text,

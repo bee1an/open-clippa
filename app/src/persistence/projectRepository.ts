@@ -5,7 +5,7 @@ const DB_NAME = 'open-clippa.project-db.v1'
 const DB_VERSION = 1
 const PROJECTS_STORE = 'projects'
 const PROJECT_STATE_STORE = 'project_state'
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 let databasePromise: Promise<IDBDatabase> | null = null
 

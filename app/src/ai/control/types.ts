@@ -30,7 +30,7 @@ export interface ProjectStateSnapshot {
   activeTransitionPairKey: string | null
 }
 
-export type MediaAssetType = 'video' | 'image'
+export type MediaAssetType = 'video' | 'image' | 'audio'
 
 export interface MediaAssetSnapshot {
   id: string
@@ -42,7 +42,7 @@ export interface MediaAssetSnapshot {
   createdAt?: number
 }
 
-export type PerformerSnapshotType = 'video' | 'image' | 'text' | 'unknown'
+export type PerformerSnapshotType = 'video' | 'image' | 'text' | 'audio' | 'unknown'
 
 export interface PerformerSnapshot {
   id: string
@@ -152,6 +152,11 @@ export interface MediaAddAssetToTimelineInput {
 }
 
 export interface MediaImportVideoFromUrlInput {
+  url: string
+  name?: string
+}
+
+export interface MediaImportAudioFromUrlInput {
   url: string
   name?: string
 }
@@ -340,6 +345,7 @@ export interface EditorControlRuntime {
 
   mediaAddAssetToTimeline: (input: MediaAddAssetToTimelineInput) => Promise<ActionResult<{ performerId: string, type: MediaAssetType }>> | ActionResult<{ performerId: string, type: MediaAssetType }>
   mediaImportVideoFromUrl: (input: MediaImportVideoFromUrlInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
+  mediaImportAudioFromUrl: (input: MediaImportAudioFromUrlInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
   mediaImportRandomImage: (input: MediaImportRandomImageInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
   mediaImportRandomVideo: (input: MediaImportRandomVideoInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>
   mediaPickRandomAsset: (input: MediaPickRandomAssetInput) => Promise<ActionResult<{ asset: MediaAssetSnapshot }>> | ActionResult<{ asset: MediaAssetSnapshot }>

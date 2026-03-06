@@ -1,10 +1,10 @@
 import type { PerformerBounds, TextStyleOption } from '@clippc/performer'
 import type { CanvasPerformer } from '@/store/usePerformerStore'
-import { Image, Text, Video } from '@clippc/performer'
+import { Audio, Image, Text, Video } from '@clippc/performer'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { usePerformerStore } from '@/store/usePerformerStore'
 
-export type PerformerType = 'video' | 'image' | 'text'
+export type PerformerType = 'video' | 'image' | 'text' | 'audio'
 
 /**
  * Rotate a vector (x, y) by the given angle (degrees).
@@ -75,6 +75,8 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     const p = performer.value
     if (!p)
       return null
+    if (p instanceof Audio)
+      return 'audio'
     if (p instanceof Video)
       return 'video'
     if (p instanceof Image)
@@ -204,6 +206,22 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     return p.getStyle()
   })
 
+  const audioVolume = computed<number>(() => {
+    void revision.value
+    const p = performer.value
+    if (!(p instanceof Audio))
+      return 1
+    return p.volume
+  })
+
+  const audioMuted = computed<boolean>(() => {
+    void revision.value
+    const p = performer.value
+    if (!(p instanceof Audio))
+      return false
+    return p.muted
+  })
+
   function updateTextContent(content: string) {
     const p = performer.value
     if (!(p instanceof Text))
@@ -226,6 +244,24 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     bump()
   }
 
+  function updateAudioVolume(volume: number) {
+    const p = performer.value
+    if (!(p instanceof Audio))
+      return
+    p.setVolume(volume)
+    performerStore.markContentDirty()
+    bump()
+  }
+
+  function updateAudioMuted(muted: boolean) {
+    const p = performer.value
+    if (!(p instanceof Audio))
+      return
+    p.setMuted(muted)
+    performerStore.markContentDirty()
+    bump()
+  }
+
   return {
     performer,
     performerType,
@@ -234,10 +270,14 @@ export function usePerformerProperties(performerId: Ref<string | null>) {
     alpha,
     textContent,
     textStyle,
+    audioVolume,
+    audioMuted,
     updatePosition,
     updateRotation,
     updateAlpha,
     updateTextContent,
     updateTextStyle,
+    updateAudioVolume,
+    updateAudioMuted,
   }
 }

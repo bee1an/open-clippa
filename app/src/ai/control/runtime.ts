@@ -12,6 +12,7 @@ import type {
   FilterLayerSnapshot,
   MediaAddAssetToTimelineInput,
   MediaAssetSnapshot,
+  MediaImportAudioFromUrlInput,
   MediaImportRandomImageInput,
   MediaImportRandomVideoInput,
   MediaImportVideoFromUrlInput,
@@ -45,6 +46,7 @@ import type {
 import type { PerformerConfig } from '@/store/usePerformerStore'
 import { getFilterPresetConfig } from '@clippc/filter'
 import {
+  Audio,
 
   Image,
   Text,
@@ -351,6 +353,8 @@ export function createEditorControlRuntime(
     if (!performer)
       return 'unknown'
 
+    if (performer instanceof Audio)
+      return 'audio'
     if (performer instanceof Video)
       return 'video'
     if (performer instanceof Image)
@@ -439,12 +443,27 @@ export function createEditorControlRuntime(
     }
   }
 
+  const mapAudioAssetSnapshot = (file: (typeof mediaStore.audioFiles)[number]): MediaAssetSnapshot => {
+    return {
+      id: file.id,
+      type: 'audio',
+      name: file.name,
+      url: file.url,
+      durationMs: file.duration,
+      size: file.size,
+      createdAt: file.createdAt?.getTime(),
+    }
+  }
+
   const collectMediaAssetSnapshots = (type: QueryMediaAssetsInput['type']): MediaAssetSnapshot[] => {
     const normalizedType = type ?? 'all'
     const assets: MediaAssetSnapshot[] = []
 
     if (normalizedType === 'all' || normalizedType === 'video')
       assets.push(...mediaStore.videoFiles.map(mapVideoAssetSnapshot))
+
+    if (normalizedType === 'all' || normalizedType === 'audio')
+      assets.push(...mediaStore.audioFiles.map(mapAudioAssetSnapshot))
 
     if (normalizedType === 'all' || normalizedType === 'image')
       assets.push(...mediaStore.imageFiles.map(mapImageAssetSnapshot))
@@ -474,6 +493,15 @@ export function createEditorControlRuntime(
         start: performer.start,
         duration: performer.duration,
         type: 'image' as const,
+      }
+    }
+
+    if (performer instanceof Audio) {
+      return {
+        id: performer.id,
+        start: performer.start,
+        duration: performer.duration,
+        type: 'other' as const,
       }
     }
 
@@ -761,6 +789,7 @@ export function createEditorControlRuntime(
         return failure('NOT_FOUND', 'No splittable timeline item at current time')
 
       const affectedIds: string[] = []
+      const splitLinkGroupIdMap = new Map<string, string>()
       for (const train of candidates) {
         const performer = performerStore.getPerformerById(train.id)
         if (performer) {
@@ -770,6 +799,15 @@ export function createEditorControlRuntime(
           const crop = 'getCropInsets' in performer && typeof performer.getCropInsets === 'function'
             ? performer.getCropInsets() as CropInsets
             : undefined
+
+          const rightLinkGroupId = (performer as { linkGroupId?: string | null }).linkGroupId
+            ? splitLinkGroupIdMap.get((performer as { linkGroupId?: string | null }).linkGroupId!)
+              ?? (() => {
+                const nextId = generateId('link')
+                splitLinkGroupIdMap.set((performer as { linkGroupId?: string | null }).linkGroupId!, nextId)
+                return nextId
+              })()
+            : null
 
           const rightConfig: PerformerConfig = performer instanceof Video
             ? {
@@ -784,8 +822,28 @@ export function createEditorControlRuntime(
                 src: performer.src,
                 sourceStart: performer.sourceStart + leftDuration,
                 sourceDuration: performer.sourceDuration,
+                timelineLane: performer.timelineLane,
+                linkGroupId: rightLinkGroupId,
                 crop,
               }
+            : performer instanceof Audio
+              ? {
+                  id: `${train.id}-split`,
+                  type: 'audio',
+                  start: splitTime,
+                  duration: rightDuration,
+                  x: 0,
+                  y: 0,
+                  zIndex: performer.zIndex,
+                  src: performer.src,
+                  sourceStart: performer.sourceStart + leftDuration,
+                  sourceDuration: performer.sourceDuration,
+                  waveformPeaks: [...performer.waveformPeaks],
+                  timelineLane: performer.timelineLane,
+                  linkGroupId: rightLinkGroupId,
+                  volume: performer.volume,
+                  muted: performer.muted,
+                }
             : performer instanceof Text
               ? {
                   id: `${train.id}-split`,
@@ -797,6 +855,8 @@ export function createEditorControlRuntime(
                   width: bounds.width,
                   height: bounds.height,
                   zIndex: performer.zIndex,
+                  timelineLane: performer.timelineLane,
+                  linkGroupId: rightLinkGroupId,
                   content: performer.getText(),
                   style: performer.getStyle(),
                 }
@@ -810,6 +870,8 @@ export function createEditorControlRuntime(
                   width: bounds.width,
                   height: bounds.height,
                   zIndex: performer.zIndex,
+                  timelineLane: performer.timelineLane,
+                  linkGroupId: rightLinkGroupId,
                   src: (performer as Image).src,
                   crop,
                 }
@@ -859,7 +921,15 @@ export function createEditorControlRuntime(
 
       const performer = performerStore.getPerformerById(activeTrain.id)
       if (performer) {
-        performerStore.removePerformer(activeTrain.id)
+        const linkedIds = (performer as { linkGroupId?: string | null }).linkGroupId
+          ? performerStore.getAllPerformers()
+              .filter(item => (item as { linkGroupId?: string | null }).linkGroupId === (performer as { linkGroupId?: string | null }).linkGroupId)
+              .map(item => item.id)
+          : [activeTrain.id]
+
+        linkedIds.forEach((id) => {
+          performerStore.removePerformer(id)
+        })
         removeEmptyRailsAndSyncDuration()
 
         if (!editorStore.isPlaying)
@@ -913,8 +983,9 @@ export function createEditorControlRuntime(
       await editorStore.clippa.ready
 
       const videoAsset = mediaStore.videoFiles.find(file => file.id === assetId)
+      const audioAsset = mediaStore.audioFiles.find(file => file.id === assetId)
       const imageAsset = mediaStore.imageFiles.find(file => file.id === assetId)
-      if (!videoAsset && !imageAsset)
+      if (!videoAsset && !audioAsset && !imageAsset)
         return failure('NOT_FOUND', `Media asset not found: ${assetId}`)
 
       const startMs = isFiniteNumber(input.startMs)
@@ -925,11 +996,43 @@ export function createEditorControlRuntime(
       const nextZIndex = isFiniteNumber(input.zIndex)
         ? Math.max(1, Math.floor(input.zIndex))
         : Math.max(1, (editorStore.clippa.timeline.rails?.maxZIndex ?? 0) + 1)
+      const nextTimelineLane = Math.max(1, (editorStore.clippa.timeline.rails?.maxZIndex ?? 0) + 1)
+
+      if (audioAsset) {
+        const audioPerformer = performerStore.addPerformer({
+          id: generateId('audio'),
+          type: 'audio',
+          src: audioAsset.url,
+          start: startMs,
+          duration: isFiniteNumber(input.durationMs) && input.durationMs > 0
+            ? input.durationMs
+            : audioAsset.duration || DEFAULT_VIDEO_DURATION_MS,
+          sourceDuration: audioAsset.duration || DEFAULT_VIDEO_DURATION_MS,
+          sourceStart: 0,
+          waveformPeaks: [...audioAsset.metadata.waveform.peaks],
+          x: 0,
+          y: 0,
+          zIndex: 0,
+          timelineLane: 1,
+          volume: 1,
+          muted: false,
+        })
+
+        await editorStore.clippa.hire(audioPerformer)
+
+        return success({
+          performerId: audioPerformer.id,
+          type: 'audio' as const,
+        })
+      }
 
       if (videoAsset) {
         const metadata = await loadVideoMetadata(videoAsset.url)
         const stageWidth = editorStore.clippa.stage.app?.renderer.width ?? 0
         const stageHeight = editorStore.clippa.stage.app?.renderer.height ?? 0
+        const audioTracks = videoAsset.metadata?.audioTracks ?? []
+        const waveformPeaks = videoAsset.metadata?.waveform.peaks ?? []
+        const linkGroupId = audioTracks.length > 0 ? generateId('link') : null
 
         const performer = performerStore.addPerformer({
           id: generateId('video'),
@@ -945,11 +1048,35 @@ export function createEditorControlRuntime(
           x,
           y,
           zIndex: nextZIndex,
+          timelineLane: nextTimelineLane,
+          linkGroupId,
         })
 
         await editorStore.clippa.hire(performer)
         if (!editorStore.clippa.stage.performers.has(performer))
           editorStore.clippa.show(performer)
+
+        if (linkGroupId) {
+          const audioPerformer = performerStore.addPerformer({
+            id: generateId('audio'),
+            type: 'audio',
+            src: videoAsset.url,
+            start: startMs,
+            duration: performer.duration,
+            sourceDuration: videoAsset.duration || metadata.duration || DEFAULT_VIDEO_DURATION_MS,
+            sourceStart: 0,
+            waveformPeaks,
+            x: 0,
+            y: 0,
+            zIndex: 0,
+            timelineLane: 0,
+            linkGroupId,
+            volume: 1,
+            muted: false,
+          })
+
+          await editorStore.clippa.hire(audioPerformer)
+        }
 
         performerStore.selectPerformer(performer.id)
 
@@ -970,6 +1097,7 @@ export function createEditorControlRuntime(
         x,
         y,
         zIndex: nextZIndex,
+        timelineLane: nextTimelineLane,
       })
 
       await editorStore.clippa.hire(performer)
@@ -999,6 +1127,25 @@ export function createEditorControlRuntime(
         const message = error instanceof Error && error.message.trim().length > 0
           ? error.message.trim()
           : '视频 URL 导入失败'
+        return failure('INVALID_ARGUMENT', message)
+      }
+    },
+
+    mediaImportAudioFromUrl(input: MediaImportAudioFromUrlInput) {
+      const url = input.url?.trim()
+      if (!url)
+        return failure('INVALID_ARGUMENT', 'url is required')
+
+      try {
+        const imported = mediaStore.addAudioFromUrl(url, asOptionalString(input.name))
+        return success({
+          asset: mapAudioAssetSnapshot(imported),
+        })
+      }
+      catch (error) {
+        const message = error instanceof Error && error.message.trim().length > 0
+          ? error.message.trim()
+          : '音频 URL 导入失败'
         return failure('INVALID_ARGUMENT', message)
       }
     },
@@ -1077,8 +1224,8 @@ export function createEditorControlRuntime(
 
     mediaPickRandomAsset(input: MediaPickRandomAssetInput) {
       const requestedType = input.type ?? 'all'
-      if (requestedType !== 'all' && requestedType !== 'video' && requestedType !== 'image')
-        return failure('INVALID_ARGUMENT', 'type must be one of: all, video, image')
+      if (requestedType !== 'all' && requestedType !== 'video' && requestedType !== 'image' && requestedType !== 'audio')
+        return failure('INVALID_ARGUMENT', 'type must be one of: all, video, image, audio')
 
       const candidates = collectMediaAssetSnapshots(requestedType)
       if (candidates.length === 0)
@@ -1129,6 +1276,13 @@ export function createEditorControlRuntime(
         return success({ assetId })
       }
 
+      const audioAsset = mediaStore.audioFiles.find(file => file.id === assetId)
+      if (audioAsset) {
+        removePerformersByAsset(audioAsset)
+        mediaStore.removeAudioFile(assetId)
+        return success({ assetId })
+      }
+
       const imageAsset = mediaStore.imageFiles.find(file => file.id === assetId)
       if (imageAsset) {
         removePerformersByAsset(imageAsset)
@@ -1144,6 +1298,9 @@ export function createEditorControlRuntime(
 
       if (type === 'all' || type === 'video')
         mediaStore.clearVideoFiles()
+
+      if (type === 'all' || type === 'audio')
+        mediaStore.clearAudioFiles()
 
       if (type === 'all' || type === 'image')
         mediaStore.clearImageFiles()
@@ -1868,6 +2025,7 @@ export function createEditorControlRuntime(
     { key: 'timelineClearSelection', commandType: 'timeline.clear_selection', label: 'Clear Timeline Selection', recordable: false },
     { key: 'mediaAddAssetToTimeline', commandType: 'media.add_asset_to_timeline', label: 'Add Media To Timeline', recordable: true },
     { key: 'mediaImportVideoFromUrl', commandType: 'media.import_video_from_url', label: 'Import Video Asset', recordable: false },
+    { key: 'mediaImportAudioFromUrl', commandType: 'media.import_audio_from_url', label: 'Import Audio Asset', recordable: false },
     { key: 'mediaImportRandomImage', commandType: 'media.import_random_image', label: 'Import Random Image Asset', recordable: false },
     { key: 'mediaImportRandomVideo', commandType: 'media.import_random_video', label: 'Import Random Video Asset', recordable: false },
     { key: 'mediaPickRandomAsset', commandType: 'media.pick_random_asset', label: 'Pick Random Asset', recordable: false },

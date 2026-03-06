@@ -1,9 +1,10 @@
 import type { CanvasSize } from 'clippc'
-import { CanvasExport, ExportCanceledError } from 'clippc'
+import { Audio, CanvasExport, ExportCanceledError } from 'clippc'
 import { defineStore } from 'pinia'
 import { nextTick } from 'vue'
 import { useEditorStore } from './useEditorStore'
 import { useExportStore } from './useExportStore'
+import { usePerformerStore } from './usePerformerStore'
 
 export type ExportTaskStatus = 'idle' | 'exporting' | 'error' | 'canceled' | 'done'
 
@@ -66,6 +67,7 @@ function createFilename(customName: string | undefined): string {
 export const useExportTaskStore = defineStore('export-task', () => {
   const editorStore = useEditorStore()
   const exportStore = useExportStore()
+  const performerStore = usePerformerStore()
 
   const status = ref<ExportTaskStatus>('idle')
   const isStarting = ref(false)
@@ -168,11 +170,26 @@ export const useExportTaskStore = defineStore('export-task', () => {
 
       let lastPreviewFrame = 0
       const previewFrameInterval = Math.max(1, Math.round(frameRate / 6))
+      const audioTracks = performerStore
+        .getAllPerformers()
+        .filter((performer): performer is Audio => performer instanceof Audio)
+        .map(performer => ({
+          id: performer.id,
+          source: performer.src,
+          startMs: performer.start,
+          durationMs: performer.duration,
+          sourceStartMs: performer.sourceStart,
+          sourceDurationMs: performer.sourceDuration,
+          waveformPeaks: [...performer.waveformPeaks],
+          volume: performer.volume,
+          muted: performer.muted,
+        }))
 
       const exportTask = new CanvasExport({
         canvas,
         duration,
         frameRate,
+        audioTracks,
         nextFrame: async ({ timestampMs }) => {
           await editorStore.clippa.director.seek(timestampMs)
           await nextTick()

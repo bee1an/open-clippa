@@ -111,11 +111,12 @@ export class Stage extends EventBus<StageEvents> {
 
     performers.forEach((p) => {
       this._performers.add(p)
+      const renderless = (p as Performer & { renderless?: boolean }).renderless === true
 
       if (p.sprite) {
         this._attachSprite(p)
       }
-      else {
+      else if (!renderless) {
         this.addNotReady(p)
       }
     })

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { ImageFile, VideoFile } from '@/store/useMediaStore'
+import type { AudioFile, ImageFile, VideoFile } from '@/store/useMediaStore'
 import { nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useEditorCommandActions } from '@/composables/useEditorCommandActions'
 import { useEditorStore } from '@/store'
 import { useMediaStore } from '@/store/useMediaStore'
 
-type AssetKind = 'image' | 'video'
+type AssetKind = 'image' | 'video' | 'audio'
 
 interface LibraryAsset {
   sourceUrl: string
@@ -24,12 +24,34 @@ interface LibraryResponse {
   ok: boolean
   error?: string
   data?: {
-    provider: 'pexels'
+    provider: 'pexels' | 'jamendo'
     kind: AssetKind
     page: number
-    perPage: number
+    perPage?: number
+    limit?: number
     total: number | null
     assets: LibraryAsset[]
+  }
+}
+
+interface JamendoTrackPayload {
+  id: string
+  name: string
+  durationMs: number
+  audioUrl: string
+  imageUrl?: string
+  artistName?: string
+}
+
+interface JamendoLibraryResponse {
+  ok: boolean
+  error?: string
+  data?: {
+    provider: 'jamendo'
+    page: number
+    limit: number
+    total: number | null
+    tracks: JamendoTrackPayload[]
   }
 }
 
@@ -74,6 +96,16 @@ const VIDEO_CATEGORY_PRESETS: CategoryPreset[] = [
   { key: 'travel', title: '旅行', query: 'travel' },
 ]
 
+const AUDIO_CATEGORY_PRESETS: CategoryPreset[] = [
+  { key: 'featured', title: '精选', query: 'instrumental' },
+  { key: 'ambient', title: '氛围', query: 'ambient' },
+  { key: 'piano', title: '钢琴', query: 'piano' },
+  { key: 'lofi', title: 'Lofi', query: 'lofi' },
+  { key: 'cinematic', title: '电影感', query: 'cinematic' },
+  { key: 'electronic', title: '电子', query: 'electronic' },
+  { key: 'acoustic', title: '原声', query: 'acoustic' },
+]
+
 const mediaStore = useMediaStore()
 const editorStore = useEditorStore()
 const editorCommandActions = useEditorCommandActions()
@@ -102,7 +134,11 @@ let categoryLoadVersion = 0
 const trimmedQuery = computed(() => query.value.trim())
 const trimmedSubmittedQuery = computed(() => submittedQuery.value.trim())
 const categoryPresets = computed<CategoryPreset[]>(() => (
-  props.kind === 'video' ? VIDEO_CATEGORY_PRESETS : IMAGE_CATEGORY_PRESETS
+  props.kind === 'video'
+    ? VIDEO_CATEGORY_PRESETS
+    : props.kind === 'audio'
+      ? AUDIO_CATEGORY_PRESETS
+      : IMAGE_CATEGORY_PRESETS
 ))
 const activeCategoryPreset = computed<CategoryPreset | null>(() => {
   if (!activeCategoryKey.value)
@@ -134,18 +170,37 @@ const allLoadedAssets = computed<LibraryAsset[]>(() => {
 const importedVideoSourceSet = computed(() => {
   return new Set(mediaStore.videoFiles.map(file => (typeof file.source === 'string' ? file.source : file.url)))
 })
+const importedAudioSourceSet = computed(() => {
+  return new Set(mediaStore.audioFiles.map(file => (typeof file.source === 'string' ? file.source : file.url)))
+})
 const importedImageSourceSet = computed(() => {
   return new Set(mediaStore.imageFiles.map(file => (typeof file.source === 'string' ? file.source : file.url)))
 })
 const importedSourceSet = computed(() => {
   return props.kind === 'video'
     ? importedVideoSourceSet.value
-    : importedImageSourceSet.value
+    : props.kind === 'audio'
+      ? importedAudioSourceSet.value
+      : importedImageSourceSet.value
 })
 
-const libraryTitle = computed(() => (props.kind === 'video' ? '视频库' : '图片库'))
-const libraryHint = computed(() => (props.kind === 'video' ? '视频素材' : '图片素材'))
-const importLibraryLabel = computed(() => '导入媒体库')
+const libraryTitle = computed(() => (
+  props.kind === 'video'
+    ? '视频库'
+    : props.kind === 'audio'
+      ? '音频库'
+      : '图片库'
+))
+const libraryHint = computed(() => (
+  props.kind === 'video'
+    ? '视频素材'
+    : props.kind === 'audio'
+      ? '音频素材'
+      : '图片素材'
+))
+const importLibraryLabel = computed(() => (
+  props.kind === 'audio' ? '导入音频库' : '导入媒体库'
+))
 const loadedSummary = computed(() => {
   if (isCategoryRowsMode.value) {
     const loadedRows = categoryRows.value.filter(row => !row.isLoading).length
@@ -178,6 +233,16 @@ function buildRequestUrl(
   targetPage: number,
   options: { queryText?: string, perPageValue?: number } = {},
 ): string {
+  if (props.kind === 'audio') {
+    const params = new URLSearchParams({
+      query: (options.queryText && options.queryText.trim().length > 0 ? options.queryText.trim() : 'instrumental'),
+      page: String(targetPage),
+      limit: String(options.perPageValue ?? GRID_PER_PAGE),
+    })
+
+    return `/api/jamendo/search?${params.toString()}`
+  }
+
   const params = new URLSearchParams({
     kind: props.kind,
     page: String(targetPage),
@@ -195,10 +260,31 @@ async function requestAssetPage(
   options: { queryText?: string, perPageValue?: number } = {},
 ): Promise<NonNullable<LibraryResponse['data']>> {
   const response = await fetch(buildRequestUrl(targetPage, options), { method: 'GET' })
-  const payload = await response.json() as LibraryResponse
+  const payload = await response.json() as LibraryResponse | JamendoLibraryResponse
 
   if (!response.ok || !payload.ok || !payload.data)
     throw new Error(payload.error ?? `加载失败（HTTP ${response.status}）`)
+
+  if (payload.data.provider === 'jamendo') {
+    const jamendoData = payload.data as NonNullable<JamendoLibraryResponse['data']>
+    return {
+      provider: 'jamendo',
+      kind: 'audio',
+      page: jamendoData.page,
+      limit: jamendoData.limit,
+      total: jamendoData.total,
+      assets: jamendoData.tracks.map((track) => ({
+        sourceUrl: track.audioUrl,
+        previewUrl: track.imageUrl ?? '',
+        width: 0,
+        height: 0,
+        durationMs: track.durationMs,
+        name: track.artistName ? `${track.artistName} - ${track.name}` : track.name,
+        authorName: track.artistName,
+        externalId: track.id,
+      })),
+    }
+  }
 
   return payload.data
 }
@@ -429,7 +515,14 @@ function isAssetImported(asset: LibraryAsset): boolean {
   return importedSourceSet.value.has(asset.sourceUrl)
 }
 
-function importAssetToMediaLibrary(asset: LibraryAsset): ImageFile | VideoFile {
+function importAssetToMediaLibrary(asset: LibraryAsset): AudioFile | ImageFile | VideoFile {
+  if (props.kind === 'audio') {
+    const audioFile = mediaStore.addAudioFromUrl(asset.sourceUrl, asset.name, `jamendo-${asset.externalId}`)
+    if (typeof asset.durationMs === 'number' && asset.durationMs > 0)
+      audioFile.duration = asset.durationMs
+    return audioFile
+  }
+
   if (props.kind === 'image')
     return mediaStore.addImageFromUrl(asset.sourceUrl, asset.name)
 
@@ -452,6 +545,17 @@ async function addAssetToCanvas(asset: LibraryAsset): Promise<void> {
   try {
     await editorStore.clippa.ready
     const startMs = editorStore.currentTime
+
+    if (props.kind === 'audio') {
+      const audioFile = importAssetToMediaLibrary(asset) as AudioFile
+      const resolvedDuration = audioFile.duration > 0 ? audioFile.duration : DEFAULT_VIDEO_DURATION_MS
+      await editorCommandActions.mediaAddAssetToTimeline({
+        assetId: audioFile.id,
+        startMs,
+        durationMs: resolvedDuration,
+      })
+      return
+    }
 
     if (props.kind === 'image') {
       const imageFile = importAssetToMediaLibrary(asset) as ImageFile
@@ -675,15 +779,22 @@ watch(trimmedQuery, (value) => {
               >
                 <div class="group relative aspect-video overflow-hidden rounded-lg border border-border/60 bg-black/40">
                   <img
+                    v-if="asset.previewUrl"
                     :src="asset.previewUrl"
                     :alt="asset.name"
                     loading="lazy"
                     class="library-media-image h-full w-full object-cover"
                   >
+                  <div
+                    v-else
+                    class="library-audio-fallback h-full w-full flex items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1d4ed8] to-[#14b8a6] text-white"
+                  >
+                    <div i-ph-waveform-bold class="text-xl opacity-85" />
+                  </div>
                   <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
 
                   <div
-                    v-if="props.kind === 'video'"
+                    v-if="props.kind === 'video' || props.kind === 'audio'"
                     class="absolute right-1 bottom-1 rounded bg-black/70 px-1 py-0.5 text-[9px] text-white"
                   >
                     {{ formatDuration(asset.durationMs) }}
@@ -781,7 +892,7 @@ watch(trimmedQuery, (value) => {
 
         <div v-else-if="assets.length === 0" class="py-8">
           <div class="mx-auto max-w-72 rounded-xl border border-border/70 bg-secondary/20 px-4 py-5 text-center">
-            <div i-ph-image-square-bold class="mx-auto mb-2 text-xl text-foreground-muted" />
+            <div :class="props.kind === 'audio' ? 'i-ph-waveform-bold' : 'i-ph-image-square-bold'" class="mx-auto mb-2 text-xl text-foreground-muted" />
             <div class="text-sm text-foreground">
               暂无素材
             </div>
@@ -802,15 +913,22 @@ watch(trimmedQuery, (value) => {
           >
             <div class="group relative aspect-video overflow-hidden rounded-lg border border-border/60 bg-black/40">
               <img
+                v-if="asset.previewUrl"
                 :src="asset.previewUrl"
                 :alt="asset.name"
                 loading="lazy"
                 class="library-media-image h-full w-full object-cover"
               >
+              <div
+                v-else
+                class="library-audio-fallback h-full w-full flex items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1d4ed8] to-[#14b8a6] text-white"
+              >
+                <div i-ph-waveform-bold class="text-2xl opacity-85" />
+              </div>
               <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
 
               <div
-                v-if="props.kind === 'video'"
+                v-if="props.kind === 'video' || props.kind === 'audio'"
                 class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white"
               >
                 {{ formatDuration(asset.durationMs) }}

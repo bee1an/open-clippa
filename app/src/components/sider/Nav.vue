@@ -40,6 +40,12 @@ const navItems = [
     title: '视频库',
   },
   {
+    path: '/editor/audio-library',
+    icon: 'i-ph-waveform-bold',
+    activeIcon: 'i-ph-waveform-fill',
+    title: '音频库',
+  },
+  {
     path: '/editor/image-library',
     icon: 'i-ph-image-bold',
     activeIcon: 'i-ph-image-fill',
