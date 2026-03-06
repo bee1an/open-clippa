@@ -110,7 +110,11 @@ function resolvePerformerClipShapeId(performer: CanvasPerformer): string | null 
   return performer.getClipShape()?.id ?? null
 }
 
-function mapPerformerSnapshot(performer: CanvasPerformer, animation: PerformerAnimationSpec | null): PerformerContentSnapshot {
+function mapPerformerSnapshot(
+  performer: CanvasPerformer,
+  animation: PerformerAnimationSpec | null,
+  timelineLane: number | null = null,
+): PerformerContentSnapshot {
   const bounds = performer.getBaseBounds()
   const kind = resolvePerformerSnapshotKind(performer)
 
@@ -120,7 +124,7 @@ function mapPerformerSnapshot(performer: CanvasPerformer, animation: PerformerAn
     startMs: performer.start,
     durationMs: performer.duration,
     zIndex: performer.zIndex,
-    timelineLane: (performer as CanvasPerformer & { timelineLane?: number }).timelineLane ?? performer.zIndex,
+    timelineLane: timelineLane ?? (performer as CanvasPerformer & { timelineLane?: number }).timelineLane ?? performer.zIndex,
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
@@ -252,10 +256,22 @@ export function captureEditorContentSnapshot(
     transitionStore,
   } = dependencies
 
+  const timelineLaneByPerformerId = new Map<string, number>()
+  const rails = editorStore.clippa.timeline.rails?.rails ?? []
+  rails.forEach((rail) => {
+    rail.trains.forEach((train) => {
+      timelineLaneByPerformerId.set(train.id, rail.zIndex)
+    })
+  })
+
   const performers = performerStore
     .getAllPerformers()
     .map((performer) => {
-      return mapPerformerSnapshot(performer, performerStore.getAnimation(performer.id))
+      return mapPerformerSnapshot(
+        performer,
+        performerStore.getAnimation(performer.id),
+        timelineLaneByPerformerId.get(performer.id) ?? null,
+      )
     })
     .sort((left, right) => {
       if (left.zIndex !== right.zIndex)

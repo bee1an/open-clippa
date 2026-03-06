@@ -69,6 +69,8 @@ const {
     src: string
     sourceStart: number
     sourceDuration: number
+    timelineLane: number
+    linkGroupId: string | null
     private crop: { left: number, top: number, right: number, bottom: number }
 
     constructor(option: any) {
@@ -76,6 +78,8 @@ const {
       this.src = typeof option.src === 'string' ? option.src : `blob:${option.id}`
       this.sourceStart = option.sourceStart ?? 0
       this.sourceDuration = option.sourceDuration ?? option.duration
+      this.timelineLane = option.timelineLane ?? option.zIndex ?? 1
+      this.linkGroupId = option.linkGroupId ?? null
       this.crop = {
         left: option.crop?.left ?? 0,
         top: option.crop?.top ?? 0,
@@ -404,6 +408,36 @@ function createTrain(option: {
   return train
 }
 
+function createTrainForPerformer(performer: any) {
+  if (performer instanceof MockAudio) {
+    if (performer.linkGroupId)
+      return null
+
+    return createTrain({
+      id: performer.id,
+      start: performer.start,
+      duration: performer.duration,
+      trainType: 'AudioTrain',
+    })
+  }
+
+  if (performer instanceof MockText) {
+    return createTrain({
+      id: performer.id,
+      start: performer.start,
+      duration: performer.duration,
+      trainType: 'TextTrain',
+    })
+  }
+
+  return createTrain({
+    id: performer.id,
+    start: performer.start,
+    duration: performer.duration,
+    trainType: 'VideoTrain',
+  })
+}
+
 function createHarness(options: {
   currentTime?: number
   duration?: number
@@ -516,16 +550,16 @@ function createHarness(options: {
 
         editorStore.clippa.stage.performers.add(performer)
 
-        let rail = railsState.getRailByZIndex(performer.zIndex)
-        if (!rail)
-          rail = railsState.createRailByZIndex(performer.zIndex)
+        const train = createTrainForPerformer(performer)
+        if (!train)
+          return
 
-        rail.insertTrain(createTrain({
-          id: performer.id,
-          start: performer.start,
-          duration: performer.duration,
-          trainType: 'VideoTrain',
-        }))
+        const timelineLane = performer.timelineLane ?? performer.zIndex
+        let rail = railsState.getRailByZIndex(timelineLane)
+        if (!rail)
+          rail = railsState.createRailByZIndex(timelineLane)
+
+        rail.insertTrain(train)
       }),
       show: vi.fn((performer: any) => {
         editorStore.clippa.stage.performers.add(performer)
@@ -540,6 +574,8 @@ function createHarness(options: {
   const addPerformer = (config: any) => {
     const nextPerformer = config.type === 'text'
       ? new MockText(config)
+      : config.type === 'audio'
+        ? new MockAudio(config)
       : config.type === 'image'
         ? new MockImage(config)
         : new MockVideo(config)
@@ -1010,16 +1046,16 @@ function createHarness(options: {
     editorStore.clippa.theater.performers.push(performer)
     editorStore.clippa.stage.performers.add(performer)
 
-    let rail = railsState.getRailByZIndex(performer.zIndex)
-    if (!rail)
-      rail = railsState.createRailByZIndex(performer.zIndex)
+    const train = createTrainForPerformer(performer)
+    if (!train)
+      return
 
-    rail.insertTrain(createTrain({
-      id: performer.id,
-      start: performer.start,
-      duration: performer.duration,
-      trainType: 'VideoTrain',
-    }))
+    const timelineLane = performer.timelineLane ?? performer.zIndex
+    let rail = railsState.getRailByZIndex(timelineLane)
+    if (!rail)
+      rail = railsState.createRailByZIndex(timelineLane)
+
+    rail.insertTrain(train)
   })
 
   if (options.selectedPerformerId) {
@@ -1230,6 +1266,71 @@ describe('aI control acceptance e2e', () => {
     expect(restIds).toContain(importKeepResult.data.asset.id)
     expect(harness.state.performers.has(mainAddResult.data.performerId)).toBe(false)
     expect(harness.state.performers.has(keepAddResult.data.performerId)).toBe(true)
+  })
+
+  it('scenario 1f: split linked video also creates linked audio split performer', async () => {
+    const linkedVideo = new MockVideo({
+      id: 'video-1',
+      start: 0,
+      duration: 6000,
+      zIndex: 1,
+      timelineLane: 2,
+      linkGroupId: 'link-1',
+      src: 'blob:video-1',
+      sourceStart: 0,
+      sourceDuration: 12000,
+      x: 40,
+      y: 20,
+      width: 640,
+      height: 360,
+    })
+    const linkedAudio = new MockAudio({
+      id: 'audio-1',
+      type: 'audio',
+      start: 0,
+      duration: 6000,
+      zIndex: 0,
+      timelineLane: 0,
+      linkGroupId: 'link-1',
+      src: 'blob:video-1',
+      sourceStart: 0,
+      sourceDuration: 12000,
+      waveformPeaks: [0.1, 0.2, 0.3],
+      volume: 0.8,
+      muted: false,
+    })
+
+    const harness = createHarness({
+      currentTime: 2500,
+      duration: 12000,
+      performers: [linkedVideo, linkedAudio],
+    })
+
+    const result = await harness.runTool('timeline_split_at_time', {
+      timeMs: 2500,
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.data.affectedIds).toEqual(['video-1'])
+
+    const leftVideo = harness.state.performers.get('video-1')
+    const rightVideo = harness.state.performers.get('video-1-split')
+    const leftAudio = harness.state.performers.get('audio-1')
+    const rightAudio = harness.state.performers.get('audio-1-split')
+
+    expect(leftVideo.duration).toBe(2500)
+    expect(rightVideo).toBeDefined()
+    expect(rightVideo.start).toBe(2500)
+    expect(rightVideo.duration).toBe(3500)
+    expect(rightVideo.timelineLane).toBe(2)
+
+    expect(leftAudio.duration).toBe(2500)
+    expect(rightAudio).toBeDefined()
+    expect(rightAudio.start).toBe(2500)
+    expect(rightAudio.duration).toBe(3500)
+    expect(rightAudio.sourceStart).toBe(2500)
+    expect(rightAudio.linkGroupId).toBe(rightVideo.linkGroupId)
+    expect(rightAudio.linkGroupId).not.toBe('link-1')
   })
 
   it('scenario 1c: create text element with default and explicit arguments', async () => {

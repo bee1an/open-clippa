@@ -73,6 +73,12 @@ export function useTimelineBinding(): void {
 
     performer.start = train.start
     performer.duration = train.duration
+
+    const parentZIndex = train.parent?.zIndex
+    if (typeof parentZIndex === 'number') {
+      const timelinePerformer = performer as CanvasPerformer & { timelineLane?: number }
+      timelinePerformer.timelineLane = parentZIndex
+    }
   }
 
   function syncRailTiming(rail: Rail | null): void {

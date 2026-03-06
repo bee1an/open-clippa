@@ -349,6 +349,161 @@ export function createEditorControlRuntime(
     return rails.flatMap(rail => rail.trains)
   }
 
+  const resolvePerformerLinkGroupId = (performer: ReturnType<typeof performerStore.getPerformerById>): string | null => {
+    if (!performer)
+      return null
+
+    return (performer as { linkGroupId?: string | null }).linkGroupId ?? null
+  }
+
+  const resolveRightLinkGroupId = (
+    performer: ReturnType<typeof performerStore.getPerformerById>,
+    splitLinkGroupIdMap: Map<string, string>,
+  ): string | null => {
+    const linkGroupId = resolvePerformerLinkGroupId(performer)
+    if (!linkGroupId)
+      return null
+
+    const existing = splitLinkGroupIdMap.get(linkGroupId)
+    if (existing)
+      return existing
+
+    const nextId = generateId('link')
+    splitLinkGroupIdMap.set(linkGroupId, nextId)
+    return nextId
+  }
+
+  const buildSplitPerformerConfig = (
+    performer: ReturnType<typeof performerStore.getPerformerById>,
+    splitTime: number,
+    rightLinkGroupId: string | null,
+  ): PerformerConfig | null => {
+    if (!performer)
+      return null
+
+    const leftDuration = splitTime - performer.start
+    const rightDuration = performer.duration - leftDuration
+    if (leftDuration <= 0 || rightDuration <= 0)
+      return null
+
+    const bounds = performer.getBaseBounds()
+    const crop = 'getCropInsets' in performer && typeof performer.getCropInsets === 'function'
+      ? performer.getCropInsets() as CropInsets
+      : undefined
+
+    if (performer instanceof Video) {
+      return {
+        id: `${performer.id}-split`,
+        start: splitTime,
+        duration: rightDuration,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        zIndex: performer.zIndex,
+        src: performer.src,
+        sourceStart: performer.sourceStart + leftDuration,
+        sourceDuration: performer.sourceDuration,
+        timelineLane: performer.timelineLane,
+        linkGroupId: rightLinkGroupId,
+        crop,
+      }
+    }
+
+    if (performer instanceof Audio) {
+      return {
+        id: `${performer.id}-split`,
+        type: 'audio',
+        start: splitTime,
+        duration: rightDuration,
+        x: 0,
+        y: 0,
+        zIndex: performer.zIndex,
+        src: performer.src,
+        sourceStart: performer.sourceStart + leftDuration,
+        sourceDuration: performer.sourceDuration,
+        waveformPeaks: [...performer.waveformPeaks],
+        timelineLane: performer.timelineLane,
+        linkGroupId: rightLinkGroupId,
+        volume: performer.volume,
+        muted: performer.muted,
+      }
+    }
+
+    if (performer instanceof Text) {
+      return {
+        id: `${performer.id}-split`,
+        type: 'text',
+        start: splitTime,
+        duration: rightDuration,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        zIndex: performer.zIndex,
+        timelineLane: performer.timelineLane,
+        linkGroupId: rightLinkGroupId,
+        content: performer.getText(),
+        style: performer.getStyle(),
+      }
+    }
+
+    if (performer instanceof Image) {
+      return {
+        id: `${performer.id}-split`,
+        type: 'image',
+        start: splitTime,
+        duration: rightDuration,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        zIndex: performer.zIndex,
+        timelineLane: performer.timelineLane,
+        linkGroupId: rightLinkGroupId,
+        src: performer.src,
+        crop,
+      }
+    }
+
+    return null
+  }
+
+  const splitPerformerAtTime = async (input: {
+    performer: NonNullable<ReturnType<typeof performerStore.getPerformerById>>
+    splitTime: number
+    rightLinkGroupId: string | null
+    train?: Train | null
+  }): Promise<boolean> => {
+    const { performer, splitTime, rightLinkGroupId, train = null } = input
+    const rightConfig = buildSplitPerformerConfig(performer, splitTime, rightLinkGroupId)
+    if (!rightConfig)
+      return false
+
+    const currentTimelineLane = train?.parent?.zIndex
+    if (typeof currentTimelineLane === 'number')
+      rightConfig.timelineLane = currentTimelineLane
+
+    const leftDuration = splitTime - performer.start
+
+    if (train) {
+      train.duration = leftDuration
+      train.updateWidth(getPxByMs(leftDuration, editorStore.clippa.timeline.state.pxPerMs))
+    }
+
+    performer.duration = leftDuration
+
+    if (train instanceof VideoTrain) {
+      train.refreshThumbnails().catch((error) => {
+        console.warn('[ai-control] refresh thumbnails failed after split', error)
+      })
+    }
+
+    const rightPerformer = performerStore.addPerformer(rightConfig)
+    await editorStore.clippa.hire(rightPerformer)
+    return true
+  }
+
   const mapPerformerType = (performer: ReturnType<typeof performerStore.getPerformerById>): PerformerSnapshot['type'] => {
     if (!performer)
       return 'unknown'
@@ -781,7 +936,8 @@ export function createEditorControlRuntime(
       const splitTime = isFiniteNumber(input.timeMs)
         ? input.timeMs
         : editorStore.currentTime
-      const candidates = listAllTrains().filter((train) => {
+      const allTrains = listAllTrains()
+      const candidates = allTrains.filter((train) => {
         return splitTime > train.start && splitTime < train.start + train.duration
       })
 
@@ -790,104 +946,52 @@ export function createEditorControlRuntime(
 
       const affectedIds: string[] = []
       const splitLinkGroupIdMap = new Map<string, string>()
+      const splitPerformerIds = new Set<string>()
       for (const train of candidates) {
         const performer = performerStore.getPerformerById(train.id)
         if (performer) {
-          const leftDuration = splitTime - train.start
-          const rightDuration = train.duration - leftDuration
-          const bounds = performer.getBaseBounds()
-          const crop = 'getCropInsets' in performer && typeof performer.getCropInsets === 'function'
-            ? performer.getCropInsets() as CropInsets
-            : undefined
+          const rightLinkGroupId = resolveRightLinkGroupId(performer, splitLinkGroupIdMap)
+          const didSplit = await splitPerformerAtTime({
+            performer,
+            splitTime,
+            rightLinkGroupId,
+            train,
+          })
+          if (!didSplit)
+            continue
 
-          const rightLinkGroupId = (performer as { linkGroupId?: string | null }).linkGroupId
-            ? splitLinkGroupIdMap.get((performer as { linkGroupId?: string | null }).linkGroupId!)
-              ?? (() => {
-                const nextId = generateId('link')
-                splitLinkGroupIdMap.set((performer as { linkGroupId?: string | null }).linkGroupId!, nextId)
-                return nextId
-              })()
-            : null
-
-          const rightConfig: PerformerConfig = performer instanceof Video
-            ? {
-                id: `${train.id}-split`,
-                start: splitTime,
-                duration: rightDuration,
-                x: bounds.x,
-                y: bounds.y,
-                width: bounds.width,
-                height: bounds.height,
-                zIndex: performer.zIndex,
-                src: performer.src,
-                sourceStart: performer.sourceStart + leftDuration,
-                sourceDuration: performer.sourceDuration,
-                timelineLane: performer.timelineLane,
-                linkGroupId: rightLinkGroupId,
-                crop,
-              }
-            : performer instanceof Audio
-              ? {
-                  id: `${train.id}-split`,
-                  type: 'audio',
-                  start: splitTime,
-                  duration: rightDuration,
-                  x: 0,
-                  y: 0,
-                  zIndex: performer.zIndex,
-                  src: performer.src,
-                  sourceStart: performer.sourceStart + leftDuration,
-                  sourceDuration: performer.sourceDuration,
-                  waveformPeaks: [...performer.waveformPeaks],
-                  timelineLane: performer.timelineLane,
-                  linkGroupId: rightLinkGroupId,
-                  volume: performer.volume,
-                  muted: performer.muted,
-                }
-            : performer instanceof Text
-              ? {
-                  id: `${train.id}-split`,
-                  type: 'text',
-                  start: splitTime,
-                  duration: rightDuration,
-                  x: bounds.x,
-                  y: bounds.y,
-                  width: bounds.width,
-                  height: bounds.height,
-                  zIndex: performer.zIndex,
-                  timelineLane: performer.timelineLane,
-                  linkGroupId: rightLinkGroupId,
-                  content: performer.getText(),
-                  style: performer.getStyle(),
-                }
-              : {
-                  id: `${train.id}-split`,
-                  type: 'image',
-                  start: splitTime,
-                  duration: rightDuration,
-                  x: bounds.x,
-                  y: bounds.y,
-                  width: bounds.width,
-                  height: bounds.height,
-                  zIndex: performer.zIndex,
-                  timelineLane: performer.timelineLane,
-                  linkGroupId: rightLinkGroupId,
-                  src: (performer as Image).src,
-                  crop,
-                }
-
-          train.duration = leftDuration
-          train.updateWidth(getPxByMs(leftDuration, editorStore.clippa.timeline.state.pxPerMs))
-          performer.duration = leftDuration
-          if (train instanceof VideoTrain) {
-            train.refreshThumbnails().catch((error) => {
-              console.warn('[ai-control] refresh thumbnails failed after split', error)
-            })
-          }
-
-          const rightPerformer = performerStore.addPerformer(rightConfig)
-          await editorStore.clippa.hire(rightPerformer)
+          splitPerformerIds.add(performer.id)
           affectedIds.push(train.id)
+
+          const linkGroupId = resolvePerformerLinkGroupId(performer)
+          if (!linkGroupId)
+            continue
+
+          const linkedPerformers = performerStore.getAllPerformers().filter((item) => {
+            if (item.id === performer.id || splitPerformerIds.has(item.id))
+              return false
+
+            return resolvePerformerLinkGroupId(item) === linkGroupId
+          })
+
+          for (const linkedPerformer of linkedPerformers) {
+            const linkedTrain = findTrainById(allTrains, linkedPerformer.id)
+            if (linkedTrain)
+              continue
+
+            const withinLinkedRange = splitTime > linkedPerformer.start
+              && splitTime < linkedPerformer.start + linkedPerformer.duration
+            if (!withinLinkedRange)
+              continue
+
+            const didSplitLinked = await splitPerformerAtTime({
+              performer: linkedPerformer,
+              splitTime,
+              rightLinkGroupId,
+            })
+            if (didSplitLinked)
+              splitPerformerIds.add(linkedPerformer.id)
+          }
           continue
         }
 
