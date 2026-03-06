@@ -1,0 +1,14 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - banner [ref=e6]:
+      - heading "项目" [level=1] [ref=e7]
+      - paragraph [ref=e8]: 创建或打开一个项目以继续编辑
+    - generic [ref=e10]:
+      - textbox "项目名称（可选）" [ref=e11]
+      - button "创建项目" [ref=e12]
+    - generic [ref=e14]: 还没有项目，请先创建第一个项目
+  - generic [ref=e15]:
+    - generic "Toggle devtools panel" [ref=e16] [cursor=pointer]:
+      - img [ref=e17]
+    - generic "Toggle Component Inspector" [ref=e22] [cursor=pointer]:
+      - img [ref=e23]

@@ -1,0 +1,121 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e27]:
+    - banner [ref=e28]:
+      - generic [ref=e30] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: lippc
+      - generic [ref=e35]:
+        - button "切换主题色" [ref=e37]
+        - button "撤销" [disabled] [ref=e40]
+        - button "重做" [disabled] [ref=e42]
+        - button "左侧 AI 面板开关" [pressed] [ref=e45]
+        - button "右侧面板开关" [ref=e48]
+        - button "导出" [disabled]:
+          - generic: 导出
+    - generic [ref=e51]:
+      - complementary [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]: clippc 助手
+            - generic [ref=e56]:
+              - button "清空消息" [disabled]
+              - button "配置" [ref=e57]
+          - generic [ref=e60]: 开始与 clippc 对话。
+          - generic [ref=e62]:
+            - textbox "输入你的问题..." [ref=e63]
+            - generic [ref=e64]:
+              - button "发送" [disabled]
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - main [ref=e67]:
+            - generic [ref=e72]:
+              - combobox [ref=e74]:
+                - generic: 16:9
+              - combobox [ref=e76]
+          - complementary [ref=e79]:
+            - generic [ref=e80]:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic: 你的媒体
+                      - generic:
+                        - button "导入媒体":
+                          - generic: 导入媒体
+                        - button "通过 URL 导入"
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - paragraph: 从设备拖放介质以导入
+              - generic [ref=e82]:
+                - link "媒体" [ref=e83] [cursor=pointer]:
+                  - /url: /3a66c4a4-772d-425f-93c1-86ce717df1fe/editor/media
+                  - generic [ref=e87]: 媒体
+                - link "滤镜" [ref=e88] [cursor=pointer]:
+                  - /url: /3a66c4a4-772d-425f-93c1-86ce717df1fe/editor/filter
+                  - generic [ref=e92]: 滤镜
+                - link "文本" [ref=e93] [cursor=pointer]:
+                  - /url: /3a66c4a4-772d-425f-93c1-86ce717df1fe/editor/text
+                  - generic [ref=e97]: 文本
+                - link "转场" [ref=e98] [cursor=pointer]:
+                  - /url: /3a66c4a4-772d-425f-93c1-86ce717df1fe/editor/transition
+                  - generic [ref=e102]: 转场
+                - link "视频库" [ref=e103] [cursor=pointer]:
+                  - /url: /3a66c4a4-772d-425f-93c1-86ce717df1fe/editor/video-library
+                  - generic [ref=e107]: 视频库
+                - link "音频库" [ref=e108] [cursor=pointer]:
+                  - /url: /3a66c4a4-772d-425f-93c1-86ce717df1fe/editor/audio-library
+                  - generic [ref=e112]: 音频库
+                - link "图片库" [ref=e113] [cursor=pointer]:
+                  - /url: /3a66c4a4-772d-425f-93c1-86ce717df1fe/editor/image-library
+                  - generic [ref=e117]: 图片库
+        - generic [ref=e118]:
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - button "静音 (M)" [ref=e123] [cursor=pointer]
+              - button "分割游尺位置的所有片段" [disabled]
+              - button "删除选中片段 (Delete)" [disabled]
+            - generic [ref=e125]:
+              - button "快退 10 秒 (←)" [disabled]
+              - button "播放 (空格)" [disabled] [ref=e126]
+              - button "快进 10 秒 (→)" [disabled]
+            - generic [ref=e128]:
+              - generic [ref=e129]:
+                - button "缩小" [ref=e130]
+                - slider [ref=e132] [cursor=pointer]: "46"
+                - button "放大" [ref=e133]
+                - button "适应全部" [ref=e135]
+              - generic [ref=e137]: 00:00/00:00
+              - button "隐藏时间轴" [ref=e138] [cursor=pointer]
+              - button "全屏播放 (F)" [ref=e140] [cursor=pointer]
+          - generic [ref=e143]:
+            - generic:
+              - generic:
+                - generic: 时间轴为空
+                - generic: 请先导入媒体并添加到时间轴后再播放
+    - generic [ref=e145]:
+      - generic [ref=e146]:
+        - generic [ref=e148]: DEBUG
+        - button "−" [ref=e149]
+      - generic [ref=e150]:
+        - generic [ref=e151]:
+          - generic [ref=e152]: currentTime
+          - generic [ref=e153]: 0ms
+        - generic [ref=e154]:
+          - generic [ref=e155]: totalDuration
+          - generic [ref=e156]: 0ms
+      - generic [ref=e157]:
+        - generic [ref=e158]: performerMap IDs
+        - generic [ref=e159]: empty
+      - generic [ref=e160]:
+        - generic [ref=e161]: train IDs
+        - generic [ref=e162]: empty
+      - generic [ref=e163]: No selection
+  - generic [ref=e15]:
+    - generic "Toggle devtools panel" [ref=e16] [cursor=pointer]:
+      - img [ref=e17]
+    - generic "Toggle Component Inspector" [ref=e22] [cursor=pointer]:
+      - img [ref=e23]
