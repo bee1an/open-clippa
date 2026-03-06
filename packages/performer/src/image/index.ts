@@ -383,6 +383,7 @@ export class Image extends EventBus<ImageEvents> implements Performer {
 
     this._sprite.x = x
     this._sprite.y = y
+    this._syncMaskState()
     this.notifyPositionUpdate()
 
     if (!this._animationController?.isApplying)
@@ -399,6 +400,7 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     }
 
     this._sprite.angle = angle
+    this._syncMaskState()
     this.notifyPositionUpdate()
 
     if (!this._animationController?.isApplying)
@@ -587,13 +589,19 @@ export class Image extends EventBus<ImageEvents> implements Performer {
     const localSize = this._resolveRawLocalSize()
     const currentTransform = this._getCurrentTransform()
     return {
-      x: currentTransform.x - this._cropInsets.left * currentTransform.scaleX,
-      y: currentTransform.y - this._cropInsets.top * currentTransform.scaleY,
+      x: currentTransform.x,
+      y: currentTransform.y,
       width: Math.max(0, localSize.width * Math.abs(currentTransform.scaleX)),
       height: Math.max(0, localSize.height * Math.abs(currentTransform.scaleY)),
+      pivotX: this._cropInsets.left,
+      pivotY: this._cropInsets.top,
       rotation: currentTransform.rotation,
       alpha: currentTransform.alpha,
     }
+  }
+
+  syncRenderAssets(): void {
+    this._syncMaskState()
   }
 
   destroy(): void {
@@ -612,6 +620,7 @@ export class Image extends EventBus<ImageEvents> implements Performer {
       this._sprite = undefined
     }
     if (this._cropMask) {
+      this._cropMask.parent?.removeChild(this._cropMask)
       this._cropMask.destroy({ children: true })
       this._cropMask = undefined
     }
@@ -785,10 +794,9 @@ export class Image extends EventBus<ImageEvents> implements Performer {
 
     const sprite = this._sprite as Sprite & {
       pivot?: { set?: (x: number, y: number) => void }
-      addChild?: (child: Graphics) => void
-      removeChild?: (child: Graphics) => void
       mask?: unknown
     }
+    const maskParent = sprite.parent
     const localSize = this._resolveRawLocalSize()
     this._cropInsets = normalizeCropInsets(this._cropInsets, localSize.width, localSize.height)
 
@@ -797,8 +805,7 @@ export class Image extends EventBus<ImageEvents> implements Performer {
         this._cropMask.clear()
         if (sprite.mask === this._cropMask)
           sprite.mask = null
-        if (this._cropMask.parent === sprite && typeof sprite.removeChild === 'function')
-          sprite.removeChild(this._cropMask)
+        this._cropMask.parent?.removeChild(this._cropMask)
       }
       sprite.pivot?.set?.(0, 0)
       return
@@ -810,6 +817,12 @@ export class Image extends EventBus<ImageEvents> implements Performer {
 
     const visible = resolveVisibleLocalSize(localSize.width, localSize.height, this._cropInsets)
     this._cropMask.clear()
+    this._cropMask.eventMode = 'none'
+    this._cropMask.x = sprite.x
+    this._cropMask.y = sprite.y
+    this._cropMask.scale.set(sprite.scale.x, sprite.scale.y)
+    this._cropMask.angle = sprite.angle || 0
+    this._cropMask.pivot.set(this._cropInsets.left, this._cropInsets.top)
     if (this._clipShape) {
       drawClipShapePath(
         this._cropMask,
@@ -826,8 +839,10 @@ export class Image extends EventBus<ImageEvents> implements Performer {
         .rect(this._cropInsets.left, this._cropInsets.top, visible.width, visible.height)
         .fill('#ffffff')
     }
-    if (this._cropMask.parent !== sprite && typeof sprite.addChild === 'function')
-      sprite.addChild(this._cropMask)
+    if (this._cropMask.parent !== maskParent)
+      this._cropMask.parent?.removeChild(this._cropMask)
+    if (maskParent && this._cropMask.parent !== maskParent)
+      maskParent.addChild(this._cropMask)
     if (sprite.mask !== this._cropMask)
       sprite.mask = this._cropMask
     sprite.pivot?.set?.(this._cropInsets.left, this._cropInsets.top)

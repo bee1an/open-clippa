@@ -150,6 +150,7 @@ export class Stage extends EventBus<StageEvents> {
 
       if (p.sprite && p.sprite.parent === this._contentRoot) {
         this._contentRoot.removeChild(p.sprite)
+        p.syncRenderAssets?.()
         this._contentRoot.sortChildren()
       }
     })
@@ -190,6 +191,7 @@ export class Stage extends EventBus<StageEvents> {
       this._contentRoot.addChild(p.sprite)
     }
 
+    p.syncRenderAssets?.()
     this._contentRoot.sortChildren()
   }
 }

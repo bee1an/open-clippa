@@ -38,6 +38,8 @@ export interface SourceRenderBounds {
   y: number
   width: number
   height: number
+  pivotX: number
+  pivotY: number
   rotation: number
   alpha: number
 }
@@ -124,6 +126,7 @@ export interface Performer {
   panCropByLocalDelta?: (deltaLocalX: number, deltaLocalY: number) => CropInsets | null
   panCropByWorldDelta?: (deltaCanvasX: number, deltaCanvasY: number) => CropInsets | null
   getSourceRenderBounds?: () => SourceRenderBounds | null
+  syncRenderAssets?: () => void
 }
 
 export interface PerformerOption {

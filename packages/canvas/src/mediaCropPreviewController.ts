@@ -44,6 +44,7 @@ export class MediaCropPreviewController {
     this.ghostSprite.y = sourceBounds.y
     this.ghostSprite.width = sourceBounds.width
     this.ghostSprite.height = sourceBounds.height
+    this.ghostSprite.pivot.set(sourceBounds.pivotX, sourceBounds.pivotY)
     this.ghostSprite.angle = sourceBounds.rotation
     this.ghostSprite.alpha = Math.min(0.16, sourceBounds.alpha * 0.2)
     this.ghostSprite.zIndex = 0
